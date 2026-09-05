@@ -185,6 +185,28 @@ workouts.put("/:id/sets", async (c) => {
   return c.json({ ok: true });
 });
 
+// PUT /api/workouts/:id/sets/:setId/complete { completed: boolean }
+workouts.put("/:id/sets/:setId/complete", async (c) => {
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+  const setId = c.req.param("setId");
+  const body = await c.req.json<{ completed?: boolean }>();
+
+  const workout = await c.env.DB.prepare("SELECT id FROM workouts WHERE id = ? AND user_id = ?")
+    .bind(id, userId)
+    .first();
+  if (!workout) return c.json({ error: "not found" }, 404);
+
+  const result = await c.env.DB.prepare(
+    "UPDATE workout_sets SET completed = ? WHERE id = ? AND workout_id = ?"
+  )
+    .bind(body.completed ? 1 : 0, setId, id)
+    .run();
+  if (result.meta.changes === 0) return c.json({ error: "set not found" }, 404);
+
+  return c.json({ ok: true });
+});
+
 // GET /api/workouts/exercises/library?q=search
 workouts.get("/exercises/library", async (c) => {
   const userId = c.get("userId");

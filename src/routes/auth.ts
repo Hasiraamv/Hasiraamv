@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { setCookie, deleteCookie } from "hono/cookie";
 import { hashPassword, verifyPassword, createToken, generateId } from "../auth";
+import { verifyGoogleIdToken } from "../google";
 import { requireAuth } from "../middleware";
 import type { AppEnv } from "../types";
 
@@ -79,6 +80,52 @@ auth.post("/login", async (c) => {
   });
 
   return c.json({ token, user: { id: user.id, email: user.email, name: user.name } });
+});
+
+// POST /api/auth/google { credential: <Google ID token from Google Identity Services> }
+auth.post("/google", async (c) => {
+  const body = await c.req.json<{ credential?: string }>();
+  if (!body.credential) return c.json({ error: "credential is required" }, 400);
+
+  let payload;
+  try {
+    payload = await verifyGoogleIdToken(body.credential, c.env.GOOGLE_CLIENT_ID);
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : "invalid Google credential" }, 401);
+  }
+
+  const email = payload.email.toLowerCase();
+
+  let user = await c.env.DB.prepare("SELECT id, email, name FROM users WHERE google_id = ? OR email = ?")
+    .bind(payload.sub, email)
+    .first<{ id: string; email: string; name: string }>();
+
+  if (!user) {
+    const id = generateId("user");
+    // Google-only accounts never use password login; store an unusable random hash.
+    const placeholderPassword = await hashPassword(crypto.randomUUID() + crypto.randomUUID());
+    await c.env.DB.prepare(
+      "INSERT INTO users (id, email, password_hash, name, google_id) VALUES (?, ?, ?, ?, ?)"
+    )
+      .bind(id, email, placeholderPassword, payload.name || email.split("@")[0], payload.sub)
+      .run();
+    user = { id, email, name: payload.name || email.split("@")[0] };
+  } else {
+    await c.env.DB.prepare("UPDATE users SET google_id = ? WHERE id = ? AND google_id IS NULL")
+      .bind(payload.sub, user.id)
+      .run();
+  }
+
+  const token = await createToken(user.id, c.env.JWT_SECRET);
+  setCookie(c, "fitpocket_session", token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "Lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+
+  return c.json({ token, user });
 });
 
 auth.post("/logout", (c) => {

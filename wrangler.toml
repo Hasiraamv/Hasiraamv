@@ -33,5 +33,9 @@ binding = "AI"
 
 [vars]
 ENVIRONMENT = "development"
+# Not sensitive (it's public in every Google sign-in request from the browser
+# anyway) so it lives here as a var rather than a secret. Get this from
+# Google Cloud Console > APIs & Services > Credentials > OAuth 2.0 Client ID.
+GOOGLE_CLIENT_ID = "REPLACE_WITH_YOUR_GOOGLE_OAUTH_CLIENT_ID"
 
 # Set the real secret with: wrangler secret put JWT_SECRET

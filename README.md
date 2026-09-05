@@ -100,4 +100,23 @@ All endpoints are under `/api`. Authenticated endpoints expect either the
 - `POST /api/ai/import-plan` `{ text }` — pastes a workout/nutrition plan, AI extracts
   structured data and creates matching nutrition targets, goals, and workouts directly
 
-See `migrations/0001_init.sql` and `migrations/0003_ai_and_water.sql` for the full data model.
+- `PUT /api/workouts/:id/sets/:setId/complete` `{ completed }` — check/uncheck a single set
+
+- `POST /api/auth/google` `{ credential }` — Google Identity Services ID token sign-in/sign-up,
+  verified against Google's public JWKS (no Clerk, no client secret needed). Requires
+  `GOOGLE_CLIENT_ID` to be set in `wrangler.toml` `[vars]` (see below) and the same client ID
+  in the frontend's `VITE_GOOGLE_CLIENT_ID` build env var.
+
+See `migrations/*.sql` for the full data model (applied in order).
+
+## Setting up Google Sign-In
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → create
+   an OAuth 2.0 Client ID (type: Web application).
+2. Under **Authorized JavaScript origins**, add `https://fitpocket.in` (and
+   `http://localhost:5173` for local dev).
+3. Copy the Client ID (looks like `xxxx.apps.googleusercontent.com`) — no client secret needed.
+4. Put it in `wrangler.toml` under `[vars] GOOGLE_CLIENT_ID = "..."` and redeploy the backend.
+5. Set `VITE_GOOGLE_CLIENT_ID=<same id>` when building the frontend (e.g. a `.env` file in
+   `frontend/`, or a Vercel/Cloudflare environment variable) and redeploy the frontend. Until
+   this is set, the Google button simply doesn't render — email/password still works.

@@ -19,7 +19,7 @@ app.use(
   })
 );
 
-app.get("/", (c) => c.json({ name: "Fit Pocket API", status: "ok" }));
+app.get("/", (c) => c.json({ name: "FitPocket API", status: "ok" }));
 app.get("/api/health", (c) => c.json({ status: "ok", time: new Date().toISOString() }));
 
 app.route("/api/auth", auth);
