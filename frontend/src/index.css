@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────
+   Design tokens — 8px grid, SF Pro typography
+   ───────────────────────────────────────────── */
+@theme {
+  /* SF Pro-style system font stack (primary font on Apple platforms) */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "SF Pro Display", "SF Pro", "Helvetica Neue", "Segoe UI", Roboto,
+    "Inter", sans-serif;
+
+  /* 8px grid spacing scale */
+  --spacing-1: 0.125rem;   /* 2px  */
+  --spacing-2: 0.25rem;    /* 2px  */
+  --spacing-3: 0.375rem;   /* 6px  */
+  --spacing-4: 0.5rem;     /* 8px  */
+  --spacing-5: 0.625rem;   /* 10px */
+  --spacing-6: 0.75rem;    /* 12px */
+  --spacing-7: 0.875rem;   /* 14px */
+  --spacing-8: 1rem;       /* 16px */
+  --spacing-9: 1.125rem;   /* 18px */
+  --spacing-10: 1.25rem;   /* 20px */
+  --spacing-12: 1.5rem;    /* 24px */
+  --spacing-14: 1.75rem;   /* 28px */
+  --spacing-16: 2rem;      /* 32px */
+  --spacing-20: 2.5rem;    /* 40px */
+  --spacing-24: 3rem;      /* 48px */
+  --spacing-28: 3.5rem;    /* 56px */
+  --spacing-32: 4rem;      /* 64px */
+
+  /* Custom brand palette */
+  --color-brand-50:  #eef2ff;
+  --color-brand-100: #dfe6ff;
+  --color-brand-200: #c5d2ff;
+  --color-brand-300: #a2b4ff;
+  --color-brand-400: #7c8cff;
+  --color-brand-500: #5b6cff;
+  --color-brand-600: #3d4df0;
+  --color-brand-700: #2f3ad1;
+  --color-brand-800: #2931a8;
+  --color-brand-900: #272e84;
+
+  /* Apple Fitness ring colors */
+  --color-ring-move: #fa5c37;
+  --color-ring-exercise: #8aff5c;
+  --color-ring-stand: #55aef7;
+
+  /* Accent gradient (energetic, fitness-style) */
+  --color-acc-lime: #c8f31d;
+  --color-acc-orange: #ff7a3c;
+  --color-acc-pink: #ff4d8d;
+  --color-acc-violet: #8b5cf6;
+  --color-acc-cyan: #22d3ee;
+}
+
+/* ─────────────────────────────────────────────
+   Base styles
+   ───────────────────────────────────────────── */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  background: #05060a;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(124, 140, 255, 0.35);
+}
+
+/* Custom slim scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ─────────────────────────────────────────────
+   Utilities
+   ───────────────────────────────────────────── */
+@utility glass {
+  background: rgba(255, 255, 255, 0.06);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+@utility glass-strong {
+  background: rgba(22, 27, 38, 0.72);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+@utility glass-tint {
+  background: rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Subtle animated gradient blobs for the ambient backdrop */
+@keyframes blob-drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(28px, -22px) scale(1.07);
+  }
+  66% {
+    transform: translate(-18px, 18px) scale(0.95);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+.animated-blob {
+  animation: blob-drift 16s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-blob {
+    animation: none;
+  }
+}
