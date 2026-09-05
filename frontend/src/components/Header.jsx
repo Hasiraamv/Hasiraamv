@@ -20,13 +20,9 @@ export default function Header({ name = "there", streak = 0 }) {
   return (
     <motion.header variants={fadeUp} className="flex items-center justify-between px-8 pt-2">
       <div className="flex flex-col gap-1">
-        <p className="text-[13px] font-medium text-white/50">{dateLabel}</p>
-        <h1 className="text-[26px] font-bold tracking-[-0.03em] text-white">
-          {greeting()},{" "}
-          <span className="bg-gradient-to-r from-acc-lime via-acc-cyan to-acc-violet bg-clip-text text-transparent">
-            {firstName}
-          </span>{" "}
-          👋
+        <p className="text-[13px] font-medium text-ink/50">{dateLabel}</p>
+        <h1 className="text-[26px] font-bold tracking-[-0.03em] text-ink">
+          {greeting()}, {firstName} 👋
         </h1>
       </div>
 
@@ -38,7 +34,7 @@ export default function Header({ name = "there", streak = 0 }) {
           className="glass-tint flex h-11 items-center gap-1.5 rounded-2xl px-3"
         >
           <Flame size={18} className="text-acc-orange" fill="currentColor" />
-          <span className="text-[13px] font-bold text-white">{streak}</span>
+          <span className="text-[13px] font-bold text-ink">{streak}</span>
         </motion.div>
 
         <motion.button
@@ -48,7 +44,7 @@ export default function Header({ name = "there", streak = 0 }) {
           aria-label="Notifications"
           className="glass-tint relative flex h-11 w-11 items-center justify-center rounded-2xl"
         >
-          <Bell size={19} className="text-white" />
+          <Bell size={19} className="text-ink" />
         </motion.button>
       </div>
     </motion.header>

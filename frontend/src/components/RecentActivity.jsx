@@ -17,18 +17,18 @@ export default function RecentActivity({ items = [], onViewAll }) {
   return (
     <motion.div variants={fadeUp} className="flex flex-col gap-3">
       <div className="flex items-center justify-between px-1">
-        <h2 className="text-[17px] font-bold tracking-[-0.02em] text-white">Recent Activity</h2>
+        <h2 className="text-[17px] font-bold tracking-[-0.02em] text-ink">Recent Activity</h2>
         <button onClick={onViewAll} className="text-[13px] font-semibold text-brand-300">
           View all
         </button>
       </div>
 
       {items.length === 0 ? (
-        <div className="glass-tint rounded-[32px] px-5 py-8 text-center text-[13px] font-medium text-white/40">
+        <div className="glass-tint rounded-[32px] px-5 py-8 text-center text-[13px] font-medium text-ink/40">
           No workouts logged yet.
         </div>
       ) : (
-        <div className="glass divide-y divide-white/6 rounded-[32px]">
+        <div className="glass divide-y divide-ink/6 rounded-[32px]">
           {items.map((item, i) => (
             <motion.div
               key={item.id}
@@ -42,14 +42,14 @@ export default function RecentActivity({ items = [], onViewAll }) {
               </div>
 
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate text-[14px] font-semibold text-white">{item.name}</span>
-                <span className="text-[12px] font-medium text-white/45">
+                <span className="truncate text-[14px] font-semibold text-ink">{item.name}</span>
+                <span className="text-[12px] font-medium text-ink/45">
                   {item.duration_minutes ? `${item.duration_minutes} min` : "Logged"}
                 </span>
               </div>
 
-              <span className="text-[11px] font-medium text-white/40">{formatDate(item.date)}</span>
-              <ArrowRight size={16} className="shrink-0 text-white/30" />
+              <span className="text-[11px] font-medium text-ink/40">{formatDate(item.date)}</span>
+              <ArrowRight size={16} className="shrink-0 text-ink/30" />
             </motion.div>
           ))}
         </div>

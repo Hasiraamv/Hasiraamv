@@ -2,9 +2,9 @@
 
 /* ─────────────────────────────────────────────
    Design tokens — 8px grid, SF Pro typography
+   Light, illustration-driven fitness-app theme
    ───────────────────────────────────────────── */
 @theme {
-  /* SF Pro-style system font stack (primary font on Apple platforms) */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text",
     "SF Pro Display", "SF Pro", "Helvetica Neue", "Segoe UI", Roboto,
     "Inter", sans-serif;
@@ -28,6 +28,9 @@
   --spacing-28: 3.5rem;    /* 56px */
   --spacing-32: 4rem;      /* 64px */
 
+  /* Ink (text) scale — near-black on light surfaces */
+  --color-ink: #10141f;
+
   /* Custom brand palette */
   --color-brand-50:  #eef2ff;
   --color-brand-100: #dfe6ff;
@@ -40,17 +43,17 @@
   --color-brand-800: #2931a8;
   --color-brand-900: #272e84;
 
-  /* Apple Fitness ring colors */
+  /* Apple Fitness-style ring colors */
   --color-ring-move: #fa5c37;
-  --color-ring-exercise: #8aff5c;
-  --color-ring-stand: #55aef7;
+  --color-ring-exercise: #2bb673;
+  --color-ring-stand: #2fa8e8;
 
-  /* Accent gradient (energetic, fitness-style) */
-  --color-acc-lime: #c8f31d;
+  /* Accent palette (colorful, flat-illustration energy) */
+  --color-acc-lime: #7bc142;
   --color-acc-orange: #ff7a3c;
   --color-acc-pink: #ff4d8d;
   --color-acc-violet: #8b5cf6;
-  --color-acc-cyan: #22d3ee;
+  --color-acc-cyan: #22a9d4;
 }
 
 /* ─────────────────────────────────────────────
@@ -68,25 +71,25 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  background: #05060a;
+  background: #eef2f8;
   overflow-x: hidden;
 }
 
 ::selection {
-  background: rgba(124, 140, 255, 0.35);
+  background: rgba(91, 108, 255, 0.2);
 }
 
 /* Custom slim scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  scrollbar-color: rgba(16, 20, 31, 0.16) transparent;
 }
 *::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(16, 20, 31, 0.16);
   border-radius: 999px;
 }
 *::-webkit-scrollbar-track {
@@ -94,27 +97,25 @@ body {
 }
 
 /* ─────────────────────────────────────────────
-   Utilities
+   Utilities — light "surface" cards (kept the
+   glass/glass-strong/glass-tint names so every
+   component that already uses them just re-skins)
    ───────────────────────────────────────────── */
 @utility glass {
-  background: rgba(255, 255, 255, 0.06);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: #ffffff;
+  border: 1px solid rgba(16, 20, 31, 0.06);
+  box-shadow: 0 1px 2px rgba(16, 20, 31, 0.04), 0 8px 24px rgba(16, 20, 31, 0.05);
 }
 
 @utility glass-strong {
-  background: rgba(22, 27, 38, 0.72);
-  -webkit-backdrop-filter: blur(32px) saturate(200%);
-  backdrop-filter: blur(32px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #ffffff;
+  border: 1px solid rgba(16, 20, 31, 0.07);
+  box-shadow: 0 -4px 32px rgba(16, 20, 31, 0.1);
 }
 
 @utility glass-tint {
-  background: rgba(255, 255, 255, 0.14);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #f1f5fb;
+  border: 1px solid rgba(16, 20, 31, 0.05);
 }
 
 @utility text-balance {

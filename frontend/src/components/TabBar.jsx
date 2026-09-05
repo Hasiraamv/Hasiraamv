@@ -17,7 +17,7 @@ function FAB({ onClick }) {
       transition={SPRING_SNAPPY}
       onClick={onClick}
       aria-label="Add"
-      className="relative -mt-7 flex h-14 w-14 items-center justify-center rounded-[20px] bg-gradient-to-br from-acc-orange to-acc-pink text-white shadow-[0_8px_30px_rgba(255,77,141,0.4)]"
+      className="relative -mt-7 flex h-14 w-14 items-center justify-center rounded-full bg-ink text-white shadow-[0_8px_24px_rgba(16,20,31,0.35)]"
     >
       <Plus size={26} />
     </motion.button>
@@ -27,9 +27,9 @@ function FAB({ onClick }) {
 export default function TabBar({ active, onChange, onAdd }) {
   return (
     <motion.div variants={fadeUp} className="relative z-20 flex items-center justify-between px-6 pb-7 pt-3">
-      <div className="absolute bottom-1.5 left-1/2 h-1 w-28 -translate-x-1/2 rounded-full bg-white/85" />
+      <div className="absolute bottom-1.5 left-1/2 h-1 w-28 -translate-x-1/2 rounded-full bg-ink/70" />
 
-      <div className="glass-strong relative flex w-full items-center justify-between rounded-[28px] px-3 py-2.5 shadow-[0_10px_40px_rgba(0,0,0,0.45)]">
+      <div className="glass-strong relative flex w-full items-center justify-between rounded-[28px] px-3 py-2.5">
         {TABS.map((tab) => {
           const isActive = active === tab.id;
           const isFAB = tab.id === "add";
@@ -50,7 +50,7 @@ export default function TabBar({ active, onChange, onAdd }) {
                 <motion.span
                   layoutId="tab-pill"
                   transition={SPRING_BOUNCY}
-                  className="absolute inset-0 rounded-2xl bg-white/10"
+                  className="absolute inset-0 rounded-2xl bg-ink/8"
                 />
               )}
 
@@ -59,12 +59,12 @@ export default function TabBar({ active, onChange, onAdd }) {
                 transition={SPRING_SNAPPY}
                 className="relative"
               >
-                <tab.icon size={21} strokeWidth={isActive ? 2.6 : 2} className={isActive ? "text-white" : "text-white/40"} />
+                <tab.icon size={21} strokeWidth={isActive ? 2.6 : 2} className={isActive ? "text-ink" : "text-ink/35"} />
               </motion.span>
 
               <span
                 className={`relative text-[9px] font-semibold uppercase tracking-[0.08em] ${
-                  isActive ? "text-white" : "text-white/35"
+                  isActive ? "text-ink" : "text-ink/35"
                 }`}
               >
                 {tab.label}

@@ -106,12 +106,12 @@ export default function NutritionScreen({ autoOpenAdd }) {
   return (
     <Stagger className="flex flex-col gap-5 px-8 pb-24 pt-2">
       <motion.div variants={fadeUp} className="flex items-center justify-between">
-        <h1 className="text-[22px] font-bold tracking-[-0.02em] text-white">Nutrition</h1>
+        <h1 className="text-[22px] font-bold tracking-[-0.02em] text-ink">Nutrition</h1>
         <motion.button
           whileTap={{ scale: 0.94 }}
           transition={SPRING_SNAPPY}
           onClick={() => setSheetOpen(true)}
-          className="glass-tint flex h-10 w-10 items-center justify-center rounded-2xl text-white"
+          className="glass-tint flex h-10 w-10 items-center justify-center rounded-2xl text-ink"
         >
           <Plus size={18} />
         </motion.button>
@@ -120,21 +120,21 @@ export default function NutritionScreen({ autoOpenAdd }) {
       {totals && (
         <motion.div variants={fadeUp} className="glass rounded-[28px] p-6">
           <div className="flex items-baseline gap-2">
-            <span className="text-[34px] font-black leading-none tracking-[-0.03em] text-white">
+            <span className="text-[34px] font-black leading-none tracking-[-0.03em] text-ink">
               {Math.round(totals.calories)}
             </span>
-            <span className="text-[13px] font-semibold text-white/45">
+            <span className="text-[13px] font-semibold text-ink/45">
               / {target ?? "—"} kcal today
             </span>
           </div>
           <div className="mt-4 grid grid-cols-3 gap-3 text-center">
             {[
-              ["Protein", totals.protein, "#c8f31d"],
+              ["Protein", totals.protein, "#7bc142"],
               ["Carbs", totals.carbs, "#22d3ee"],
               ["Fat", totals.fat, "#ff7a3c"],
             ].map(([label, value, color]) => (
               <div key={label} className="glass-tint rounded-2xl py-3">
-                <div className="text-[15px] font-bold text-white">{Math.round(value)}g</div>
+                <div className="text-[15px] font-bold text-ink">{Math.round(value)}g</div>
                 <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color }}>
                   {label}
                 </div>
@@ -145,7 +145,7 @@ export default function NutritionScreen({ autoOpenAdd }) {
       )}
 
       {logs === null && (
-        <motion.div variants={fadeUp} className="flex justify-center py-8 text-white/40">
+        <motion.div variants={fadeUp} className="flex justify-center py-8 text-ink/40">
           <Loader2 size={22} className="animate-spin" />
         </motion.div>
       )}
@@ -155,9 +155,9 @@ export default function NutritionScreen({ autoOpenAdd }) {
           variants={fadeUp}
           className="glass-tint flex flex-col items-center gap-3 rounded-[28px] px-6 py-10 text-center"
         >
-          <Apple size={28} className="text-white/30" />
-          <p className="text-[14px] font-semibold text-white/70">Nothing logged today</p>
-          <p className="max-w-[200px] text-[12px] text-white/40">Tap + to log a meal.</p>
+          <Apple size={28} className="text-ink/30" />
+          <p className="text-[14px] font-semibold text-ink/70">Nothing logged today</p>
+          <p className="max-w-[200px] text-[12px] text-ink/40">Tap + to log a meal.</p>
         </motion.div>
       )}
 
@@ -168,12 +168,12 @@ export default function NutritionScreen({ autoOpenAdd }) {
               <Apple size={20} className="text-acc-cyan" />
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="truncate text-[14px] font-semibold text-white">{l.food_name}</span>
-              <span className="text-[12px] font-medium text-white/45">
+              <span className="truncate text-[14px] font-semibold text-ink">{l.food_name}</span>
+              <span className="text-[12px] font-medium text-ink/45">
                 {MEAL_LABEL[l.meal_type] || l.meal_type} · {Math.round(l.calories)} kcal
               </span>
             </div>
-            <button onClick={() => remove(l.id)} aria-label="Delete log" className="shrink-0 text-white/25">
+            <button onClick={() => remove(l.id)} aria-label="Delete log" className="shrink-0 text-ink/25">
               <Trash2 size={16} />
             </button>
           </motion.div>

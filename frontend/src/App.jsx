@@ -76,7 +76,7 @@ function Gate() {
     return (
       <PhoneFrame>
         <div className="flex flex-1 items-center justify-center">
-          <Loader2 size={28} className="animate-spin text-white/40" />
+          <Loader2 size={28} className="animate-spin text-ink/40" />
         </div>
       </PhoneFrame>
     );
@@ -102,11 +102,11 @@ export default function App() {
         <Backdrop />
 
         <div className="pointer-events-none absolute left-8 top-8 z-10 hidden xl:block">
-          <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-white/30">Fit Pocket</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-[-0.03em] text-white/70">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-ink/30">Fit Pocket</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-[-0.03em] text-ink/70">
             Fitness · Nutrition · Budget
           </h1>
-          <p className="mt-2 max-w-[260px] text-sm leading-relaxed text-white/35">
+          <p className="mt-2 max-w-[260px] text-sm leading-relaxed text-ink/35">
             One pocket for your workouts, meals, and money.
           </p>
         </div>

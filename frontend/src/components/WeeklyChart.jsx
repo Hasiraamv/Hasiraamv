@@ -41,12 +41,12 @@ export default function WeeklyChart({ days = [], totalMinutes = 0 }) {
     <motion.div ref={ref} variants={fadeUp} className="glass rounded-[32px] p-6">
       <div className="mb-5 flex items-end justify-between">
         <div>
-          <h2 className="text-[17px] font-bold tracking-[-0.02em] text-white">Weekly Activity</h2>
-          <p className="mt-0.5 text-[12px] font-medium text-white/45">
+          <h2 className="text-[17px] font-bold tracking-[-0.02em] text-ink">Weekly Activity</h2>
+          <p className="mt-0.5 text-[12px] font-medium text-ink/45">
             {totalMinutes} min trained this week
           </p>
         </div>
-        <span className="rounded-full bg-white/8 px-3 py-1 text-[11px] font-semibold text-white/60">Last 7 days</span>
+        <span className="rounded-full bg-ink/6 px-3 py-1 text-[11px] font-semibold text-ink/60">Last 7 days</span>
       </div>
 
       <div className="flex h-32 items-end justify-between gap-3">
@@ -63,13 +63,13 @@ export default function WeeklyChart({ days = [], totalMinutes = 0 }) {
                 }}
               >
                 {i === bestIndex && d.minutes > 0 && (
-                  <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                  <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-2 py-0.5 text-[10px] font-semibold text-white">
                     {d.minutes}m
                   </span>
                 )}
               </div>
             </div>
-            <span className={`text-[11px] font-semibold ${i === bestIndex ? "text-brand-300" : "text-white/40"}`}>
+            <span className={`text-[11px] font-semibold ${i === bestIndex ? "text-brand-300" : "text-ink/40"}`}>
               {d.day}
             </span>
           </div>

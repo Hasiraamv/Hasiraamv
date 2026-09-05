@@ -81,7 +81,7 @@ export default function ActivityRings({
 
   const RINGS = [
     { key: "calories", label: "Calories", color: "#fa5c37", track: "rgba(250,92,55,0.14)", radius: MAX_RADIUS, progress: targets.calories, value: `${Math.round(calories)}` },
-    { key: "workouts", label: "Workouts", color: "#8aff5c", track: "rgba(138,255,92,0.14)", radius: MAX_RADIUS - STROKE - 5, progress: targets.workouts, value: `${workouts}` },
+    { key: "workouts", label: "Workouts", color: "#7bc142", track: "rgba(138,255,92,0.14)", radius: MAX_RADIUS - STROKE - 5, progress: targets.workouts, value: `${workouts}` },
     { key: "budget", label: "Budget left", color: "#55aef7", track: "rgba(85,174,247,0.14)", radius: MAX_RADIUS - (STROKE + 5) * 2, progress: targets.budget, value: `${Math.round(targets.budget * 100)}%` },
   ];
 
@@ -113,14 +113,14 @@ export default function ActivityRings({
         </svg>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">Today</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink/40">Today</span>
           <div className="flex items-baseline gap-2">
-            <span className="text-[46px] font-black leading-none tracking-[-0.04em] text-white">
+            <span className="text-[46px] font-black leading-none tracking-[-0.04em] text-ink">
               {Math.round(calories)}
             </span>
-            <span className="text-sm font-semibold text-white/50">kcal</span>
+            <span className="text-sm font-semibold text-ink/45">kcal</span>
           </div>
-          <span className="mt-1 flex items-center gap-1.5 text-[12px] font-medium text-white/45">
+          <span className="mt-1 flex items-center gap-1.5 text-[12px] font-medium text-ink/45">
             <span className="h-1.5 w-1.5 rounded-full bg-ring-exercise" />
             Goal: {caloriesGoal ?? "—"} kcal
           </span>
@@ -131,7 +131,7 @@ export default function ActivityRings({
         {RINGS.map((ring) => (
           <div key={ring.key} className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ring.color }} />
-            <span className="text-[11px] font-medium text-white/50">
+            <span className="text-[11px] font-medium text-ink/50">
               {ring.value} {ring.label}
             </span>
           </div>

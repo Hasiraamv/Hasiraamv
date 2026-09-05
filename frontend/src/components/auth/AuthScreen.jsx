@@ -7,10 +7,10 @@ import { fadeUp, Stagger, SPRING_SNAPPY } from "../../lib/motion.jsx";
 function Field({ icon: Icon, ...props }) {
   return (
     <div className="glass flex items-center gap-3 rounded-2xl px-4 py-3.5">
-      <Icon size={18} className="shrink-0 text-white/40" />
+      <Icon size={18} className="shrink-0 text-ink/35" />
       <input
         {...props}
-        className="w-full bg-transparent text-[14px] font-medium text-white placeholder:text-white/35 focus:outline-none"
+        className="w-full bg-transparent text-[14px] font-medium text-ink placeholder:text-ink/30 focus:outline-none"
       />
     </div>
   );
@@ -42,10 +42,10 @@ export default function AuthScreen() {
         <div className="glass-tint flex h-16 w-16 items-center justify-center rounded-[24px] text-3xl">
           💪
         </div>
-        <h1 className="text-[26px] font-bold tracking-[-0.03em] text-white">
+        <h1 className="text-[26px] font-bold tracking-[-0.03em] text-ink">
           Fit Pocket
         </h1>
-        <p className="max-w-[240px] text-[13px] leading-relaxed text-white/45">
+        <p className="max-w-[240px] text-[13px] leading-relaxed text-ink/45">
           Fitness, nutrition and budget — all in one pocket.
         </p>
       </motion.div>
@@ -60,14 +60,14 @@ export default function AuthScreen() {
               setError(null);
             }}
             className={`relative flex-1 rounded-xl py-2.5 text-[13px] font-semibold transition-colors ${
-              mode === m ? "text-white" : "text-white/40"
+              mode === m ? "text-white" : "text-ink/40"
             }`}
           >
             {mode === m && (
               <motion.span
                 layoutId="auth-pill"
                 transition={SPRING_SNAPPY}
-                className="absolute inset-0 rounded-xl bg-white/12"
+                className="absolute inset-0 rounded-xl bg-ink"
               />
             )}
             <span className="relative">{m === "login" ? "Sign In" : "Sign Up"}</span>
@@ -125,7 +125,7 @@ export default function AuthScreen() {
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="rounded-xl bg-acc-pink/12 px-4 py-2.5 text-[12px] font-medium text-acc-pink"
+              className="rounded-xl bg-acc-pink/10 px-4 py-2.5 text-[12px] font-medium text-acc-pink"
             >
               {error}
             </motion.p>
@@ -137,7 +137,7 @@ export default function AuthScreen() {
           transition={SPRING_SNAPPY}
           type="submit"
           disabled={submitting}
-          className="mt-2 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-500 to-acc-violet px-4 py-3.5 text-[14px] font-bold text-white shadow-[0_8px_30px_rgba(91,108,255,0.35)] disabled:opacity-60"
+          className="mt-2 flex items-center justify-center gap-2 rounded-2xl bg-ink px-4 py-3.5 text-[14px] font-bold text-white shadow-[0_8px_24px_rgba(16,20,31,0.25)] disabled:opacity-60"
         >
           {submitting ? (
             <Loader2 size={18} className="animate-spin" />

@@ -123,19 +123,19 @@ export default function ActivityScreen({ autoOpenAdd }) {
   return (
     <Stagger className="flex flex-col gap-5 px-8 pb-24 pt-2">
       <motion.div variants={fadeUp} className="flex items-center justify-between">
-        <h1 className="text-[22px] font-bold tracking-[-0.02em] text-white">Workouts</h1>
+        <h1 className="text-[22px] font-bold tracking-[-0.02em] text-ink">Workouts</h1>
         <motion.button
           whileTap={{ scale: 0.94 }}
           transition={SPRING_SNAPPY}
           onClick={() => setSheetOpen(true)}
-          className="glass-tint flex h-10 w-10 items-center justify-center rounded-2xl text-white"
+          className="glass-tint flex h-10 w-10 items-center justify-center rounded-2xl text-ink"
         >
           <Plus size={18} />
         </motion.button>
       </motion.div>
 
       {workouts === null && (
-        <motion.div variants={fadeUp} className="flex justify-center py-12 text-white/40">
+        <motion.div variants={fadeUp} className="flex justify-center py-12 text-ink/40">
           <Loader2 size={22} className="animate-spin" />
         </motion.div>
       )}
@@ -145,9 +145,9 @@ export default function ActivityScreen({ autoOpenAdd }) {
           variants={fadeUp}
           className="glass-tint flex flex-col items-center gap-3 rounded-[28px] px-6 py-10 text-center"
         >
-          <Dumbbell size={28} className="text-white/30" />
-          <p className="text-[14px] font-semibold text-white/70">No workouts yet</p>
-          <p className="max-w-[200px] text-[12px] text-white/40">
+          <Dumbbell size={28} className="text-ink/30" />
+          <p className="text-[14px] font-semibold text-ink/70">No workouts yet</p>
+          <p className="max-w-[200px] text-[12px] text-ink/40">
             Tap + to log your first workout.
           </p>
         </motion.div>
@@ -164,8 +164,8 @@ export default function ActivityScreen({ autoOpenAdd }) {
               <Dumbbell size={20} className="text-acc-lime" />
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="truncate text-[14px] font-semibold text-white">{w.name}</span>
-              <span className="text-[12px] font-medium text-white/45">
+              <span className="truncate text-[14px] font-semibold text-ink">{w.name}</span>
+              <span className="text-[12px] font-medium text-ink/45">
                 {w.date}
                 {w.duration_minutes ? ` · ${w.duration_minutes} min` : ""}
               </span>
@@ -173,7 +173,7 @@ export default function ActivityScreen({ autoOpenAdd }) {
             <button
               onClick={() => remove(w.id)}
               aria-label="Delete workout"
-              className="shrink-0 text-white/25"
+              className="shrink-0 text-ink/25"
             >
               <Trash2 size={16} />
             </button>

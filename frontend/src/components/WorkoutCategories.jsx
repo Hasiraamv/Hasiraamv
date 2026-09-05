@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { fadeUp, SPRING_SNAPPY } from "../lib/motion.jsx";
 
 const CATEGORIES = [
-  { label: "Strength", icon: Dumbbell, color: "#c8f31d" },
+  { label: "Strength", icon: Dumbbell, color: "#7bc142" },
   { label: "Running", icon: Footprints, color: "#22d3ee" },
   { label: "Cycling", icon: Bike, color: "#5b6cff" },
   { label: "Swimming", icon: Waves, color: "#55aef7" },
@@ -15,7 +15,7 @@ export default function WorkoutCategories({ onSelect }) {
   return (
     <motion.div variants={fadeUp} className="flex flex-col gap-3">
       <div className="flex items-center justify-between px-1">
-        <h2 className="text-[17px] font-bold tracking-[-0.02em] text-white">
+        <h2 className="text-[17px] font-bold tracking-[-0.02em] text-ink">
           Workouts
         </h2>
         <button onClick={onSelect} className="text-[13px] font-semibold text-brand-300">
@@ -39,7 +39,7 @@ export default function WorkoutCategories({ onSelect }) {
             >
               <cat.icon size={20} style={{ color: cat.color }} />
             </div>
-            <span className="text-[12px] font-semibold text-white/80">
+            <span className="text-[12px] font-semibold text-ink/80">
               {cat.label}
             </span>
           </motion.button>

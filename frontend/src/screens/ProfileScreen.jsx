@@ -134,22 +134,22 @@ export default function ProfileScreen() {
   return (
     <Stagger className="flex flex-col gap-5 px-8 pb-24 pt-2">
       <motion.div variants={fadeUp} className="flex flex-col items-center gap-3 pt-2 text-center">
-        <div className="glass-tint flex h-20 w-20 items-center justify-center rounded-[28px] text-3xl font-bold text-white">
+        <div className="glass-tint flex h-20 w-20 items-center justify-center rounded-[28px] text-3xl font-bold text-ink">
           {user?.name?.[0]?.toUpperCase() || "?"}
         </div>
         <div>
-          <h1 className="text-[19px] font-bold tracking-[-0.02em] text-white">{user?.name}</h1>
-          <p className="text-[12px] font-medium text-white/40">{user?.email}</p>
+          <h1 className="text-[19px] font-bold tracking-[-0.02em] text-ink">{user?.name}</h1>
+          <p className="text-[12px] font-medium text-ink/40">{user?.email}</p>
         </div>
       </motion.div>
 
       <motion.div variants={fadeUp} className="glass rounded-[28px] p-6">
         <div className="mb-3 flex items-center justify-between">
-          <span className="flex items-center gap-2 text-[13px] font-semibold text-white/70">
+          <span className="flex items-center gap-2 text-[13px] font-semibold text-ink/70">
             <Wallet size={16} className="text-acc-lime" />
             This Month
           </span>
-          <button onClick={() => setSheet("expense")} className="glass-tint flex h-8 w-8 items-center justify-center rounded-full text-white">
+          <button onClick={() => setSheet("expense")} className="glass-tint flex h-8 w-8 items-center justify-center rounded-full text-ink">
             <Plus size={14} />
           </button>
         </div>
@@ -157,15 +157,15 @@ export default function ProfileScreen() {
           <div className="grid grid-cols-2 gap-3">
             <div className="glass-tint rounded-2xl px-4 py-3">
               <div className="text-[16px] font-bold text-acc-lime">₹{Math.round(budget.income ?? 0)}</div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/40">Income</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink/40">Income</div>
             </div>
             <div className="glass-tint rounded-2xl px-4 py-3">
               <div className="text-[16px] font-bold text-acc-orange">₹{Math.round(budget.expenses ?? 0)}</div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/40">Expenses</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink/40">Expenses</div>
             </div>
           </div>
         ) : (
-          <Loader2 size={18} className="animate-spin text-white/40" />
+          <Loader2 size={18} className="animate-spin text-ink/40" />
         )}
       </motion.div>
 
@@ -180,8 +180,8 @@ export default function ProfileScreen() {
           <Target size={20} className="text-acc-cyan" />
         </div>
         <div className="flex-1">
-          <span className="block text-[14px] font-semibold text-white">Nutrition Targets</span>
-          <span className="text-[12px] font-medium text-white/45">
+          <span className="block text-[14px] font-semibold text-ink">Nutrition Targets</span>
+          <span className="text-[12px] font-medium text-ink/45">
             {dashboard?.nutrition?.targets?.daily_calories
               ? `${dashboard.nutrition.targets.daily_calories} kcal / day`
               : "Not set"}
