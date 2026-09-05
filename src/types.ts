@@ -1,5 +1,6 @@
 export type Bindings = {
   DB: D1Database;
+  AI: Ai;
   JWT_SECRET: string;
   ENVIRONMENT: string;
 };

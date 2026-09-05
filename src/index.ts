@@ -7,6 +7,7 @@ import nutrition from "./routes/nutrition";
 import budget from "./routes/budget";
 import goals from "./routes/goals";
 import dashboard from "./routes/dashboard";
+import ai from "./routes/ai";
 
 const app = new Hono<AppEnv>();
 
@@ -27,6 +28,7 @@ app.route("/api/nutrition", nutrition);
 app.route("/api/budget", budget);
 app.route("/api/goals", goals);
 app.route("/api/dashboard", dashboard);
+app.route("/api/ai", ai);
 
 app.notFound((c) => c.json({ error: "not found" }, 404));
 app.onError((err, c) => {

@@ -13,6 +13,7 @@ separate frontend effort).
 - **Framework**: [Hono](https://hono.dev)
 - **Database**: Cloudflare D1 (SQLite)
 - **Auth**: JWT (HS256) in an httpOnly cookie, PBKDF2 password hashing (Web Crypto, no external deps)
+- **AI**: Cloudflare Workers AI (`env.AI` binding) — no separate API key, billed on the Cloudflare account
 
 ## Status
 
@@ -79,6 +80,7 @@ All endpoints are under `/api`. Authenticated endpoints expect either the
 - `GET/POST /api/nutrition/logs`, `DELETE /api/nutrition/logs/:id`
 - `GET /api/nutrition/summary?date=`
 - `PUT /api/nutrition/targets`
+- `GET/POST /api/nutrition/water?date=` — water intake log
 
 - `GET/POST /api/budget/categories`
 - `GET/POST /api/budget/transactions`, `PUT/DELETE /api/budget/transactions/:id`
@@ -89,4 +91,13 @@ All endpoints are under `/api`. Authenticated endpoints expect either the
 
 - `GET /api/dashboard` — one-shot aggregate for the home screen
 
-See `migrations/0001_init.sql` for the full data model.
+- `POST /api/ai/coach` `{ message }` — chat with the AI coach (has access to your real
+  calories/workouts/goals); replies and history are persisted
+- `GET /api/ai/coach/history` — past coach messages
+- `POST /api/ai/scan-food` `{ image: "data:image/jpeg;base64,..." }` — estimates a food's
+  name/calories/macros from a photo; returns a suggestion for the client to confirm and
+  save via `POST /api/nutrition/logs`
+- `POST /api/ai/import-plan` `{ text }` — pastes a workout/nutrition plan, AI extracts
+  structured data and creates matching nutrition targets, goals, and workouts directly
+
+See `migrations/0001_init.sql` and `migrations/0003_ai_and_water.sql` for the full data model.

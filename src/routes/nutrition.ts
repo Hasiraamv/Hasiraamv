@@ -223,4 +223,41 @@ nutrition.put("/targets", async (c) => {
   return c.json({ ok: true });
 });
 
+// ---- Water ----
+
+// GET /api/nutrition/water?date=YYYY-MM-DD
+nutrition.get("/water", async (c) => {
+  const userId = c.get("userId");
+  const date = c.req.query("date") ?? new Date().toISOString().slice(0, 10);
+
+  const total = await c.env.DB.prepare(
+    "SELECT COALESCE(SUM(amount_ml), 0) AS total_ml FROM water_logs WHERE user_id = ? AND date = ?"
+  )
+    .bind(userId, date)
+    .first();
+
+  const { results: logs } = await c.env.DB.prepare(
+    "SELECT * FROM water_logs WHERE user_id = ? AND date = ? ORDER BY created_at DESC"
+  )
+    .bind(userId, date)
+    .all();
+
+  return c.json({ date, total_ml: (total as { total_ml: number } | null)?.total_ml ?? 0, logs });
+});
+
+// POST /api/nutrition/water { amount_ml, date? }
+nutrition.post("/water", async (c) => {
+  const userId = c.get("userId");
+  const body = await c.req.json<{ amount_ml?: number; date?: string }>();
+  if (!body.amount_ml) return c.json({ error: "amount_ml is required" }, 400);
+
+  const id = generateId("water");
+  const date = body.date ?? new Date().toISOString().slice(0, 10);
+  await c.env.DB.prepare("INSERT INTO water_logs (id, user_id, date, amount_ml) VALUES (?, ?, ?, ?)")
+    .bind(id, userId, date, body.amount_ml)
+    .run();
+
+  return c.json({ id }, 201);
+});
+
 export default nutrition;
