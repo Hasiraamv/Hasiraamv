@@ -1,16 +1,32 @@
-# React + Vite
+# Fit Pocket — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite + Tailwind CSS v4 + Framer Motion. Talks to the Fit Pocket
+API at `https://api.fitpocket.in`. Deploys to `fitpocket.in` as a
+Cloudflare Worker with static assets (Cloudflare's current recommendation
+in place of Pages).
 
-Currently, two official plugins are available:
+## Local dev
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev   # http://localhost:5173, talks to the live API by default
+```
 
-## React Compiler
+To point at a local backend instead, set `VITE_API_BASE` (see
+`src/lib/api.js`), e.g. `VITE_API_BASE=http://localhost:8787 npm run dev`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Deploy
 
-## Expanding the Oxlint configuration
+```bash
+npx wrangler login    # first time only
+npm run deploy         # builds, then wrangler deploy
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+This deploys to the `fitpocket-web` Worker and routes `fitpocket.in/*` to
+it (see `wrangler.jsonc`) — the `fitpocket.in` zone must already be active
+in the Cloudflare account for the route to take effect. The backend
+(`api.fitpocket.in`) is a separate Worker; see the repo root `README.md`.
+
+`not_found_handling: "single-page-application"` in `wrangler.jsonc` makes
+every unmatched path fall back to `index.html`, so client-side routing
+(if added later) works correctly.
