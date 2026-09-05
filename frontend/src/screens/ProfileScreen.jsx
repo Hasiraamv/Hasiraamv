@@ -224,7 +224,7 @@ function ThemeToggle() {
               <motion.span
                 layoutId="theme-pill"
                 transition={SPRING_SNAPPY}
-                className="absolute inset-0 rounded-xl bg-ink"
+                className="absolute inset-0 rounded-xl bg-acc-orange"
               />
             )}
             <opt.icon size={14} className="relative" />

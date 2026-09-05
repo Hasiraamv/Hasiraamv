@@ -79,10 +79,14 @@ export default function ActivityRings({
     budget: clamp01(budgetLeftPct),
   };
 
+  // Track uses a neutral, theme-aware color (not a tint of the ring color)
+  // so an empty ring reads as genuinely empty instead of "already filled".
+  const TRACK = "var(--surface-border-strong)";
+
   const RINGS = [
-    { key: "calories", label: "Calories", color: "#ff7a00", track: "rgba(255,122,0,0.14)", radius: MAX_RADIUS, progress: targets.calories, value: `${Math.round(calories)}` },
-    { key: "workouts", label: "Workouts", color: "#7bc142", track: "rgba(138,255,92,0.14)", radius: MAX_RADIUS - STROKE - 5, progress: targets.workouts, value: `${workouts}` },
-    { key: "budget", label: "Budget left", color: "#55aef7", track: "rgba(85,174,247,0.14)", radius: MAX_RADIUS - (STROKE + 5) * 2, progress: targets.budget, value: `${Math.round(targets.budget * 100)}%` },
+    { key: "calories", label: "Calories", color: "#ff7a00", track: TRACK, radius: MAX_RADIUS, progress: targets.calories, value: `${Math.round(calories)}` },
+    { key: "workouts", label: "Workouts", color: "#7bc142", track: TRACK, radius: MAX_RADIUS - STROKE - 5, progress: targets.workouts, value: `${workouts}` },
+    { key: "budget", label: "Budget left", color: "#55aef7", track: TRACK, radius: MAX_RADIUS - (STROKE + 5) * 2, progress: targets.budget, value: `${Math.round(targets.budget * 100)}%` },
   ];
 
   useEffect(() => {

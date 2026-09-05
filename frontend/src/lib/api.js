@@ -62,6 +62,8 @@ export const api = {
     setTargets: (payload) => request("/api/nutrition/targets", { method: "PUT", body: payload }),
     water: (date) => request(`/api/nutrition/water${qs({ date })}`),
     addWater: (payload) => request("/api/nutrition/water", { method: "POST", body: payload }),
+    sleep: (date) => request(`/api/nutrition/sleep${qs({ date })}`),
+    logSleep: (payload) => request("/api/nutrition/sleep", { method: "POST", body: payload }),
   },
   budget: {
     summary: (month) => request(`/api/budget/summary${qs({ month })}`),

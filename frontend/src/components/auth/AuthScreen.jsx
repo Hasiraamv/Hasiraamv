@@ -123,7 +123,7 @@ export default function AuthScreen() {
               <motion.span
                 layoutId="auth-pill"
                 transition={SPRING_SNAPPY}
-                className="absolute inset-0 rounded-xl bg-ink"
+                className="absolute inset-0 rounded-xl bg-acc-orange"
               />
             )}
             <span className="relative">{m === "login" ? "Sign In" : "Sign Up"}</span>

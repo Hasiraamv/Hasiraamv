@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Apple, Plus, Trash2, Loader2, Camera, Droplet } from "lucide-react";
+import { Apple, Plus, Trash2, Loader2, Camera, Droplet, Moon } from "lucide-react";
 import { api } from "../lib/api";
 import { Stagger, fadeUp, SPRING_SNAPPY } from "../lib/motion.jsx";
 import Sheet from "../components/Sheet.jsx";
@@ -128,10 +128,46 @@ function WaterCard({ waterMl, waterTarget, onAdd }) {
   );
 }
 
+const SLEEP_QUICK_LOG = [6, 7, 8, 9];
+
+function SleepCard({ hours, target = 8, onLog }) {
+  const pct = hours ? Math.min(1, hours / target) : 0;
+  return (
+    <motion.div variants={fadeUp} className="glass rounded-[28px] p-6">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="flex items-center gap-2 text-[13px] font-semibold text-ink/70">
+          <Moon size={16} className="text-acc-violet" />
+          Sleep
+        </span>
+        <span className="text-[13px] font-semibold text-ink/50">
+          {hours ? `${hours}h` : "Not logged"} / {target}h
+        </span>
+      </div>
+      <div className="mb-4 h-2 overflow-hidden rounded-full bg-ink/8">
+        <div className="h-full rounded-full bg-acc-violet transition-all" style={{ width: `${pct * 100}%` }} />
+      </div>
+      <div className="flex gap-2">
+        {SLEEP_QUICK_LOG.map((h) => (
+          <button
+            key={h}
+            onClick={() => onLog(h)}
+            className={`flex-1 rounded-xl py-2 text-[13px] font-semibold transition-colors ${
+              hours === h ? "bg-acc-violet text-white" : "glass-tint text-ink"
+            }`}
+          >
+            {h}h
+          </button>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
 export default function NutritionScreen({ autoOpenAdd }) {
   const [logs, setLogs] = useState(null);
   const [summary, setSummary] = useState(null);
   const [water, setWater] = useState(null);
+  const [sleep, setSleep] = useState(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [scanPrefill, setScanPrefill] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -142,6 +178,7 @@ export default function NutritionScreen({ autoOpenAdd }) {
     api.nutrition.logs({ date: today() }).then((d) => setLogs(d.logs));
     api.nutrition.summary(today()).then(setSummary);
     api.nutrition.water(today()).then(setWater);
+    api.nutrition.sleep(today()).then((d) => setSleep(d.log));
   };
 
   useEffect(load, []);
@@ -160,6 +197,11 @@ export default function NutritionScreen({ autoOpenAdd }) {
 
   const addWater = async (ml) => {
     await api.nutrition.addWater({ amount_ml: ml, date: today() });
+    load();
+  };
+
+  const logSleep = async (hours) => {
+    await api.nutrition.logSleep({ hours, date: today() });
     load();
   };
 
@@ -259,6 +301,12 @@ export default function NutritionScreen({ autoOpenAdd }) {
         waterMl={water?.total_ml ?? 0}
         waterTarget={summary?.targets?.daily_water_ml}
         onAdd={addWater}
+      />
+
+      <SleepCard
+        hours={sleep?.hours}
+        target={summary?.targets?.daily_sleep_hours ?? 8}
+        onLog={logSleep}
       />
 
       {logs === null && (
