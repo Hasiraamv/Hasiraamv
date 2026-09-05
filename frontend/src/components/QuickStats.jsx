@@ -4,7 +4,7 @@ import { fadeUp } from "../lib/motion.jsx";
 
 export default function QuickStats({ calories = 0, workoutsThisWeek = 0, activeMinutes = 0, budgetLeft = 0 }) {
   const STATS = [
-    { label: "Calories", value: `${Math.round(calories)}`, sub: "today", icon: Flame, color: "#ff7a3c", bg: "rgba(255,122,60,0.12)" },
+    { label: "Calories", value: `${Math.round(calories)}`, sub: "today", icon: Flame, color: "#ff7a00", bg: "rgba(255,122,0,0.12)" },
     { label: "Workouts", value: `${workoutsThisWeek}`, sub: "this week", icon: Dumbbell, color: "#7bc142", bg: "rgba(200,243,29,0.1)" },
     { label: "Active Min", value: `${activeMinutes}`, sub: "this week", icon: Timer, color: "#22d3ee", bg: "rgba(34,211,238,0.12)" },
     { label: "Budget Left", value: `₹${Math.round(budgetLeft)}`, sub: "this month", icon: Wallet, color: "#55aef7", bg: "rgba(85,174,247,0.14)" },

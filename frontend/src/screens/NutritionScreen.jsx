@@ -242,7 +242,7 @@ export default function NutritionScreen({ autoOpenAdd }) {
             {[
               ["Protein", totals.protein, "#7bc142"],
               ["Carbs", totals.carbs, "#22a9d4"],
-              ["Fat", totals.fat, "#ff7a3c"],
+              ["Fat", totals.fat, "#ff7a00"],
             ].map(([label, value, color]) => (
               <div key={label} className="glass-tint rounded-2xl py-3">
                 <div className="text-[15px] font-bold text-ink">{Math.round(value)}g</div>

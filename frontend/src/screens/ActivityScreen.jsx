@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Dumbbell, Plus, Trash2, Loader2 } from "lucide-react";
+import { Dumbbell, Plus, Trash2, Loader2, Check } from "lucide-react";
 import { api } from "../lib/api";
 import { Stagger, fadeUp, SPRING_SNAPPY } from "../lib/motion.jsx";
 import Sheet from "../components/Sheet.jsx";
@@ -101,9 +101,85 @@ function AddWorkoutForm({ onDone }) {
   );
 }
 
+function SetRow({ set, onToggle }) {
+  return (
+    <button
+      onClick={() => onToggle(set.id, !set.completed)}
+      className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
+        set.completed ? "bg-acc-lime/10" : "glass-tint"
+      }`}
+    >
+      <span
+        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+          set.completed ? "border-acc-lime bg-acc-lime" : "border-ink/20"
+        }`}
+      >
+        {!!set.completed && <Check size={14} className="text-white" strokeWidth={3} />}
+      </span>
+      <span className={`flex-1 text-[14px] font-semibold ${set.completed ? "text-ink/50 line-through" : "text-ink"}`}>
+        {set.exercise_name}
+      </span>
+      <span className="text-[12px] font-medium text-ink/45">
+        {[set.reps && `${set.reps} reps`, set.weight_kg && `${set.weight_kg}kg`].filter(Boolean).join(" · ") || "—"}
+      </span>
+    </button>
+  );
+}
+
+function WorkoutDetail({ workoutId, onChanged }) {
+  const [data, setData] = useState(null);
+
+  const load = () => {
+    api.workouts.get(workoutId).then(setData);
+  };
+  useEffect(load, [workoutId]);
+
+  const toggle = async (setId, completed) => {
+    setData((prev) => ({
+      ...prev,
+      sets: prev.sets.map((s) => (s.id === setId ? { ...s, completed } : s)),
+    }));
+    await api.workouts.toggleSet(workoutId, setId, completed);
+    onChanged?.();
+  };
+
+  if (!data) {
+    return (
+      <div className="flex justify-center py-8">
+        <Loader2 size={22} className="animate-spin text-ink/40" />
+      </div>
+    );
+  }
+
+  const doneCount = data.sets.filter((s) => s.completed).length;
+
+  return (
+    <div className="flex flex-col gap-4 pb-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[13px] font-medium text-ink/50">{data.workout.date}</span>
+        <span className="text-[13px] font-semibold text-ink/60">
+          {doneCount}/{data.sets.length} done
+        </span>
+      </div>
+      {data.sets.length === 0 ? (
+        <p className="glass-tint rounded-2xl px-4 py-6 text-center text-[13px] text-ink/40">
+          No sets logged for this workout.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {data.sets.map((s) => (
+            <SetRow key={s.id} set={s} onToggle={toggle} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ActivityScreen({ autoOpenAdd }) {
   const [workouts, setWorkouts] = useState(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [detailId, setDetailId] = useState(null);
 
   const load = () => {
     api.workouts.list().then((d) => setWorkouts(d.workouts));
@@ -128,6 +204,7 @@ export default function ActivityScreen({ autoOpenAdd }) {
           whileTap={{ scale: 0.94 }}
           transition={SPRING_SNAPPY}
           onClick={() => setSheetOpen(true)}
+          aria-label="Log a new workout"
           className="glass-tint flex h-10 w-10 items-center justify-center rounded-2xl text-ink"
         >
           <Plus size={18} />
@@ -155,10 +232,11 @@ export default function ActivityScreen({ autoOpenAdd }) {
 
       <div className="flex flex-col gap-3">
         {workouts?.map((w) => (
-          <motion.div
+          <motion.button
             key={w.id}
             variants={fadeUp}
-            className="glass flex items-center gap-4 rounded-[24px] px-5 py-4"
+            onClick={() => setDetailId(w.id)}
+            className="glass flex items-center gap-4 rounded-[24px] px-5 py-4 text-left"
           >
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-acc-lime/12">
               <Dumbbell size={20} className="text-acc-lime" />
@@ -170,14 +248,20 @@ export default function ActivityScreen({ autoOpenAdd }) {
                 {w.duration_minutes ? ` · ${w.duration_minutes} min` : ""}
               </span>
             </div>
-            <button
-              onClick={() => remove(w.id)}
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                remove(w.id);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && (e.stopPropagation(), remove(w.id))}
               aria-label="Delete workout"
               className="shrink-0 text-ink/25"
             >
               <Trash2 size={16} />
-            </button>
-          </motion.div>
+            </span>
+          </motion.button>
         ))}
       </div>
 
@@ -188,6 +272,10 @@ export default function ActivityScreen({ autoOpenAdd }) {
             load();
           }}
         />
+      </Sheet>
+
+      <Sheet open={!!detailId} onClose={() => setDetailId(null)} title="Workout">
+        {detailId && <WorkoutDetail workoutId={detailId} onChanged={load} />}
       </Sheet>
     </Stagger>
   );

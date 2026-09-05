@@ -80,7 +80,7 @@ export default function ActivityRings({
   };
 
   const RINGS = [
-    { key: "calories", label: "Calories", color: "#fa5c37", track: "rgba(250,92,55,0.14)", radius: MAX_RADIUS, progress: targets.calories, value: `${Math.round(calories)}` },
+    { key: "calories", label: "Calories", color: "#ff7a00", track: "rgba(255,122,0,0.14)", radius: MAX_RADIUS, progress: targets.calories, value: `${Math.round(calories)}` },
     { key: "workouts", label: "Workouts", color: "#7bc142", track: "rgba(138,255,92,0.14)", radius: MAX_RADIUS - STROKE - 5, progress: targets.workouts, value: `${workouts}` },
     { key: "budget", label: "Budget left", color: "#55aef7", track: "rgba(85,174,247,0.14)", radius: MAX_RADIUS - (STROKE + 5) * 2, progress: targets.budget, value: `${Math.round(targets.budget * 100)}%` },
   ];

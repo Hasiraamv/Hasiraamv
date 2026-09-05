@@ -30,7 +30,7 @@ export function PrimaryButton({ children, className = "", ...props }) {
   return (
     <button
       {...props}
-      className={`flex w-full items-center justify-center gap-2 rounded-2xl bg-ink px-4 py-3.5 text-[14px] font-bold text-white shadow-[0_8px_24px_rgba(16,20,31,0.25)] disabled:opacity-50${className ? ` ${className}` : ""}`}
+      className={`flex w-full items-center justify-center gap-2 rounded-2xl bg-acc-orange px-4 py-3.5 text-[14px] font-bold text-white shadow-[0_8px_24px_rgba(255,122,0,0.3)] disabled:opacity-50${className ? ` ${className}` : ""}`}
     >
       {children}
     </button>

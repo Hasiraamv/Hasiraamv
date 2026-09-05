@@ -39,6 +39,7 @@ export const api = {
   auth: {
     register: (payload) => request("/api/auth/register", { method: "POST", body: payload }),
     login: (payload) => request("/api/auth/login", { method: "POST", body: payload }),
+    google: (credential) => request("/api/auth/google", { method: "POST", body: { credential } }),
     logout: () => request("/api/auth/logout", { method: "POST" }),
     me: () => request("/api/auth/me"),
   },
@@ -49,6 +50,8 @@ export const api = {
     create: (payload) => request("/api/workouts", { method: "POST", body: payload }),
     remove: (id) => request(`/api/workouts/${id}`, { method: "DELETE" }),
     exerciseLibrary: (q) => request(`/api/workouts/exercises/library${qs({ q })}`),
+    toggleSet: (workoutId, setId, completed) =>
+      request(`/api/workouts/${workoutId}/sets/${setId}/complete`, { method: "PUT", body: { completed } }),
   },
   nutrition: {
     logs: (params = {}) => request(`/api/nutrition/logs${qs(params)}`),

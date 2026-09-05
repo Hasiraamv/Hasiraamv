@@ -61,7 +61,7 @@ export default function CoachSheet({ open, onClose }) {
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="AI Coach">
+    <Sheet open={open} onClose={onClose} title="PocketBuddy">
       <div className="flex h-[60vh] flex-col gap-3">
         <div className="flex-1 overflow-y-auto pr-1">
           {loadingHistory ? (
@@ -71,7 +71,7 @@ export default function CoachSheet({ open, onClose }) {
           ) : messages.length === 0 ? (
             <div className="glass-tint flex flex-col items-center gap-2 rounded-2xl px-6 py-8 text-center">
               <Sparkles size={22} className="text-acc-violet" />
-              <p className="text-[13px] font-semibold text-ink/70">Ask your coach anything</p>
+              <p className="text-[13px] font-semibold text-ink/70">Ask PocketBuddy anything</p>
               <p className="text-[12px] text-ink/40">
                 "How am I doing this week?" · "What should I eat tonight?" · "Suggest a leg day"
               </p>
@@ -97,7 +97,7 @@ export default function CoachSheet({ open, onClose }) {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask your coach..."
+            placeholder="Ask PocketBuddy..."
             className="glass min-w-0 flex-1 rounded-full px-4 py-3 text-[14px] text-ink placeholder:text-ink/30 focus:outline-none"
           />
           <motion.button

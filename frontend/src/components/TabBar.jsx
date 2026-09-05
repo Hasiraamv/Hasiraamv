@@ -17,7 +17,7 @@ function FAB({ onClick }) {
       transition={SPRING_SNAPPY}
       onClick={onClick}
       aria-label="Add"
-      className="relative -mt-7 flex h-14 w-14 items-center justify-center rounded-full bg-ink text-white shadow-[0_8px_24px_rgba(16,20,31,0.35)]"
+      className="relative -mt-7 flex h-14 w-14 items-center justify-center rounded-full bg-acc-orange text-white shadow-[0_8px_24px_rgba(255,122,0,0.4)]"
     >
       <Plus size={26} />
     </motion.button>
@@ -50,7 +50,7 @@ export default function TabBar({ active, onChange, onAdd }) {
                 <motion.span
                   layoutId="tab-pill"
                   transition={SPRING_BOUNCY}
-                  className="absolute inset-0 rounded-2xl bg-ink/8"
+                  className="absolute inset-0 rounded-2xl bg-acc-orange/12"
                 />
               )}
 
@@ -59,12 +59,16 @@ export default function TabBar({ active, onChange, onAdd }) {
                 transition={SPRING_SNAPPY}
                 className="relative"
               >
-                <tab.icon size={21} strokeWidth={isActive ? 2.6 : 2} className={isActive ? "text-ink" : "text-ink/35"} />
+                <tab.icon
+                  size={21}
+                  strokeWidth={isActive ? 2.6 : 2}
+                  className={isActive ? "text-acc-orange" : "text-ink/35"}
+                />
               </motion.span>
 
               <span
                 className={`relative text-[9px] font-semibold uppercase tracking-[0.08em] ${
-                  isActive ? "text-ink" : "text-ink/35"
+                  isActive ? "text-acc-orange" : "text-ink/35"
                 }`}
               >
                 {tab.label}

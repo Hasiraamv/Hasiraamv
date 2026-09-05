@@ -66,6 +66,21 @@ export function AuthProvider({ children }) {
     [persistSession]
   );
 
+  const loginWithGoogle = useCallback(
+    async (credential) => {
+      setError(null);
+      try {
+        const data = await api.auth.google(credential);
+        persistSession(data);
+        return true;
+      } catch (e) {
+        setError(e.message);
+        return false;
+      }
+    },
+    [persistSession]
+  );
+
   const logout = useCallback(async () => {
     try {
       await api.auth.logout();
@@ -79,7 +94,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, status, error, setError, login, register, logout }}>
+    <AuthContext.Provider value={{ user, status, error, setError, login, register, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

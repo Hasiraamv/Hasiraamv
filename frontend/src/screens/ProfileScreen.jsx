@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { LogOut, Wallet, Target, Loader2, Plus, FileUp, CheckCircle2 } from "lucide-react";
+import { LogOut, Wallet, Target, Loader2, Plus, FileUp, CheckCircle2, Sun, Moon, Monitor } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth.jsx";
+import { useTheme } from "../lib/theme.jsx";
 import { Stagger, fadeUp, SPRING_SNAPPY } from "../lib/motion.jsx";
 import Sheet from "../components/Sheet.jsx";
 import { Label, Input, Select, PrimaryButton } from "../components/FormField.jsx";
@@ -198,6 +199,43 @@ function ImportPlanForm({ onDone }) {
   );
 }
 
+const THEME_OPTIONS = [
+  { id: "light", icon: Sun, label: "Light" },
+  { id: "system", icon: Monitor, label: "Auto" },
+  { id: "dark", icon: Moon, label: "Dark" },
+];
+
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <motion.div variants={fadeUp} className="glass-tint flex rounded-2xl p-1">
+      {THEME_OPTIONS.map((opt) => {
+        const isActive = theme === opt.id;
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => setTheme(opt.id)}
+            className={`relative flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-semibold transition-colors ${
+              isActive ? "text-white" : "text-ink/45"
+            }`}
+          >
+            {isActive && (
+              <motion.span
+                layoutId="theme-pill"
+                transition={SPRING_SNAPPY}
+                className="absolute inset-0 rounded-xl bg-ink"
+              />
+            )}
+            <opt.icon size={14} className="relative" />
+            <span className="relative">{opt.label}</span>
+          </button>
+        );
+      })}
+    </motion.div>
+  );
+}
+
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const [dashboard, setDashboard] = useState(null);
@@ -221,6 +259,8 @@ export default function ProfileScreen() {
           <p className="text-[12px] font-medium text-ink/40">{user?.email}</p>
         </div>
       </motion.div>
+
+      <ThemeToggle />
 
       <motion.div variants={fadeUp} className="glass rounded-[28px] p-6">
         <div className="mb-3 flex items-center justify-between">

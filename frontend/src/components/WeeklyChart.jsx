@@ -5,7 +5,7 @@ import { fadeUp } from "../lib/motion.jsx";
 const GRADIENT = [
   "linear-gradient(180deg, #22d3ee, #5b6cff)",
   "linear-gradient(180deg, #8b5cf6, #5b6cff)",
-  "linear-gradient(180deg, #ff7a3c, #ff4d8d)",
+  "linear-gradient(180deg, #ff7a00, #ff4d8d)",
 ];
 
 /**

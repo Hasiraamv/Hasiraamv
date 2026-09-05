@@ -2,7 +2,7 @@ import { Play, Clock, ListChecks, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import { fadeUp, SPRING_SNAPPY } from "../lib/motion.jsx";
 
-const CARD_GRADIENT = "linear-gradient(135deg, #ff7a3c, #ff4d8d 55%, #8b5cf6)";
+const CARD_GRADIENT = "linear-gradient(135deg, #ff7a00, #ff4d8d 55%, #8b5cf6)";
 
 export default function TodayWorkout({ workout, onAdd }) {
   if (!workout) {

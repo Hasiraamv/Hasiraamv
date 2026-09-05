@@ -7,7 +7,7 @@ const CATEGORIES = [
   { label: "Running", icon: Footprints, color: "#22d3ee" },
   { label: "Cycling", icon: Bike, color: "#5b6cff" },
   { label: "Swimming", icon: Waves, color: "#55aef7" },
-  { label: "HIIT", icon: Flame, color: "#ff7a3c" },
+  { label: "HIIT", icon: Flame, color: "#ff7a00" },
   { label: "Yoga", icon: HeartPulse, color: "#ff4d8d" },
 ];
 

@@ -11,6 +11,7 @@ import ActivityScreen from "./screens/ActivityScreen.jsx";
 import NutritionScreen from "./screens/NutritionScreen.jsx";
 import ProfileScreen from "./screens/ProfileScreen.jsx";
 import { AuthProvider, useAuth } from "./lib/auth.jsx";
+import { ThemeProvider } from "./lib/theme.jsx";
 import { SPRING_SNAPPY } from "./lib/motion.jsx";
 
 const screenVariants = {
@@ -69,8 +70,8 @@ function AppShell() {
         whileTap={{ scale: 0.92 }}
         transition={SPRING_SNAPPY}
         onClick={() => setCoachOpen(true)}
-        aria-label="Open AI Coach"
-        className="fixed bottom-28 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-ink text-white shadow-[0_8px_24px_rgba(16,20,31,0.35)] sm:right-8"
+        aria-label="Open PocketBuddy"
+        className="fixed bottom-28 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-ink text-app-bg shadow-[0_8px_24px_rgba(43,26,15,0.35)] sm:right-8"
       >
         <Sparkles size={22} />
       </motion.button>
@@ -108,13 +109,15 @@ function Gate() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <div className="relative min-h-screen w-full">
-        <Backdrop />
-        <div className="relative z-10 mx-auto w-full max-w-lg">
-          <Gate />
+    <ThemeProvider>
+      <AuthProvider>
+        <div className="relative min-h-screen w-full">
+          <Backdrop />
+          <div className="relative z-10 mx-auto w-full max-w-lg">
+            <Gate />
+          </div>
         </div>
-      </div>
-    </AuthProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
