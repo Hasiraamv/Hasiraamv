@@ -5,8 +5,7 @@ import { Stagger } from "../lib/motion.jsx";
 import Header from "../components/Header.jsx";
 import ActivityRings from "../components/ActivityRings.jsx";
 import TodayWorkout from "../components/TodayWorkout.jsx";
-import QuickStats from "../components/QuickStats.jsx";
-import WeeklyChart from "../components/WeeklyChart.jsx";
+import StatCard from "../components/StatCard.jsx";
 import WorkoutCategories from "../components/WorkoutCategories.jsx";
 import RecentActivity from "../components/RecentActivity.jsx";
 
@@ -36,15 +35,21 @@ export default function HomeScreen({ onGoToActivity }) {
   const dates = last7Days();
   const today = dates[6];
 
-  const byDate = {};
+  const minutesByDate = {};
+  const countByDate = {};
   (workouts || []).forEach((w) => {
-    byDate[w.date] = (byDate[w.date] || 0) + (w.duration_minutes || 0);
+    minutesByDate[w.date] = (minutesByDate[w.date] || 0) + (w.duration_minutes || 0);
+    countByDate[w.date] = (countByDate[w.date] || 0) + 1;
   });
-  const chartDays = dates.map((date) => ({
+  const minutesDays = dates.map((date) => ({
     day: DAY_LABELS[new Date(date + "T00:00:00").getDay()],
-    minutes: byDate[date] || 0,
+    value: minutesByDate[date] || 0,
   }));
-  const totalMinutes = chartDays.reduce((sum, d) => sum + d.minutes, 0);
+  const workoutDays = dates.map((date) => ({
+    day: DAY_LABELS[new Date(date + "T00:00:00").getDay()],
+    value: countByDate[date] || 0,
+  }));
+  const totalMinutes = minutesDays.reduce((sum, d) => sum + d.value, 0);
 
   const todayWorkout = workouts?.find((w) => w.date === today);
   const recentItems = (workouts || [])
@@ -68,14 +73,24 @@ export default function HomeScreen({ onGoToActivity }) {
         workouts={workoutsThisWeek}
         budgetLeftPct={budgetLeftPct}
       />
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard
+          label="Workouts"
+          value={workoutsThisWeek}
+          sub="This week"
+          color="#7bc142"
+          days={workoutDays}
+        />
+        <StatCard
+          label="Active Minutes"
+          value={totalMinutes}
+          unit="min"
+          sub="This week"
+          color="#22a9d4"
+          days={minutesDays}
+        />
+      </div>
       <TodayWorkout workout={todayWorkout} onAdd={onGoToActivity} />
-      <QuickStats
-        calories={calories}
-        workoutsThisWeek={workoutsThisWeek}
-        activeMinutes={totalMinutes}
-        budgetLeft={budgetLeft}
-      />
-      <WeeklyChart days={chartDays} totalMinutes={totalMinutes} />
       <WorkoutCategories onSelect={onGoToActivity} />
       <RecentActivity items={recentItems} onViewAll={onGoToActivity} />
     </Stagger>

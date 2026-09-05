@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { motion, useInView, animate } from "framer-motion";
 import { fadeUp } from "../lib/motion.jsx";
 
-const RING_SIZE = 216;
+const RING_SIZE = 148;
 const CENTER = RING_SIZE / 2;
-const MAX_RADIUS = 92;
-const STROKE = 17;
+const MAX_RADIUS = 62;
+const STROKE = 13;
 
 function clamp01(n) {
   if (!Number.isFinite(n)) return 0;
@@ -57,7 +57,10 @@ function RingSegment({ color, track, radius, animatedProgress }) {
 }
 
 /**
- * Apple Fitness-style animated rings, driven by real dashboard data:
+ * FitPocket "Activity Rings" summary card, styled after the classic
+ * Move/Exercise/Stand layout: a compact ring graphic on the left, a
+ * stacked list of stat rows (value / goal) on the right.
+ *
  *  - Calories: consumed vs daily target
  *  - Workouts: sessions logged in the last 7 days vs a goal
  *  - Budget: share of this month's budget remaining
@@ -84,9 +87,36 @@ export default function ActivityRings({
   const TRACK = "var(--surface-border-strong)";
 
   const RINGS = [
-    { key: "calories", label: "Calories", color: "#ff7a00", track: TRACK, radius: MAX_RADIUS, progress: targets.calories, value: `${Math.round(calories)}` },
-    { key: "workouts", label: "Workouts", color: "#7bc142", track: TRACK, radius: MAX_RADIUS - STROKE - 5, progress: targets.workouts, value: `${workouts}` },
-    { key: "budget", label: "Budget left", color: "#55aef7", track: TRACK, radius: MAX_RADIUS - (STROKE + 5) * 2, progress: targets.budget, value: `${Math.round(targets.budget * 100)}%` },
+    {
+      key: "calories",
+      label: "Calories",
+      color: "#ff7a00",
+      track: TRACK,
+      radius: MAX_RADIUS,
+      progress: targets.calories,
+      value: `${Math.round(calories)}`,
+      goal: `${caloriesGoal ?? "—"} cal`,
+    },
+    {
+      key: "workouts",
+      label: "Workouts",
+      color: "#7bc142",
+      track: TRACK,
+      radius: MAX_RADIUS - STROKE - 4,
+      progress: targets.workouts,
+      value: `${workouts}`,
+      goal: `${workoutsGoal} this week`,
+    },
+    {
+      key: "budget",
+      label: "Budget left",
+      color: "#55aef7",
+      track: TRACK,
+      radius: MAX_RADIUS - (STROKE + 4) * 2,
+      progress: targets.budget,
+      value: `${Math.round(targets.budget * 100)}%`,
+      goal: "of this month",
+    },
   ];
 
   useEffect(() => {
@@ -108,38 +138,43 @@ export default function ActivityRings({
   }, [inView, calories, workouts, budgetLeftPct]);
 
   return (
-    <motion.div ref={ref} variants={fadeUp} className="glass relative flex items-center justify-center rounded-[32px] p-6">
-      <div className="relative">
-        <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
-          {RINGS.map((ring) => (
-            <RingSegment key={ring.key} color={ring.color} track={ring.track} radius={ring.radius} animatedProgress={animated[ring.key]} />
-          ))}
-        </svg>
+    <motion.div ref={ref} variants={fadeUp} className="glass rounded-[32px] p-6">
+      <h2 className="mb-5 text-[17px] font-bold tracking-[-0.02em] text-ink">Activity Rings</h2>
 
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink/40">Today</span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-[46px] font-black leading-none tracking-[-0.04em] text-ink">
-              {Math.round(calories)}
-            </span>
-            <span className="text-sm font-semibold text-ink/45">kcal</span>
-          </div>
-          <span className="mt-1 flex items-center gap-1.5 text-[12px] font-medium text-ink/45">
-            <span className="h-1.5 w-1.5 rounded-full bg-ring-exercise" />
-            Goal: {caloriesGoal ?? "—"} kcal
-          </span>
+      <div className="flex items-center gap-6">
+        <div className="relative shrink-0">
+          <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
+            {RINGS.map((ring) => (
+              <RingSegment
+                key={ring.key}
+                color={ring.color}
+                track={ring.track}
+                radius={ring.radius}
+                animatedProgress={animated[ring.key]}
+              />
+            ))}
+          </svg>
         </div>
-      </div>
 
-      <div className="absolute bottom-5 left-0 right-0 flex items-center justify-center gap-6">
-        {RINGS.map((ring) => (
-          <div key={ring.key} className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ring.color }} />
-            <span className="text-[11px] font-medium text-ink/50">
-              {ring.value} {ring.label}
-            </span>
-          </div>
-        ))}
+        <div className="flex flex-1 flex-col gap-4">
+          {RINGS.map((ring) => (
+            <div key={ring.key} className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2 text-[13px] font-semibold text-ink/60">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: ring.color, boxShadow: `0 0 6px ${ring.color}66` }}
+                />
+                {ring.label}
+              </span>
+              <span className="text-right text-[15px] font-bold leading-tight text-ink">
+                {ring.value}
+                <span className="ml-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-ink/40">
+                  {ring.goal}
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     </motion.div>
   );
