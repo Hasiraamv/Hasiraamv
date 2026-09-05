@@ -10,6 +10,7 @@ import HomeScreen from "./screens/HomeScreen.jsx";
 import ActivityScreen from "./screens/ActivityScreen.jsx";
 import NutritionScreen from "./screens/NutritionScreen.jsx";
 import ProfileScreen from "./screens/ProfileScreen.jsx";
+import ResetPasswordScreen from "./screens/ResetPasswordScreen.jsx";
 import { AuthProvider, useAuth } from "./lib/auth.jsx";
 import { ThemeProvider } from "./lib/theme.jsx";
 import { SPRING_SNAPPY } from "./lib/motion.jsx";
@@ -85,8 +86,18 @@ function AppShell() {
   );
 }
 
+function getResetToken() {
+  const match = window.location.hash.match(/^#reset=(.+)$/);
+  return match ? match[1] : null;
+}
+
 function Gate() {
   const { status } = useAuth();
+  const resetToken = getResetToken();
+
+  if (resetToken) {
+    return <ResetPasswordScreen token={resetToken} />;
+  }
 
   if (status === "loading") {
     return (

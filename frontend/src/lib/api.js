@@ -40,6 +40,9 @@ export const api = {
     register: (payload) => request("/api/auth/register", { method: "POST", body: payload }),
     login: (payload) => request("/api/auth/login", { method: "POST", body: payload }),
     google: (credential) => request("/api/auth/google", { method: "POST", body: { credential } }),
+    forgotPassword: (email) => request("/api/auth/forgot-password", { method: "POST", body: { email } }),
+    resetPassword: (token, password) =>
+      request("/api/auth/reset-password", { method: "POST", body: { token, password } }),
     logout: () => request("/api/auth/logout", { method: "POST" }),
     me: () => request("/api/auth/me"),
   },

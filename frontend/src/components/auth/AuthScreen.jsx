@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, User, Loader2, ArrowRight } from "lucide-react";
+import { Mail, Lock, User, Loader2, ArrowRight, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { useAuth } from "../../lib/auth.jsx";
+import { api } from "../../lib/api";
 import { fadeUp, Stagger, SPRING_SNAPPY } from "../../lib/motion.jsx";
 import Logo from "../Logo.jsx";
 
@@ -63,9 +64,83 @@ function GoogleSignInButton() {
   return <div ref={ref} className="flex justify-center" />;
 }
 
+function ForgotPasswordForm({ onBack }) {
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState(null);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      await api.auth.forgotPassword(email.trim());
+      setSent(true);
+    } catch (err) {
+      setError(err.message || "Something went wrong. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <motion.div variants={fadeUp} className="flex flex-col gap-4">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-1.5 self-start text-[13px] font-semibold text-ink/50"
+      >
+        <ArrowLeft size={15} />
+        Back to sign in
+      </button>
+
+      {sent ? (
+        <div className="glass-tint flex flex-col items-center gap-3 rounded-2xl px-5 py-8 text-center">
+          <CheckCircle2 size={32} className="text-acc-orange" />
+          <p className="text-[14px] font-semibold text-ink">Check your email</p>
+          <p className="text-[12px] text-ink/50">
+            If an account exists for <span className="font-semibold text-ink/70">{email}</span>, a reset link is on
+            its way. It expires in 30 minutes.
+          </p>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="flex flex-col gap-3">
+          <div>
+            <h2 className="mb-1 text-[16px] font-bold text-ink">Reset your password</h2>
+            <p className="text-[12px] text-ink/50">Enter your email and we'll send you a reset link.</p>
+          </div>
+          <Field
+            icon={Mail}
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+          />
+          {error && (
+            <p className="rounded-xl bg-acc-pink/10 px-4 py-2.5 text-[12px] font-medium text-acc-pink">{error}</p>
+          )}
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            transition={SPRING_SNAPPY}
+            type="submit"
+            disabled={submitting}
+            className="mt-1 flex items-center justify-center gap-2 rounded-2xl bg-acc-orange px-4 py-3.5 text-[14px] font-bold text-white shadow-[0_8px_24px_rgba(255,122,0,0.3)] disabled:opacity-60"
+          >
+            {submitting ? <Loader2 size={18} className="animate-spin" /> : "Send reset link"}
+          </motion.button>
+        </form>
+      )}
+    </motion.div>
+  );
+}
+
 export default function AuthScreen() {
   const { login, register, error, setError } = useAuth();
   const [mode, setMode] = useState("login"); // login | signup
+  const [forgotOpen, setForgotOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
 
@@ -106,105 +181,124 @@ export default function AuthScreen() {
         </motion.div>
       )}
 
-      <motion.div variants={fadeUp} className="glass-tint flex rounded-2xl p-1">
-        {["login", "signup"].map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => {
-              setMode(m);
-              setError(null);
-            }}
-            className={`relative flex-1 rounded-xl py-2.5 text-[13px] font-semibold transition-colors ${
-              mode === m ? "text-white" : "text-ink/40"
-            }`}
-          >
-            {mode === m && (
-              <motion.span
-                layoutId="auth-pill"
-                transition={SPRING_SNAPPY}
-                className="absolute inset-0 rounded-xl bg-acc-orange"
-              />
+      {forgotOpen ? (
+        <ForgotPasswordForm onBack={() => setForgotOpen(false)} />
+      ) : (
+        <>
+          <motion.div variants={fadeUp} className="glass-tint flex rounded-2xl p-1">
+            {["login", "signup"].map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => {
+                  setMode(m);
+                  setError(null);
+                }}
+                className={`relative flex-1 rounded-xl py-2.5 text-[13px] font-semibold transition-colors ${
+                  mode === m ? "text-white" : "text-ink/40"
+                }`}
+              >
+                {mode === m && (
+                  <motion.span
+                    layoutId="auth-pill"
+                    transition={SPRING_SNAPPY}
+                    className="absolute inset-0 rounded-xl bg-acc-orange"
+                  />
+                )}
+                <span className="relative">{m === "login" ? "Sign In" : "Sign Up"}</span>
+              </button>
+            ))}
+          </motion.div>
+
+          <motion.form variants={fadeUp} onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {mode === "signup" && (
+                <motion.div
+                  key="name"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={SPRING_SNAPPY}
+                  className="overflow-hidden"
+                >
+                  <Field
+                    icon={User}
+                    type="text"
+                    placeholder="Full name"
+                    value={form.name}
+                    onChange={update("name")}
+                    required
+                    autoComplete="name"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <Field
+              icon={Mail}
+              type="email"
+              placeholder="Email"
+              value={form.email}
+              onChange={update("email")}
+              required
+              autoComplete="email"
+            />
+            <Field
+              icon={Lock}
+              type="password"
+              placeholder="Password (min. 8 characters)"
+              value={form.password}
+              onChange={update("password")}
+              required
+              minLength={8}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+            />
+
+            {mode === "login" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setForgotOpen(true);
+                }}
+                className="self-end text-[12px] font-semibold text-acc-orange"
+              >
+                Forgot password?
+              </button>
             )}
-            <span className="relative">{m === "login" ? "Sign In" : "Sign Up"}</span>
-          </button>
-        ))}
-      </motion.div>
 
-      <motion.form variants={fadeUp} onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <AnimatePresence mode="popLayout" initial={false}>
-          {mode === "signup" && (
-            <motion.div
-              key="name"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
+            <AnimatePresence>
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="rounded-xl bg-acc-pink/10 px-4 py-2.5 text-[12px] font-medium text-acc-pink"
+                >
+                  {error}
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            <motion.button
+              whileTap={{ scale: 0.97 }}
               transition={SPRING_SNAPPY}
-              className="overflow-hidden"
+              type="submit"
+              disabled={submitting}
+              className="mt-2 flex items-center justify-center gap-2 rounded-2xl bg-acc-orange px-4 py-3.5 text-[14px] font-bold text-white shadow-[0_8px_24px_rgba(255,122,0,0.3)] disabled:opacity-60"
             >
-              <Field
-                icon={User}
-                type="text"
-                placeholder="Full name"
-                value={form.name}
-                onChange={update("name")}
-                required
-                autoComplete="name"
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <Field
-          icon={Mail}
-          type="email"
-          placeholder="Email"
-          value={form.email}
-          onChange={update("email")}
-          required
-          autoComplete="email"
-        />
-        <Field
-          icon={Lock}
-          type="password"
-          placeholder="Password (min. 8 characters)"
-          value={form.password}
-          onChange={update("password")}
-          required
-          minLength={8}
-          autoComplete={mode === "login" ? "current-password" : "new-password"}
-        />
-
-        <AnimatePresence>
-          {error && (
-            <motion.p
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="rounded-xl bg-acc-pink/10 px-4 py-2.5 text-[12px] font-medium text-acc-pink"
-            >
-              {error}
-            </motion.p>
-          )}
-        </AnimatePresence>
-
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          transition={SPRING_SNAPPY}
-          type="submit"
-          disabled={submitting}
-          className="mt-2 flex items-center justify-center gap-2 rounded-2xl bg-acc-orange px-4 py-3.5 text-[14px] font-bold text-white shadow-[0_8px_24px_rgba(255,122,0,0.3)] disabled:opacity-60"
-        >
-          {submitting ? (
-            <Loader2 size={18} className="animate-spin" />
-          ) : (
-            <>
-              {mode === "login" ? "Sign In" : "Create Account"}
-              <ArrowRight size={16} />
-            </>
-          )}
-        </motion.button>
-      </motion.form>
+              {submitting ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <>
+                  {mode === "login" ? "Sign In" : "Create Account"}
+                  <ArrowRight size={16} />
+                </>
+              )}
+            </motion.button>
+          </motion.form>
+        </>
+      )}
     </Stagger>
   );
 }
