@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Apple, Plus, Trash2, Loader2 } from "lucide-react";
+import { Apple, Plus, Trash2, Loader2, Camera, Droplet } from "lucide-react";
 import { api } from "../lib/api";
 import { Stagger, fadeUp, SPRING_SNAPPY } from "../lib/motion.jsx";
 import Sheet from "../components/Sheet.jsx";
@@ -8,12 +8,21 @@ import { Label, Input, Select, PrimaryButton } from "../components/FormField.jsx
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-function AddFoodForm({ onDone }) {
-  const [name, setName] = useState("");
-  const [calories, setCalories] = useState("");
-  const [protein, setProtein] = useState("");
-  const [carbs, setCarbs] = useState("");
-  const [fat, setFat] = useState("");
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function AddFoodForm({ onDone, initial }) {
+  const [name, setName] = useState(initial?.food_name ?? "");
+  const [calories, setCalories] = useState(initial?.calories != null ? String(Math.round(initial.calories)) : "");
+  const [protein, setProtein] = useState(initial?.protein != null ? String(Math.round(initial.protein)) : "");
+  const [carbs, setCarbs] = useState(initial?.carbs != null ? String(Math.round(initial.carbs)) : "");
+  const [fat, setFat] = useState(initial?.fat != null ? String(Math.round(initial.fat)) : "");
   const [mealType, setMealType] = useState("breakfast");
   const [saving, setSaving] = useState(false);
 
@@ -38,6 +47,12 @@ function AddFoodForm({ onDone }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4 pb-2">
+      {initial && (
+        <div className="glass-tint flex items-center gap-2 rounded-xl px-3 py-2 text-[12px] font-medium text-ink/60">
+          <Camera size={14} className="text-acc-violet" />
+          AI estimate from your photo — check it before saving.
+        </div>
+      )}
       <div>
         <Label>Food</Label>
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Grilled chicken" required />
@@ -78,26 +93,92 @@ function AddFoodForm({ onDone }) {
 }
 
 const MEAL_LABEL = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner", snack: "Snack", other: "Other" };
+const WATER_QUICK_ADD = [250, 500, 750];
+
+function WaterCard({ waterMl, waterTarget, onAdd }) {
+  const pct = waterTarget ? Math.min(1, waterMl / waterTarget) : 0;
+  return (
+    <motion.div variants={fadeUp} className="glass rounded-[28px] p-6">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="flex items-center gap-2 text-[13px] font-semibold text-ink/70">
+          <Droplet size={16} className="text-acc-cyan" />
+          Water
+        </span>
+        <span className="text-[13px] font-semibold text-ink/50">
+          {waterMl}ml{waterTarget ? ` / ${waterTarget}ml` : ""}
+        </span>
+      </div>
+      {waterTarget && (
+        <div className="mb-4 h-2 overflow-hidden rounded-full bg-ink/8">
+          <div className="h-full rounded-full bg-acc-cyan transition-all" style={{ width: `${pct * 100}%` }} />
+        </div>
+      )}
+      <div className="flex gap-2">
+        {WATER_QUICK_ADD.map((ml) => (
+          <button
+            key={ml}
+            onClick={() => onAdd(ml)}
+            className="glass-tint flex-1 rounded-xl py-2 text-[13px] font-semibold text-ink"
+          >
+            +{ml}ml
+          </button>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
 
 export default function NutritionScreen({ autoOpenAdd }) {
   const [logs, setLogs] = useState(null);
   const [summary, setSummary] = useState(null);
+  const [water, setWater] = useState(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [scanPrefill, setScanPrefill] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState(null);
+  const fileInputRef = useRef(null);
 
   const load = () => {
     api.nutrition.logs({ date: today() }).then((d) => setLogs(d.logs));
     api.nutrition.summary(today()).then(setSummary);
+    api.nutrition.water(today()).then(setWater);
   };
 
   useEffect(load, []);
   useEffect(() => {
-    if (autoOpenAdd) setSheetOpen(true);
+    if (autoOpenAdd) {
+      setScanPrefill(null);
+      setSheetOpen(true);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenAdd]);
 
   const remove = async (id) => {
     await api.nutrition.removeLog(id);
     load();
+  };
+
+  const addWater = async (ml) => {
+    await api.nutrition.addWater({ amount_ml: ml, date: today() });
+    load();
+  };
+
+  const handlePhoto = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setScanError(null);
+    setScanning(true);
+    try {
+      const base64 = await fileToBase64(file);
+      const suggestion = await api.ai.scanFood(base64);
+      setScanPrefill(suggestion);
+      setSheetOpen(true);
+    } catch (err) {
+      setScanError(err.message || "Could not read that photo.");
+    } finally {
+      setScanning(false);
+    }
   };
 
   const totals = summary?.totals;
@@ -107,15 +188,45 @@ export default function NutritionScreen({ autoOpenAdd }) {
     <Stagger className="flex flex-col gap-5 px-8 pb-24 pt-2">
       <motion.div variants={fadeUp} className="flex items-center justify-between">
         <h1 className="text-[22px] font-bold tracking-[-0.02em] text-ink">Nutrition</h1>
-        <motion.button
-          whileTap={{ scale: 0.94 }}
-          transition={SPRING_SNAPPY}
-          onClick={() => setSheetOpen(true)}
-          className="glass-tint flex h-10 w-10 items-center justify-center rounded-2xl text-ink"
-        >
-          <Plus size={18} />
-        </motion.button>
+        <div className="flex items-center gap-2">
+          <motion.button
+            whileTap={{ scale: 0.94 }}
+            transition={SPRING_SNAPPY}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={scanning}
+            aria-label="Scan food photo"
+            className="glass-tint flex h-10 w-10 items-center justify-center rounded-2xl text-ink"
+          >
+            {scanning ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.94 }}
+            transition={SPRING_SNAPPY}
+            onClick={() => {
+              setScanPrefill(null);
+              setSheetOpen(true);
+            }}
+            aria-label="Add food manually"
+            className="glass-tint flex h-10 w-10 items-center justify-center rounded-2xl text-ink"
+          >
+            <Plus size={18} />
+          </motion.button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handlePhoto}
+          />
+        </div>
       </motion.div>
+
+      {scanError && (
+        <motion.p variants={fadeUp} className="rounded-xl bg-acc-pink/10 px-4 py-2.5 text-[12px] font-medium text-acc-pink">
+          {scanError}
+        </motion.p>
+      )}
 
       {totals && (
         <motion.div variants={fadeUp} className="glass rounded-[28px] p-6">
@@ -130,7 +241,7 @@ export default function NutritionScreen({ autoOpenAdd }) {
           <div className="mt-4 grid grid-cols-3 gap-3 text-center">
             {[
               ["Protein", totals.protein, "#7bc142"],
-              ["Carbs", totals.carbs, "#22d3ee"],
+              ["Carbs", totals.carbs, "#22a9d4"],
               ["Fat", totals.fat, "#ff7a3c"],
             ].map(([label, value, color]) => (
               <div key={label} className="glass-tint rounded-2xl py-3">
@@ -143,6 +254,12 @@ export default function NutritionScreen({ autoOpenAdd }) {
           </div>
         </motion.div>
       )}
+
+      <WaterCard
+        waterMl={water?.total_ml ?? 0}
+        waterTarget={summary?.targets?.daily_water_ml}
+        onAdd={addWater}
+      />
 
       {logs === null && (
         <motion.div variants={fadeUp} className="flex justify-center py-8 text-ink/40">
@@ -157,7 +274,7 @@ export default function NutritionScreen({ autoOpenAdd }) {
         >
           <Apple size={28} className="text-ink/30" />
           <p className="text-[14px] font-semibold text-ink/70">Nothing logged today</p>
-          <p className="max-w-[200px] text-[12px] text-ink/40">Tap + to log a meal.</p>
+          <p className="max-w-[200px] text-[12px] text-ink/40">Tap + to log a meal, or the camera to scan one.</p>
         </motion.div>
       )}
 
@@ -180,10 +297,16 @@ export default function NutritionScreen({ autoOpenAdd }) {
         ))}
       </div>
 
-      <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Log Food">
+      <Sheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title={scanPrefill ? "Confirm Scanned Food" : "Log Food"}
+      >
         <AddFoodForm
+          initial={scanPrefill}
           onDone={() => {
             setSheetOpen(false);
+            setScanPrefill(null);
             load();
           }}
         />

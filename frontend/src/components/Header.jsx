@@ -18,7 +18,7 @@ export default function Header({ name = "there", streak = 0 }) {
   const firstName = name.split(" ")[0];
 
   return (
-    <motion.header variants={fadeUp} className="flex items-center justify-between px-8 pt-2">
+    <motion.header variants={fadeUp} className="flex items-center justify-between pt-2">
       <div className="flex flex-col gap-1">
         <p className="text-[13px] font-medium text-ink/50">{dateLabel}</p>
         <h1 className="text-[26px] font-bold tracking-[-0.03em] text-ink">

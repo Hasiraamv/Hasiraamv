@@ -60,7 +60,7 @@ export default function HomeScreen({ onGoToActivity }) {
   const budgetLeftPct = income > 0 ? budgetLeft / income : 1;
 
   return (
-    <Stagger className="flex flex-col gap-6 pb-8">
+    <Stagger className="flex flex-col gap-6 px-8 pb-8">
       <Header name={user?.name} streak={workoutsThisWeek} />
       <ActivityRings
         calories={calories}

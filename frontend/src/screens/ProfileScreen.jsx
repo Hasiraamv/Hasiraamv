@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { LogOut, Wallet, Target, Loader2, Plus } from "lucide-react";
+import { LogOut, Wallet, Target, Loader2, Plus, FileUp, CheckCircle2 } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth.jsx";
 import { Stagger, fadeUp, SPRING_SNAPPY } from "../lib/motion.jsx";
@@ -119,10 +119,89 @@ function TargetsForm({ current, onDone }) {
   );
 }
 
+function ImportPlanForm({ onDone }) {
+  const [text, setText] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+  const fileRef = useRef(null);
+
+  const onFile = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setText(String(reader.result || ""));
+    reader.readAsText(file);
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    setImporting(true);
+    setError(null);
+    try {
+      const { summary } = await api.ai.importPlan(text);
+      setResult(summary);
+    } catch (err) {
+      setError(err.message || "Could not read that plan.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  if (result) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-4 text-center">
+        <CheckCircle2 size={32} className="text-acc-lime" />
+        <p className="text-[14px] font-semibold text-ink">Plan imported</p>
+        <p className="text-[12px] text-ink/50">
+          {result.targets_set && "Nutrition targets set. "}
+          {result.goals_created > 0 && `${result.goals_created} goal(s) added. `}
+          {result.workouts_created > 0 && `${result.workouts_created} workout(s) added.`}
+          {!result.targets_set && !result.goals_created && !result.workouts_created && "Nothing new was found to add."}
+        </p>
+        <PrimaryButton onClick={onDone} className="mt-2">
+          Done
+        </PrimaryButton>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4 pb-2">
+      <p className="text-[12px] leading-relaxed text-ink/50">
+        Paste a workout or nutrition plan (or upload a .txt file) — AI will pull out targets, goals,
+        and workouts and fill them in automatically.
+      </p>
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        className="glass-tint flex items-center justify-center gap-2 rounded-xl py-3 text-[13px] font-semibold text-ink"
+      >
+        <FileUp size={16} />
+        Upload .txt file
+      </button>
+      <input ref={fileRef} type="file" accept=".txt,text/plain" className="hidden" onChange={onFile} />
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Paste your plan here..."
+        rows={8}
+        className="glass min-w-0 rounded-xl px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-ink/30 focus:outline-none"
+      />
+      {error && <p className="rounded-xl bg-acc-pink/10 px-4 py-2.5 text-[12px] font-medium text-acc-pink">{error}</p>}
+      <PrimaryButton type="submit" disabled={importing || !text.trim()}>
+        {importing ? <Loader2 size={18} className="animate-spin" /> : "Import with AI"}
+      </PrimaryButton>
+    </form>
+  );
+}
+
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const [dashboard, setDashboard] = useState(null);
-  const [sheet, setSheet] = useState(null); // "expense" | "targets" | null
+  const [sheet, setSheet] = useState(null); // "expense" | "targets" | "import" | null
 
   const load = () => {
     api.dashboard().then(setDashboard);
@@ -193,6 +272,22 @@ export default function ProfileScreen() {
         variants={fadeUp}
         whileTap={{ scale: 0.98 }}
         transition={SPRING_SNAPPY}
+        onClick={() => setSheet("import")}
+        className="glass flex items-center gap-4 rounded-[24px] px-5 py-4 text-left"
+      >
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-acc-violet/12">
+          <FileUp size={20} className="text-acc-violet" />
+        </div>
+        <div className="flex-1">
+          <span className="block text-[14px] font-semibold text-ink">Import a Plan</span>
+          <span className="text-[12px] font-medium text-ink/45">Let AI fill it in from a paste or file</span>
+        </div>
+      </motion.button>
+
+      <motion.button
+        variants={fadeUp}
+        whileTap={{ scale: 0.98 }}
+        transition={SPRING_SNAPPY}
         onClick={logout}
         className="glass flex items-center gap-4 rounded-[24px] px-5 py-4 text-left text-acc-pink"
       >
@@ -213,6 +308,14 @@ export default function ProfileScreen() {
       <Sheet open={sheet === "targets"} onClose={() => setSheet(null)} title="Nutrition Targets">
         <TargetsForm
           current={dashboard?.nutrition?.targets}
+          onDone={() => {
+            setSheet(null);
+            load();
+          }}
+        />
+      </Sheet>
+      <Sheet open={sheet === "import"} onClose={() => setSheet(null)} title="Import a Plan">
+        <ImportPlanForm
           onDone={() => {
             setSheet(null);
             load();

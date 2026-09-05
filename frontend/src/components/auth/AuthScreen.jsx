@@ -37,7 +37,7 @@ export default function AuthScreen() {
   };
 
   return (
-    <Stagger className="flex h-full flex-col justify-center gap-8 px-8 pb-10">
+    <Stagger className="flex min-h-[75vh] flex-col justify-center gap-8 px-8 pb-10">
       <motion.div variants={fadeUp} className="flex flex-col items-center gap-3 text-center">
         <div className="glass-tint flex h-16 w-16 items-center justify-center rounded-[24px] text-3xl">
           💪

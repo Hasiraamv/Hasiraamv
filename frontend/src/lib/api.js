@@ -57,6 +57,8 @@ export const api = {
     foods: (q) => request(`/api/nutrition/foods${qs({ q })}`),
     summary: (date) => request(`/api/nutrition/summary${qs({ date })}`),
     setTargets: (payload) => request("/api/nutrition/targets", { method: "PUT", body: payload }),
+    water: (date) => request(`/api/nutrition/water${qs({ date })}`),
+    addWater: (payload) => request("/api/nutrition/water", { method: "POST", body: payload }),
   },
   budget: {
     summary: (month) => request(`/api/budget/summary${qs({ month })}`),
@@ -66,6 +68,12 @@ export const api = {
   },
   goals: {
     list: (params = {}) => request(`/api/goals${qs(params)}`),
+  },
+  ai: {
+    coachHistory: () => request("/api/ai/coach/history"),
+    coach: (message) => request("/api/ai/coach", { method: "POST", body: { message } }),
+    scanFood: (image) => request("/api/ai/scan-food", { method: "POST", body: { image } }),
+    importPlan: (text) => request("/api/ai/import-plan", { method: "POST", body: { text } }),
   },
 };
 
