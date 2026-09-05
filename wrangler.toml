@@ -3,9 +3,25 @@ main = "src/index.ts"
 compatibility_date = "2024-12-05"
 compatibility_flags = ["nodejs_compat"]
 
-# Custom domain routing (configure in Cloudflare dashboard once the zone is added):
-# route = { pattern = "fitpocket.in/*", zone_name = "fitpocket.in" }
-# route = { pattern = "api.fitpocket.in/*", zone_name = "fitpocket.in" }
+# Custom domain routing. `fitpocket.in` (the zone) must already be active in
+# this Cloudflare account (added under Websites) for this to take effect —
+# `wrangler deploy` creates/updates the route automatically, no dashboard
+# click-ops needed once the zone exists.
+#
+# api.fitpocket.in -> this Worker (the backend). The root domain is left free
+# for the frontend (a separate Pages/Worker deployment) so the two don't
+# collide on the same hostname.
+routes = [
+  { pattern = "api.fitpocket.in/*", zone_name = "fitpocket.in" }
+]
+
+# If you'd rather serve everything (frontend + /api/*) from this same Worker
+# instead of a separate frontend deployment, replace the route above with:
+# routes = [
+#   { pattern = "fitpocket.in/*", zone_name = "fitpocket.in" }
+# ]
+# and have this Worker also serve static assets (see Cloudflare's Workers
+# Assets / Static Assets docs) alongside the /api routes already defined.
 
 [[d1_databases]]
 binding = "DB"
