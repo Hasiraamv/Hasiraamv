@@ -260,4 +260,57 @@ nutrition.post("/water", async (c) => {
   return c.json({ id }, 201);
 });
 
+// ---- Sleep ----
+
+// GET /api/nutrition/sleep?date=YYYY-MM-DD (or from/to range)
+nutrition.get("/sleep", async (c) => {
+  const userId = c.get("userId");
+  const date = c.req.query("date");
+  const from = c.req.query("from");
+  const to = c.req.query("to");
+
+  if (date) {
+    const log = await c.env.DB.prepare("SELECT * FROM sleep_logs WHERE user_id = ? AND date = ?")
+      .bind(userId, date)
+      .first();
+    return c.json({ log: log ?? null });
+  }
+
+  let query = "SELECT * FROM sleep_logs WHERE user_id = ?";
+  const params: unknown[] = [userId];
+  if (from) {
+    query += " AND date >= ?";
+    params.push(from);
+  }
+  if (to) {
+    query += " AND date <= ?";
+    params.push(to);
+  }
+  query += " ORDER BY date ASC";
+
+  const { results: logs } = await c.env.DB.prepare(query).bind(...params).all();
+  return c.json({ logs });
+});
+
+// POST /api/nutrition/sleep { hours, date?, quality? } - upsert by date
+nutrition.post("/sleep", async (c) => {
+  const userId = c.get("userId");
+  const body = await c.req.json<{ hours?: number; date?: string; quality?: string }>();
+  if (body.hours == null) return c.json({ error: "hours is required" }, 400);
+
+  const id = generateId("sleep");
+  const date = body.date ?? new Date().toISOString().slice(0, 10);
+  await c.env.DB.prepare(
+    `INSERT INTO sleep_logs (id, user_id, date, hours, quality)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, date) DO UPDATE SET
+       hours = excluded.hours,
+       quality = excluded.quality`
+  )
+    .bind(id, userId, date, body.hours, body.quality ?? null)
+    .run();
+
+  return c.json({ ok: true });
+});
+
 export default nutrition;
