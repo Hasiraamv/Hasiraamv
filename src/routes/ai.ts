@@ -6,8 +6,13 @@ import type { AppEnv } from "../types";
 const ai = new Hono<AppEnv>();
 ai.use("*", requireAuth);
 
-const TEXT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
-const VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
+// llama-3.1-8b-instruct was deprecated by Cloudflare on 2026-05-30;
+// glm-4.7-flash is Cloudflare's recommended replacement for chat/instruct use.
+// Typed as a bare `string` (not a literal) so the Ai binding's per-model
+// overloads (which expect stricter message unions for pinned models)
+// fall back to its generic Record<string, unknown> signature.
+const TEXT_MODEL: string = "@cf/zai-org/glm-4.7-flash";
+const VISION_MODEL: string = "@cf/meta/llama-3.2-11b-vision-instruct";
 
 /** Models sometimes wrap JSON in prose or markdown fences — pull out the first {...} block. */
 function extractJson(text: string): unknown {
