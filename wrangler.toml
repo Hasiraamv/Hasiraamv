@@ -10,7 +10,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "fitpocket-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "ed9b8523-d6ce-4c6a-8b8d-696c23b7a227"
 
 [vars]
 ENVIRONMENT = "development"

@@ -14,16 +14,24 @@ separate frontend effort).
 - **Database**: Cloudflare D1 (SQLite)
 - **Auth**: JWT (HS256) in an httpOnly cookie, PBKDF2 password hashing (Web Crypto, no external deps)
 
+## Status
+
+- The `fitpocket-db` D1 database already exists in the Cloudflare account
+  and has this schema applied directly (old app's tables were dropped and
+  replaced — see migration note below). `wrangler.toml` already points at
+  its real `database_id`.
+- The `fitpocket` Worker already exists in the account (currently still
+  running the old app's bundle) — deploying this repo will overwrite it
+  with the new API.
+- Remaining manual steps (need your Cloudflare login, not done from here):
+  authenticate wrangler, set the `JWT_SECRET` secret, and run `wrangler deploy`.
+
 ## Local setup
 
 ```bash
 npm install
 
-# create the D1 database (first time only)
-npx wrangler d1 create fitpocket-db
-# copy the returned database_id into wrangler.toml
-
-# run migrations locally
+# run migrations locally (only needed for local dev DB, remote is already migrated)
 npm run db:migrate:local
 
 # set a JWT secret for local dev
@@ -35,7 +43,7 @@ npm run dev
 ## Deploy
 
 ```bash
-npm run db:migrate:remote
+npx wrangler login
 npx wrangler secret put JWT_SECRET   # paste a strong random secret
 npm run deploy
 ```
@@ -43,6 +51,14 @@ npm run deploy
 Then point `fitpocket.in` (and/or `api.fitpocket.in`) at the Worker via a
 route in the Cloudflare dashboard or by uncommenting the `route` lines in
 `wrangler.toml`.
+
+> Note: the remote D1 schema was applied directly via the Cloudflare API
+> rather than `wrangler d1 migrations apply`, so D1's migration-tracking
+> table (`d1_migrations`) is not present on the remote database. This is
+> harmless — the schema matches `migrations/0001_init.sql` /
+> `0002_seed.sql` exactly — but running `db:migrate:remote` later may try
+> to re-apply from scratch. If so, recreate `d1_migrations` first or apply
+> future migrations by hand the same way.
 
 ## API overview
 
