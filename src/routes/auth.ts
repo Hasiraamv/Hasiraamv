@@ -1,9 +1,19 @@
 import { Hono } from "hono";
 import { setCookie, deleteCookie } from "hono/cookie";
-import { hashPassword, verifyPassword, createToken, generateId } from "../auth";
+import {
+  hashPassword,
+  verifyPassword,
+  createToken,
+  generateId,
+  generateResetToken,
+  sha256Hex,
+} from "../auth";
 import { verifyGoogleIdToken } from "../google";
+import { sendEmail } from "../email";
 import { requireAuth } from "../middleware";
 import type { AppEnv } from "../types";
+
+const RESET_TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 const auth = new Hono<AppEnv>();
 
@@ -126,6 +136,78 @@ auth.post("/google", async (c) => {
   });
 
   return c.json({ token, user });
+});
+
+// POST /api/auth/forgot-password { email }
+// Always responds { ok: true } regardless of whether the account exists,
+// so this endpoint can't be used to enumerate registered emails.
+auth.post("/forgot-password", async (c) => {
+  const body = await c.req.json<{ email?: string }>();
+  const email = body.email?.trim().toLowerCase();
+  if (!email) return c.json({ error: "email is required" }, 400);
+
+  const user = await c.env.DB.prepare("SELECT id, name FROM users WHERE email = ?")
+    .bind(email)
+    .first<{ id: string; name: string }>();
+
+  if (user) {
+    const token = generateResetToken();
+    const tokenHash = await sha256Hex(token);
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS).toISOString();
+
+    await c.env.DB.prepare(
+      "INSERT INTO password_resets (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)"
+    )
+      .bind(generateId("reset"), user.id, tokenHash, expiresAt)
+      .run();
+
+    const resetUrl = `${c.env.FRONTEND_URL}/#reset=${token}`;
+    try {
+      await sendEmail(c.env, {
+        to: email,
+        subject: "Reset your FitPocket password",
+        html: `
+          <p>Hi ${user.name || "there"},</p>
+          <p>Someone requested a password reset for your FitPocket account. This link expires in 30 minutes.</p>
+          <p><a href="${resetUrl}">Reset your password</a></p>
+          <p>If you didn't request this, you can safely ignore this email.</p>
+        `,
+      });
+    } catch (e) {
+      console.error("Failed to send password reset email", e);
+    }
+  }
+
+  return c.json({ ok: true });
+});
+
+// POST /api/auth/reset-password { token, password }
+auth.post("/reset-password", async (c) => {
+  const body = await c.req.json<{ token?: string; password?: string }>();
+  const { token, password } = body;
+  if (!token || !password) return c.json({ error: "token and password are required" }, 400);
+  if (password.length < 8) return c.json({ error: "password must be at least 8 characters" }, 400);
+
+  const tokenHash = await sha256Hex(token);
+  const reset = await c.env.DB.prepare(
+    "SELECT id, user_id, expires_at, used_at FROM password_resets WHERE token_hash = ?"
+  )
+    .bind(tokenHash)
+    .first<{ id: string; user_id: string; expires_at: string; used_at: string | null }>();
+
+  if (!reset || reset.used_at || new Date(reset.expires_at).getTime() < Date.now()) {
+    return c.json({ error: "this reset link is invalid or has expired" }, 400);
+  }
+
+  const passwordHash = await hashPassword(password);
+  await c.env.DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?")
+    .bind(passwordHash, reset.user_id)
+    .run();
+  await c.env.DB.prepare("UPDATE password_resets SET used_at = datetime('now') WHERE id = ?")
+    .bind(reset.id)
+    .run();
+
+  return c.json({ ok: true });
 });
 
 auth.post("/logout", (c) => {

@@ -4,6 +4,9 @@ export type Bindings = {
   JWT_SECRET: string;
   GOOGLE_CLIENT_ID: string;
   ENVIRONMENT: string;
+  RESEND_API_KEY: string;
+  FROM_EMAIL: string;
+  FRONTEND_URL: string;
 };
 
 export type Variables = {

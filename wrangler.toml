@@ -38,4 +38,11 @@ ENVIRONMENT = "development"
 # Google Cloud Console > APIs & Services > Credentials > OAuth 2.0 Client ID.
 GOOGLE_CLIENT_ID = "REPLACE_WITH_YOUR_GOOGLE_OAUTH_CLIENT_ID"
 
+# Password-reset emails are sent via Resend (https://resend.com — free tier
+# is plenty for this volume). Sign up, verify the fitpocket.in domain (or
+# use their onboarding@resend.dev sender while testing), then:
+#   wrangler secret put RESEND_API_KEY
+FROM_EMAIL = "FitPocket <noreply@fitpocket.in>"
+FRONTEND_URL = "https://fitpocket.in"
+
 # Set the real secret with: wrangler secret put JWT_SECRET
