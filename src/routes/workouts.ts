@@ -1,10 +1,35 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware";
 import { generateId } from "../auth";
+import { estimateCaloriesBurned } from "../calories";
 import type { AppEnv } from "../types";
 
 const workouts = new Hono<AppEnv>();
 workouts.use("*", requireAuth);
+
+async function getLatestWeightKg(db: D1Database, userId: string): Promise<number | null> {
+  const row = await db
+    .prepare("SELECT weight_kg FROM body_metrics WHERE user_id = ? AND weight_kg IS NOT NULL ORDER BY date DESC LIMIT 1")
+    .bind(userId)
+    .first<{ weight_kg: number }>();
+  return row?.weight_kg ?? null;
+}
+
+async function recalculateCalories(
+  db: D1Database,
+  userId: string,
+  workoutId: string,
+  durationMinutes: number | null | undefined
+): Promise<void> {
+  const [{ results: sets }, weightKg] = await Promise.all([
+    db.prepare("SELECT weight_kg, reps, duration_seconds, distance_km FROM workout_sets WHERE workout_id = ?")
+      .bind(workoutId)
+      .all(),
+    getLatestWeightKg(db, userId),
+  ]);
+  const calories = estimateCaloriesBurned(durationMinutes, sets as never[], weightKg);
+  await db.prepare("UPDATE workouts SET calories_burned = ? WHERE id = ?").bind(calories, workoutId).run();
+}
 
 type SetInput = {
   exercise_id?: string;
@@ -102,6 +127,8 @@ workouts.post("/", async (c) => {
     await c.env.DB.batch(stmts);
   }
 
+  await recalculateCalories(c.env.DB, userId, id, body.duration_minutes);
+
   return c.json({ id }, 201);
 });
 
@@ -133,6 +160,10 @@ workouts.put("/:id", async (c) => {
     .bind(body.name ?? null, body.date ?? null, body.notes ?? null, body.duration_minutes ?? null, id, userId)
     .run();
 
+  if (body.duration_minutes != null) {
+    await recalculateCalories(c.env.DB, userId, id, body.duration_minutes);
+  }
+
   return c.json({ ok: true });
 });
 
@@ -153,9 +184,9 @@ workouts.put("/:id/sets", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json<{ sets: SetInput[] }>();
 
-  const workout = await c.env.DB.prepare("SELECT id FROM workouts WHERE id = ? AND user_id = ?")
+  const workout = await c.env.DB.prepare("SELECT id, duration_minutes FROM workouts WHERE id = ? AND user_id = ?")
     .bind(id, userId)
-    .first();
+    .first<{ id: string; duration_minutes: number | null }>();
   if (!workout) return c.json({ error: "not found" }, 404);
 
   await c.env.DB.prepare("DELETE FROM workout_sets WHERE workout_id = ?").bind(id).run();
@@ -181,6 +212,8 @@ workouts.put("/:id/sets", async (c) => {
     );
     await c.env.DB.batch(stmts);
   }
+
+  await recalculateCalories(c.env.DB, userId, id, workout.duration_minutes);
 
   return c.json({ ok: true });
 });

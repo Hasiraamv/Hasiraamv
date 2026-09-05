@@ -4,6 +4,15 @@ import { generateId } from "../auth";
 import type { AppEnv } from "../types";
 
 const ai = new Hono<AppEnv>();
+
+// One-time acknowledgement Cloudflare requires before an account can use
+// Llama 3.2 Vision (Meta's license + acceptable-use policy). Safe to call
+// repeatedly — hit it once after deploy, then it's a no-op forever after.
+ai.get("/_agree-vision-license", async (c) => {
+  const result = await c.env.AI.run(VISION_MODEL, { prompt: "agree" });
+  return c.json(result);
+});
+
 ai.use("*", requireAuth);
 
 // llama-3.1-8b-instruct was deprecated by Cloudflare on 2026-05-30;
@@ -125,7 +134,13 @@ ai.post("/scan-food", async (c) => {
     { role: "user", content: "Identify this food and estimate its nutrition." },
   ];
 
-  const result = await c.env.AI.run(VISION_MODEL, { messages, image: body.image });
+  let result: unknown;
+  try {
+    result = await c.env.AI.run(VISION_MODEL, { messages, image: body.image });
+  } catch (e) {
+    console.error("scan-food AI.run failed", e);
+    return c.json({ error: e instanceof Error ? e.message : "The vision model failed to process that photo." }, 502);
+  }
   const text = (result as { response?: string }).response ?? "";
 
   try {
