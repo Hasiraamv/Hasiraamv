@@ -1,11 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { LogOut, Wallet, Target, Loader2, Plus, FileUp, FileText, CheckCircle2, Sun, Moon, Monitor } from "lucide-react";
+import {
+  LogOut,
+  Wallet,
+  Target,
+  Loader2,
+  Plus,
+  FileUp,
+  FileText,
+  CheckCircle2,
+  Sun,
+  Moon,
+  Monitor,
+  ShieldCheck,
+  ScrollText,
+} from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth.jsx";
 import { useTheme } from "../lib/theme.jsx";
+import { PRIVACY_POLICY, TERMS_AND_CONDITIONS } from "../lib/legalContent.js";
 import { Stagger, fadeUp, SPRING_SNAPPY } from "../lib/motion.jsx";
 import Sheet from "../components/Sheet.jsx";
+import LegalSheet from "../components/LegalSheet.jsx";
 import { Label, Input, Select, PrimaryButton } from "../components/FormField.jsx";
 
 function AddExpenseForm({ onDone }) {
@@ -274,7 +290,7 @@ function ThemeToggle() {
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const [dashboard, setDashboard] = useState(null);
-  const [sheet, setSheet] = useState(null); // "expense" | "targets" | "import" | null
+  const [sheet, setSheet] = useState(null); // "expense" | "targets" | "import" | "privacy" | "terms" | null
 
   const load = () => {
     api.dashboard().then(setDashboard);
@@ -363,6 +379,32 @@ export default function ProfileScreen() {
         variants={fadeUp}
         whileTap={{ scale: 0.98 }}
         transition={SPRING_SNAPPY}
+        onClick={() => setSheet("privacy")}
+        className="glass flex items-center gap-4 rounded-[24px] px-5 py-4 text-left"
+      >
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-ink/6">
+          <ShieldCheck size={20} className="text-ink/60" />
+        </div>
+        <span className="flex-1 text-[14px] font-semibold text-ink">Privacy Policy</span>
+      </motion.button>
+
+      <motion.button
+        variants={fadeUp}
+        whileTap={{ scale: 0.98 }}
+        transition={SPRING_SNAPPY}
+        onClick={() => setSheet("terms")}
+        className="glass flex items-center gap-4 rounded-[24px] px-5 py-4 text-left"
+      >
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-ink/6">
+          <ScrollText size={20} className="text-ink/60" />
+        </div>
+        <span className="flex-1 text-[14px] font-semibold text-ink">Terms & Conditions</span>
+      </motion.button>
+
+      <motion.button
+        variants={fadeUp}
+        whileTap={{ scale: 0.98 }}
+        transition={SPRING_SNAPPY}
         onClick={logout}
         className="glass flex items-center gap-4 rounded-[24px] px-5 py-4 text-left text-acc-pink"
       >
@@ -371,6 +413,10 @@ export default function ProfileScreen() {
         </div>
         <span className="text-[14px] font-semibold">Sign Out</span>
       </motion.button>
+
+      <motion.p variants={fadeUp} className="pb-2 pt-2 text-center text-[11px] font-medium text-ink/30">
+        FitPocket is created and managed by Pocket Projects.
+      </motion.p>
 
       <Sheet open={sheet === "expense"} onClose={() => setSheet(null)} title="Add Transaction">
         <AddExpenseForm
@@ -396,6 +442,12 @@ export default function ProfileScreen() {
             load();
           }}
         />
+      </Sheet>
+      <Sheet open={sheet === "privacy"} onClose={() => setSheet(null)} title="Privacy Policy">
+        <LegalSheet text={PRIVACY_POLICY} />
+      </Sheet>
+      <Sheet open={sheet === "terms"} onClose={() => setSheet(null)} title="Terms & Conditions">
+        <LegalSheet text={TERMS_AND_CONDITIONS} />
       </Sheet>
     </Stagger>
   );

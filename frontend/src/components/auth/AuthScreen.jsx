@@ -299,6 +299,12 @@ export default function AuthScreen() {
           </motion.form>
         </>
       )}
+
+      <motion.p variants={fadeUp} className="px-4 text-center text-[11px] leading-relaxed text-ink/30">
+        By continuing you agree to FitPocket's Terms & Conditions and Privacy Policy.
+        <br />
+        Created and managed by Pocket Projects.
+      </motion.p>
     </Stagger>
   );
 }
