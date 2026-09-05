@@ -39,13 +39,10 @@ ENVIRONMENT = "development"
 GOOGLE_CLIENT_ID = "REPLACE_WITH_YOUR_GOOGLE_OAUTH_CLIENT_ID"
 
 # Password-reset emails are sent via Resend (https://resend.com — free tier
-# is plenty for this volume). Sign up, then:
+# is plenty for this volume). Requires the fitpocket.in domain verified in
+# Resend (Domains -> Add Domain -> DNS records added in Cloudflare) and:
 #   wrangler secret put RESEND_API_KEY
-# Using Resend's shared test sender for now since fitpocket.in isn't verified
-# as a sending domain yet — switch to "FitPocket <noreply@fitpocket.in>" once
-# it is (Resend dashboard -> Domains -> Add Domain -> add the DNS records to
-# Cloudflare -> wait for "Verified").
-FROM_EMAIL = "FitPocket <onboarding@resend.dev>"
+FROM_EMAIL = "FitPocket <noreply@fitpocket.in>"
 FRONTEND_URL = "https://fitpocket.in"
 
 # Set the real secret with: wrangler secret put JWT_SECRET
