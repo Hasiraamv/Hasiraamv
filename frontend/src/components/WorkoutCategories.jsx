@@ -11,14 +11,14 @@ const CATEGORIES = [
   { label: "Yoga", icon: HeartPulse, color: "#ff4d8d" },
 ];
 
-export default function WorkoutCategories() {
+export default function WorkoutCategories({ onSelect }) {
   return (
     <motion.div variants={fadeUp} className="flex flex-col gap-3">
       <div className="flex items-center justify-between px-1">
         <h2 className="text-[17px] font-bold tracking-[-0.02em] text-white">
           Workouts
         </h2>
-        <button className="text-[13px] font-semibold text-brand-300">
+        <button onClick={onSelect} className="text-[13px] font-semibold text-brand-300">
           See all
         </button>
       </div>
@@ -27,6 +27,7 @@ export default function WorkoutCategories() {
         {CATEGORIES.map((cat) => (
           <motion.button
             key={cat.label}
+            onClick={onSelect}
             whileHover={{ y: -2, scale: 1.04 }}
             whileTap={{ scale: 0.95 }}
             transition={SPRING_SNAPPY}

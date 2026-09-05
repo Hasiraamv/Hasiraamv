@@ -1,139 +1,118 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Loader2 } from "lucide-react";
 
 import Backdrop from "./components/Backdrop";
 import PhoneFrame from "./components/PhoneFrame";
 import StatusBar from "./components/StatusBar";
-import Header from "./components/Header";
-import ActivityRings from "./components/ActivityRings";
-import TodayWorkout from "./components/TodayWorkout";
-import QuickStats from "./components/QuickStats";
-import WeeklyChart from "./components/WeeklyChart";
-import WorkoutCategories from "./components/WorkoutCategories";
-import RecentActivity from "./components/RecentActivity";
 import TabBar from "./components/TabBar";
-import { Stagger, fadeUp, SPRING_SNAPPY } from "./lib/motion.jsx";
+import AuthScreen from "./components/auth/AuthScreen.jsx";
+import HomeScreen from "./screens/HomeScreen.jsx";
+import ActivityScreen from "./screens/ActivityScreen.jsx";
+import NutritionScreen from "./screens/NutritionScreen.jsx";
+import ProfileScreen from "./screens/ProfileScreen.jsx";
+import { AuthProvider, useAuth } from "./lib/auth.jsx";
+import { SPRING_SNAPPY } from "./lib/motion.jsx";
 
-/* Tab content switch variants (native slide + spring) */
 const screenVariants = {
-  enter: (dir) => ({
-    opacity: 0,
-    x: dir > 0 ? 48 : -48,
-    scale: 0.99,
-  }),
-  center: {
-    opacity: 1,
-    x: 0,
-    scale: 1,
-    transition: SPRING_SNAPPY,
-  },
-  exit: (dir) => ({
-    opacity: 0,
-    x: dir > 0 ? -48 : 48,
-    scale: 0.99,
-    transition: { duration: 0.18 },
-  }),
+  enter: (dir) => ({ opacity: 0, x: dir > 0 ? 48 : -48, scale: 0.99 }),
+  center: { opacity: 1, x: 0, scale: 1, transition: SPRING_SNAPPY },
+  exit: (dir) => ({ opacity: 0, x: dir > 0 ? -48 : 48, scale: 0.99, transition: { duration: 0.18 } }),
 };
 
-/* ─── Home screen ─────────────────────────────── */
-function HomeScreen() {
-  return (
-    <Stagger className="flex flex-col gap-6 pb-8">
-      <Header />
-      <ActivityRings />
-      <TodayWorkout />
-      <QuickStats />
-      <WeeklyChart />
-      <WorkoutCategories />
-      <RecentActivity />
-    </Stagger>
-  );
-}
+const TAB_ORDER = ["home", "activity", "add", "nutrition", "profile"];
 
-/* ─── Placeholder screens for other tabs ─────── */
-function PlaceholderScreen({ title, emoji }) {
-  return (
-    <Stagger className="flex flex-1 flex-col items-center justify-center gap-4 px-8 pb-24">
-      <motion.div
-        variants={fadeUp}
-        className="glass-tint flex h-24 w-24 items-center justify-center rounded-[32px] text-5xl"
-      >
-        {emoji}
-      </motion.div>
-      <motion.h2
-        variants={fadeUp}
-        className="text-center text-[22px] font-bold tracking-[-0.02em] text-white"
-      >
-        {title}
-      </motion.h2>
-      <motion.p
-        variants={fadeUp}
-        className="max-w-[240px] text-center text-[13px] leading-relaxed text-white/45"
-      >
-        This screen is a placeholder in this demo. The full experience lives on
-        the Home tab.
-      </motion.p>
-    </Stagger>
-  );
-}
-
-const TABS = {
-  home: <HomeScreen />,
-  activity: <PlaceholderScreen title="Activity" emoji="📊" />,
-  explore: <PlaceholderScreen title="Explore" emoji="🗺️" />,
-  profile: <PlaceholderScreen title="Profile" emoji="👤" />,
-};
-
-export default function App() {
+function AppShell() {
   const [activeTab, setActiveTab] = useState("home");
   const [direction, setDirection] = useState(1);
+  const [addSignal, setAddSignal] = useState({ tab: null, nonce: 0 });
 
-  const handleChange = (id) => {
-    const order = ["home", "activity", "add", "explore", "profile"];
-    setDirection(order.indexOf(id) - order.indexOf(activeTab));
+  const goTo = (id) => {
+    setDirection(TAB_ORDER.indexOf(id) - TAB_ORDER.indexOf(activeTab));
     setActiveTab(id);
   };
 
+  const handleAdd = () => {
+    const target = activeTab === "nutrition" ? "nutrition" : "activity";
+    if (activeTab !== target) goTo(target);
+    setAddSignal({ tab: target, nonce: Date.now() });
+  };
+
+  let screen;
+  if (activeTab === "home") screen = <HomeScreen onGoToActivity={() => goTo("activity")} />;
+  else if (activeTab === "activity")
+    screen = <ActivityScreen autoOpenAdd={addSignal.tab === "activity" ? addSignal.nonce : 0} />;
+  else if (activeTab === "nutrition")
+    screen = <NutritionScreen autoOpenAdd={addSignal.tab === "nutrition" ? addSignal.nonce : 0} />;
+  else screen = <ProfileScreen />;
+
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center py-8">
-      <Backdrop />
-
-      {/* Desktop side caption (hidden on small screens) */}
-      <div className="pointer-events-none absolute left-8 top-8 z-10 hidden xl:block">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-white/30">
-          UI Concept
-        </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-[-0.03em] text-white/70">
-          Fitness Tracker
-        </h1>
-        <p className="mt-2 max-w-[260px] text-sm leading-relaxed text-white/35">
-          A native-feeling mobile dashboard built with React, Tailwind CSS &
-          Framer Motion.
-        </p>
+    <PhoneFrame>
+      <StatusBar />
+      <div className="no-scrollbar relative z-10 flex-1 overflow-y-auto pt-2">
+        <AnimatePresence mode="wait" custom={direction}>
+          <motion.div
+            key={activeTab}
+            custom={direction}
+            variants={screenVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            className="flex h-full flex-col"
+          >
+            {screen}
+          </motion.div>
+        </AnimatePresence>
       </div>
+      <TabBar active={activeTab} onChange={goTo} onAdd={handleAdd} />
+    </PhoneFrame>
+  );
+}
 
+function Gate() {
+  const { status } = useAuth();
+
+  if (status === "loading") {
+    return (
       <PhoneFrame>
-        <StatusBar />
+        <div className="flex flex-1 items-center justify-center">
+          <Loader2 size={28} className="animate-spin text-white/40" />
+        </div>
+      </PhoneFrame>
+    );
+  }
 
-        {/* Scrollable content area */}
-        <div className="no-scrollbar relative z-10 flex-1 overflow-y-auto pt-2">
-          <AnimatePresence mode="wait" custom={direction}>
-            <motion.div
-              key={activeTab}
-              custom={direction}
-              variants={screenVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              className="flex h-full flex-col"
-            >
-              {TABS[activeTab]}
-            </motion.div>
-          </AnimatePresence>
+  if (status === "guest") {
+    return (
+      <PhoneFrame>
+        <div className="flex flex-1 flex-col">
+          <AuthScreen />
+        </div>
+      </PhoneFrame>
+    );
+  }
+
+  return <AppShell />;
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <div className="relative flex min-h-screen w-full items-center justify-center py-8">
+        <Backdrop />
+
+        <div className="pointer-events-none absolute left-8 top-8 z-10 hidden xl:block">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-white/30">Fit Pocket</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-[-0.03em] text-white/70">
+            Fitness · Nutrition · Budget
+          </h1>
+          <p className="mt-2 max-w-[260px] text-sm leading-relaxed text-white/35">
+            One pocket for your workouts, meals, and money.
+          </p>
         </div>
 
-        <TabBar active={activeTab} onChange={handleChange} />
-      </PhoneFrame>
-    </div>
+        <Gate />
+      </div>
+    </AuthProvider>
   );
 }
