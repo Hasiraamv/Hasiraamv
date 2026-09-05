@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { LogOut, Wallet, Target, Loader2, Plus, FileUp, CheckCircle2, Sun, Moon, Monitor } from "lucide-react";
+import { LogOut, Wallet, Target, Loader2, Plus, FileUp, FileText, CheckCircle2, Sun, Moon, Monitor } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth.jsx";
 import { useTheme } from "../lib/theme.jsx";
@@ -123,9 +123,11 @@ function TargetsForm({ current, onDone }) {
 function ImportPlanForm({ onDone }) {
   const [text, setText] = useState("");
   const [importing, setImporting] = useState(false);
+  const [reading, setReading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const fileRef = useRef(null);
+  const pdfRef = useRef(null);
 
   const onFile = (e) => {
     const file = e.target.files?.[0];
@@ -134,6 +136,27 @@ function ImportPlanForm({ onDone }) {
     const reader = new FileReader();
     reader.onload = () => setText(String(reader.result || ""));
     reader.readAsText(file);
+  };
+
+  const onPdf = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setError(null);
+    setReading(true);
+    try {
+      const { extractPdfText } = await import("../lib/pdf.js");
+      const extracted = await extractPdfText(file);
+      if (!extracted) {
+        setError("Couldn't find any text in that PDF — it may be a scanned image.");
+        return;
+      }
+      setText(extracted);
+    } catch (err) {
+      setError(err.message || "Could not read that PDF.");
+    } finally {
+      setReading(false);
+    }
   };
 
   const submit = async (e) => {
@@ -172,18 +195,30 @@ function ImportPlanForm({ onDone }) {
   return (
     <form onSubmit={submit} className="flex flex-col gap-4 pb-2">
       <p className="text-[12px] leading-relaxed text-ink/50">
-        Paste a workout or nutrition plan (or upload a .txt file) — AI will pull out targets, goals,
-        and workouts and fill them in automatically.
+        Paste a workout or nutrition plan, or upload a PDF or .txt file — AI will pull out targets,
+        goals, and workouts and fill them in automatically.
       </p>
-      <button
-        type="button"
-        onClick={() => fileRef.current?.click()}
-        className="glass-tint flex items-center justify-center gap-2 rounded-xl py-3 text-[13px] font-semibold text-ink"
-      >
-        <FileUp size={16} />
-        Upload .txt file
-      </button>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => pdfRef.current?.click()}
+          disabled={reading}
+          className="glass-tint flex items-center justify-center gap-2 rounded-xl py-3 text-[13px] font-semibold text-ink disabled:opacity-60"
+        >
+          {reading ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+          Scan PDF
+        </button>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="glass-tint flex items-center justify-center gap-2 rounded-xl py-3 text-[13px] font-semibold text-ink"
+        >
+          <FileUp size={16} />
+          Upload .txt
+        </button>
+      </div>
       <input ref={fileRef} type="file" accept=".txt,text/plain" className="hidden" onChange={onFile} />
+      <input ref={pdfRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={onPdf} />
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}

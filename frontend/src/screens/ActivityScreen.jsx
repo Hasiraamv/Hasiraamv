@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Dumbbell, Plus, Trash2, Loader2, Check } from "lucide-react";
+import { Dumbbell, Plus, Trash2, Loader2, Check, Flame, Clock } from "lucide-react";
 import { api } from "../lib/api";
 import { Stagger, fadeUp, SPRING_SNAPPY } from "../lib/motion.jsx";
 import Sheet from "../components/Sheet.jsx";
@@ -13,6 +13,7 @@ function emptySet() {
 function AddWorkoutForm({ onDone }) {
   const [name, setName] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [durationMinutes, setDurationMinutes] = useState("");
   const [sets, setSets] = useState([emptySet()]);
   const [saving, setSaving] = useState(false);
 
@@ -26,6 +27,7 @@ function AddWorkoutForm({ onDone }) {
       await api.workouts.create({
         name,
         date,
+        duration_minutes: durationMinutes ? Number(durationMinutes) : undefined,
         sets: sets
           .filter((s) => s.exercise_name.trim())
           .map((s, idx) => ({
@@ -52,9 +54,20 @@ function AddWorkoutForm({ onDone }) {
           required
         />
       </div>
-      <div>
-        <Label>Date</Label>
-        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label>Date</Label>
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+        </div>
+        <div>
+          <Label>Duration (min)</Label>
+          <Input
+            inputMode="numeric"
+            placeholder="e.g. 45"
+            value={durationMinutes}
+            onChange={(e) => setDurationMinutes(e.target.value)}
+          />
+        </div>
       </div>
 
       <div>
@@ -155,6 +168,30 @@ function WorkoutDetail({ workoutId, onChanged }) {
 
   return (
     <div className="flex flex-col gap-4 pb-2">
+      <div className="glass-tint flex items-center gap-3 rounded-2xl px-4 py-3.5">
+        <div className="flex flex-1 items-center gap-2">
+          <Clock size={16} className="text-acc-cyan" />
+          <div className="flex flex-col">
+            <span className="text-[15px] font-bold leading-none text-ink">
+              {data.workout.duration_minutes ?? "—"}
+              <span className="ml-0.5 text-[11px] font-semibold text-ink/40">min</span>
+            </span>
+            <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-ink/40">Duration</span>
+          </div>
+        </div>
+        <div className="h-8 w-px bg-ink/8" />
+        <div className="flex flex-1 items-center gap-2">
+          <Flame size={16} className="text-acc-orange" />
+          <div className="flex flex-col">
+            <span className="text-[15px] font-bold leading-none text-ink">
+              {data.workout.calories_burned ? Math.round(data.workout.calories_burned) : "—"}
+              <span className="ml-0.5 text-[11px] font-semibold text-ink/40">cal</span>
+            </span>
+            <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-ink/40">Burned (est.)</span>
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <span className="text-[13px] font-medium text-ink/50">{data.workout.date}</span>
         <span className="text-[13px] font-semibold text-ink/60">
@@ -246,6 +283,7 @@ export default function ActivityScreen({ autoOpenAdd }) {
               <span className="text-[12px] font-medium text-ink/45">
                 {w.date}
                 {w.duration_minutes ? ` · ${w.duration_minutes} min` : ""}
+                {w.calories_burned ? ` · ${Math.round(w.calories_burned)} cal` : ""}
               </span>
             </div>
             <span
