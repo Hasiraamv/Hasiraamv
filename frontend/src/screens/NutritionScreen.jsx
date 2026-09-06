@@ -97,6 +97,15 @@ const WATER_QUICK_ADD = [250, 500, 750];
 
 function WaterCard({ waterMl, waterTarget, onAdd }) {
   const pct = waterTarget ? Math.min(1, waterMl / waterTarget) : 0;
+  const [custom, setCustom] = useState("");
+
+  const addCustom = () => {
+    const ml = Number(custom);
+    if (!ml || ml <= 0) return;
+    onAdd(ml);
+    setCustom("");
+  };
+
   return (
     <motion.div variants={fadeUp} className="glass rounded-[28px] p-6">
       <div className="mb-3 flex items-center justify-between">
@@ -123,6 +132,26 @@ function WaterCard({ waterMl, waterTarget, onAdd }) {
             +{ml}ml
           </button>
         ))}
+      </div>
+      <div className="mt-2 flex gap-2">
+        <input
+          type="number"
+          inputMode="numeric"
+          min="1"
+          placeholder="Custom amount (ml)"
+          value={custom}
+          onChange={(e) => setCustom(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addCustom()}
+          className="glass-tint min-w-0 flex-1 rounded-xl px-3 py-2 text-[13px] font-medium text-ink placeholder:text-ink/35 focus:outline-none"
+        />
+        <button
+          onClick={addCustom}
+          disabled={!custom}
+          aria-label="Add custom water amount"
+          className="glass-tint flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ink disabled:opacity-40"
+        >
+          <Plus size={16} />
+        </button>
       </div>
     </motion.div>
   );

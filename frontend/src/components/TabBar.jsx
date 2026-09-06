@@ -26,9 +26,7 @@ function FAB({ onClick }) {
 
 export default function TabBar({ active, onChange, onAdd }) {
   return (
-    <motion.div variants={fadeUp} className="relative z-20 flex items-center justify-between px-6 pb-7 pt-3">
-      <div className="absolute bottom-1.5 left-1/2 h-1 w-28 -translate-x-1/2 rounded-full bg-ink/70" />
-
+    <motion.div variants={fadeUp} className="relative z-20 flex items-center justify-between px-6 pb-5 pt-3">
       <div className="glass-strong relative flex w-full items-center justify-between rounded-[28px] px-3 py-2.5">
         {TABS.map((tab) => {
           const isActive = active === tab.id;
