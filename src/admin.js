@@ -1,6 +1,7 @@
 import { escapeHtml, formatINR, html, redirect } from './render.js';
 import * as db from './db.js';
 import { issueCertificate } from './certificates.js';
+import { storeImage, deleteImage } from './images.js';
 import {
   parseCookies,
   cookieHeader,
@@ -65,9 +66,12 @@ export async function adminRouter(request, env, path) {
   if (path === '/admin/certificates') return certificatesPage(env);
   if (path === '/admin/certificates/issue' && method === 'POST') return issueCert(request, env);
   if (path === '/admin/certificates/revoke' && method === 'POST') return revokeCert(request, env);
-  if (path === '/admin/products') return productsPage(env);
+  if (path === '/admin/products')
+    return productsPage(env, new URL(request.url).searchParams.get('error'));
   if (path === '/admin/products/create' && method === 'POST') return createProduct(request, env);
   if (path === '/admin/offers/create' && method === 'POST') return createOffer(request, env);
+  if (path === '/admin/images/upload' && method === 'POST') return uploadImage(request, env);
+  if (path === '/admin/images/delete' && method === 'POST') return removeImage(request, env);
   if (path === '/admin/sourcing') return sourcingPage(env);
 
   return adminHtml('<div class="notice">Unknown admin page.</div>', 404);
@@ -415,7 +419,7 @@ async function revokeCert(request, env) {
   return redirect('/admin/certificates');
 }
 
-async function productsPage(env) {
+async function productsPage(env, errorMessage) {
   const [categories, sellers] = await Promise.all([
     db.getCategories(env.DB),
     env.DB.prepare('SELECT * FROM sellers ORDER BY name').all().then((r) => r.results || []),
@@ -428,8 +432,28 @@ async function productsPage(env) {
       ORDER BY p.created_at DESC LIMIT 100`
   ).all();
 
+  const { results: allImages } = await env.DB.prepare(
+    'SELECT id, product_id, url FROM product_images ORDER BY product_id, sort_order'
+  ).all();
+  const imagesByProduct = new Map();
+  for (const im of allImages || []) {
+    if (!imagesByProduct.has(im.product_id)) imagesByProduct.set(im.product_id, []);
+    imagesByProduct.get(im.product_id).push(im);
+  }
+
   return adminHtml(`
 <h2 class="serif" style="font-size:32px; margin:0 0 22px;">Products &amp; offers</h2>
+${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${escapeHtml(errorMessage)}</div>` : ''}
+${
+  env.IMAGES
+    ? ''
+    : `<div class="notice" style="margin-bottom:20px;">
+         <strong>Image storage is not connected.</strong> Enable R2 in the Cloudflare dashboard,
+         create a bucket called <code>mintmark-images</code>, then uncomment the
+         <code>[[r2_buckets]]</code> block in <code>wrangler.toml</code> and redeploy. Until then you
+         can still paste an image URL when creating a product.
+       </div>`
+}
 
 <div class="grid grid-2" style="gap:24px; align-items:start; margin-bottom:32px;">
   <div class="panel" style="padding:22px;">
@@ -502,18 +526,45 @@ async function productsPage(env) {
 
 <h3 class="serif" style="font-size:24px; margin:0 0 14px;">Catalogue</h3>
 <table class="table">
-  <thead><tr><th>Product</th><th>Category</th><th class="num">Offers</th><th class="num">Lowest</th><th></th></tr></thead>
+  <thead><tr><th>Product</th><th>Photos</th><th class="num">Offers</th><th class="num">Lowest</th><th></th></tr></thead>
   <tbody>
     ${(products || [])
-      .map(
-        (p) => `<tr>
-        <td data-label="Product">${escapeHtml(p.title)}</td>
-        <td data-label="Category">${escapeHtml(p.category_name)}</td>
+      .map((p) => {
+        const imgs = imagesByProduct.get(p.id) || [];
+        return `<tr>
+        <td data-label="Product">
+          <strong>${escapeHtml(p.title)}</strong>
+          <div style="font-size:11.5px; color:var(--faint);">${escapeHtml(p.category_name)}</div>
+        </td>
+        <td data-label="Photos">
+          <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+            ${imgs
+              .map(
+                (im) => `<span style="position:relative; display:inline-block;">
+                  <img src="${escapeHtml(im.url)}" alt="" style="width:44px; height:44px; object-fit:cover; border:1px solid var(--line);">
+                  <form method="post" action="/admin/images/delete" style="display:inline;">
+                    <input type="hidden" name="image_id" value="${im.id}">
+                    <button type="submit" title="Delete photo" style="position:absolute; top:-6px; right:-6px; width:18px; height:18px; line-height:1; border:1px solid var(--line); background:var(--card); cursor:pointer; font-size:11px; padding:0;">×</button>
+                  </form>
+                </span>`
+              )
+              .join('')}
+            ${
+              env.IMAGES
+                ? `<form method="post" action="/admin/images/upload" enctype="multipart/form-data" style="display:flex; gap:6px; align-items:center;">
+                     <input type="hidden" name="product_id" value="${p.id}">
+                     <input type="file" name="file" accept="image/jpeg,image/png,image/webp,image/gif" required style="font-size:11px; max-width:170px;">
+                     <button class="chip" type="submit" style="cursor:pointer;">Upload</button>
+                   </form>`
+                : `<span class="faint" style="font-size:11.5px;">${imgs.length ? '' : 'No photos'}</span>`
+            }
+          </div>
+        </td>
         <td data-label="Offers" class="num">${p.offer_count}</td>
         <td data-label="Lowest" class="num">${p.lowest ? formatINR(p.lowest) : '—'}</td>
         <td><a href="/p/${escapeHtml(p.slug)}" target="_blank">View</a></td>
-      </tr>`
-      )
+      </tr>`;
+      })
       .join('')}
   </tbody>
 </table>`);
@@ -604,6 +655,47 @@ async function createOffer(request, env) {
     )
     .run();
 
+  return redirect('/admin/products');
+}
+
+async function uploadImage(request, env) {
+  const form = await request.formData();
+  const productId = Number(form.get('product_id'));
+  if (!Number.isInteger(productId)) return redirect('/admin/products');
+
+  const result = await storeImage(env, form.get('file'));
+  if (!result.ok) {
+    return redirect(`/admin/products?error=${encodeURIComponent(result.error)}`);
+  }
+
+  const product = await env.DB.prepare('SELECT title FROM products WHERE id = ?')
+    .bind(productId)
+    .first();
+  const next = await env.DB.prepare(
+    'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM product_images WHERE product_id = ?'
+  )
+    .bind(productId)
+    .first();
+
+  await env.DB.prepare(
+    'INSERT INTO product_images (product_id, url, alt, sort_order) VALUES (?, ?, ?, ?)'
+  )
+    .bind(productId, `/img/${result.key}`, product?.title || null, next?.n || 0)
+    .run();
+
+  return redirect('/admin/products');
+}
+
+async function removeImage(request, env) {
+  const form = await request.formData();
+  const imageId = Number(form.get('image_id'));
+  if (!Number.isInteger(imageId)) return redirect('/admin/products');
+
+  const row = await env.DB.prepare('SELECT url FROM product_images WHERE id = ?').bind(imageId).first();
+  if (row) {
+    await env.DB.prepare('DELETE FROM product_images WHERE id = ?').bind(imageId).run();
+    await deleteImage(env, row.url);
+  }
   return redirect('/admin/products');
 }
 
