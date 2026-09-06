@@ -23,8 +23,16 @@ ai.use("*", requireAuth);
 const TEXT_MODEL: string = "@cf/zai-org/glm-4.7-flash";
 const VISION_MODEL: string = "@cf/meta/llama-3.2-11b-vision-instruct";
 
-/** Models sometimes wrap JSON in prose or markdown fences — pull out the first {...} block. */
-function extractJson(text: string): unknown {
+/**
+ * Models sometimes wrap JSON in prose or markdown fences — pull out the
+ * first {...} block. Workers AI also sometimes hands back `response` as an
+ * already-parsed object instead of a string (when the model's own output
+ * happens to look like structured content), so pass those straight through.
+ */
+function extractJson(value: unknown): unknown {
+  if (value && typeof value === "object") return value;
+
+  const text = String(value ?? "");
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced ? fenced[1] : text;
   const start = candidate.indexOf("{");
@@ -141,10 +149,10 @@ ai.post("/scan-food", async (c) => {
     console.error("scan-food AI.run failed", e);
     return c.json({ error: e instanceof Error ? e.message : "The vision model failed to process that photo." }, 502);
   }
-  const text = (result as { response?: string }).response ?? "";
+  const rawResponse = (result as { response?: unknown }).response;
 
   try {
-    const parsed = extractJson(text) as Record<string, unknown>;
+    const parsed = extractJson(rawResponse) as Record<string, unknown>;
     return c.json({
       food_name: String(parsed.food_name ?? "Unknown food"),
       quantity_g: Number(parsed.quantity_g ?? 100),
@@ -154,7 +162,7 @@ ai.post("/scan-food", async (c) => {
       fat: Number(parsed.fat ?? 0),
     });
   } catch {
-    return c.json({ error: "Could not read that photo — try again with better lighting.", raw: text }, 422);
+    return c.json({ error: "Could not read that photo — try again with better lighting.", raw: rawResponse }, 422);
   }
 });
 
