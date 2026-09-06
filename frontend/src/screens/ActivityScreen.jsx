@@ -101,7 +101,7 @@ function AddWorkoutForm({ onDone }) {
         <button
           type="button"
           onClick={() => setSets((prev) => [...prev, emptySet()])}
-          className="mt-2 text-[13px] font-semibold text-brand-300"
+          className="mt-2 text-[13px] font-semibold text-acc-orange"
         >
           + Add set
         </button>

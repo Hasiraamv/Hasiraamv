@@ -18,7 +18,7 @@ export default function RecentActivity({ items = [], onViewAll }) {
     <motion.div variants={fadeUp} className="flex flex-col gap-3">
       <div className="flex items-center justify-between px-1">
         <h2 className="text-[17px] font-bold tracking-[-0.02em] text-ink">Recent Activity</h2>
-        <button onClick={onViewAll} className="text-[13px] font-semibold text-brand-300">
+        <button onClick={onViewAll} className="text-[13px] font-semibold text-acc-orange">
           View all
         </button>
       </div>

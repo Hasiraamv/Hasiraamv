@@ -100,7 +100,7 @@ export default function ActivityRings({
     {
       key: "workouts",
       label: "Workouts",
-      color: "#7bc142",
+      color: "#c9922c",
       track: TRACK,
       radius: MAX_RADIUS - STROKE - 4,
       progress: targets.workouts,
@@ -110,7 +110,7 @@ export default function ActivityRings({
     {
       key: "budget",
       label: "Budget left",
-      color: "#55aef7",
+      color: "#8a7460",
       track: TRACK,
       radius: MAX_RADIUS - (STROKE + 4) * 2,
       progress: targets.budget,

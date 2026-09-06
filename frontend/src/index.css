@@ -58,12 +58,23 @@
   --color-brand-stone: #c9c4bb;    /* Secondary — Balance */
   --color-brand-depth: #1a1a1a;    /* UI / Dark — Depth */
 
-  /* Accent palette (colorful, flat-illustration energy) */
-  --color-acc-lime: #7bc142;
-  --color-acc-orange: #ff7a00;
-  --color-acc-pink: #ff4d8d;
-  --color-acc-violet: #8b5cf6;
-  --color-acc-cyan: #22a9d4;
+  /* Accent palette — every accent is drawn from or tinted toward the
+     FitPocket brand kit (orange / dark brown / cream / stone / near-black)
+     instead of arbitrary off-brand hues, so category colors still read as
+     "one app" rather than a generic template rainbow. */
+  --color-acc-orange: #ff7a00; /* Primary — calories, primary actions */
+  --color-acc-gold: #c9922c;   /* Workouts, success, positive/income */
+  --color-acc-rust: #a8461f;   /* Fat/carbs, warnings, destructive actions */
+  --color-acc-clay: #8a7460;   /* Water, neutral secondary data */
+  --color-acc-umber: #5c4632;  /* Sleep, tertiary data */
+
+  /* Back-compat aliases for the old off-brand accent names, repointed to
+     the brand-derived colors above so every existing usage stays on-brand
+     without touching each call site. */
+  --color-acc-lime: var(--color-acc-gold);
+  --color-acc-pink: var(--color-acc-rust);
+  --color-acc-cyan: var(--color-acc-clay);
+  --color-acc-violet: var(--color-acc-umber);
 }
 
 /* ─────────────────────────────────────────────

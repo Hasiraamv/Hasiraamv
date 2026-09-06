@@ -78,7 +78,7 @@ export default function HomeScreen({ onGoToActivity }) {
           label="Workouts"
           value={workoutsThisWeek}
           sub="This week"
-          color="#7bc142"
+          color="#c9922c"
           days={workoutDays}
         />
         <StatCard
@@ -86,7 +86,7 @@ export default function HomeScreen({ onGoToActivity }) {
           value={totalMinutes}
           unit="min"
           sub="This week"
-          color="#22a9d4"
+          color="#8a7460"
           days={minutesDays}
         />
       </div>

@@ -3,12 +3,12 @@ import { motion } from "framer-motion";
 import { fadeUp, SPRING_SNAPPY } from "../lib/motion.jsx";
 
 const CATEGORIES = [
-  { label: "Strength", icon: Dumbbell, color: "#7bc142" },
-  { label: "Running", icon: Footprints, color: "#22d3ee" },
-  { label: "Cycling", icon: Bike, color: "#5b6cff" },
-  { label: "Swimming", icon: Waves, color: "#55aef7" },
+  { label: "Strength", icon: Dumbbell, color: "#c9922c" },
+  { label: "Running", icon: Footprints, color: "#a8461f" },
+  { label: "Cycling", icon: Bike, color: "#5c4632" },
+  { label: "Swimming", icon: Waves, color: "#8a7460" },
   { label: "HIIT", icon: Flame, color: "#ff7a00" },
-  { label: "Yoga", icon: HeartPulse, color: "#ff4d8d" },
+  { label: "Yoga", icon: HeartPulse, color: "#2b1a0f" },
 ];
 
 export default function WorkoutCategories({ onSelect }) {
@@ -18,7 +18,7 @@ export default function WorkoutCategories({ onSelect }) {
         <h2 className="text-[17px] font-bold tracking-[-0.02em] text-ink">
           Workouts
         </h2>
-        <button onClick={onSelect} className="text-[13px] font-semibold text-brand-300">
+        <button onClick={onSelect} className="text-[13px] font-semibold text-acc-orange">
           See all
         </button>
       </div>
