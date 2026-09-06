@@ -1,0 +1,22 @@
+name = "mintmark"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# Deploying to the pocket37 domain replaces whatever that Worker currently serves.
+# Set the route only when you are ready for that switchover.
+# routes = [{ pattern = "pocket37.com/*", zone_name = "pocket37.com" }]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mintmark"
+database_id = "PUT_DATABASE_ID_HERE"
+
+[vars]
+SITE_NAME = "Mintmark"
+SITE_URL = "https://pocket37.com"
+SUPPORT_WHATSAPP = "+91 00000 00000"
+CURRENCY = "INR"
+
+# Secrets (set with `wrangler secret put <NAME>`, never commit them):
+#   ADMIN_PASSWORD   password for /admin
+#   SESSION_SECRET   random string used to sign admin and cart cookies
