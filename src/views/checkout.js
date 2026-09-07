@@ -227,16 +227,26 @@ export function orderPage({ order, events, certificate }) {
 
   <div class="panel" style="margin-top:18px; padding:20px 24px;">
     <div style="font-size:13.5px; font-weight:600; margin-bottom:10px;">If this order were refunded</div>
-    <div style="display:flex; flex-direction:column; gap:7px; font-size:12.5px; color:#5c5748; max-width:420px;">
-      <div style="display:flex; justify-content:space-between;"><span>Piece and authentication</span><span>${formatINR(
-        refund.refundable
-      )}</span></div>
-      <div style="display:flex; justify-content:space-between;"><span>Import duty and freight — not refundable</span><span>${formatINR(
-        refund.nonRefundable
-      )}</span></div>
-      <div style="display:flex; justify-content:space-between; padding-top:8px; border-top:1px solid var(--line); font-weight:600; color:var(--text);"><span>You would receive</span><span>${formatINR(
-        refund.refundable
-      )}</span></div>
+    <div style="display:flex; flex-direction:column; gap:10px; font-size:12.5px; color:#5c5748; max-width:460px;">
+      <div>
+        <div style="font-weight:600; color:var(--green); margin-bottom:2px;">If it's our fault — not authentic, damaged, or not as described</div>
+        <div style="display:flex; justify-content:space-between;"><span>You receive</span><span style="font-weight:600;">${formatINR(
+          order.amount
+        )}</span></div>
+        <div style="font-size:11px; color:var(--faint);">Everything, duty and freight included. Nothing withheld.</div>
+      </div>
+      <div style="padding-top:10px; border-top:1px solid var(--line);">
+        <div style="font-weight:600; margin-bottom:2px;">If you change your mind</div>
+        <div style="display:flex; justify-content:space-between;"><span>Piece and authentication</span><span>${formatINR(
+          refund.refundable
+        )}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>Import duty and freight — not refundable</span><span>${formatINR(
+          refund.nonRefundable
+        )}</span></div>
+        <div style="display:flex; justify-content:space-between; padding-top:6px; font-weight:600; color:var(--text);"><span>You would receive</span><span>${formatINR(
+          refund.refundable
+        )}</span></div>
+      </div>
     </div>
     <div style="font-size:11.5px; color:var(--muted); margin-top:10px; line-height:1.55;">
       Duty is paid to customs on arrival and cannot be reclaimed. Before dispatch, nothing has been

@@ -76,27 +76,43 @@ export async function computeOfferPricing(db, { categoryId, city, sellerPrice, o
   return computed;
 }
 
-// What comes back to the buyer on a refund.
+// What comes back to the buyer on a refund. Which of these applies depends entirely on
+// whose fault it is, and that distinction is the industry and legal standard:
 //
-// Import duty is paid to the government the moment the parcel lands and cannot be reclaimed,
-// and the freight has already been flown. So the refundable part is the piece itself plus the
-// authentication fee — we charged for a check, and a refund means that check did not deliver
-// what it promised.
+//   'fault'          — the piece is not authentic, is damaged, or is not as described.
+//                      EVERYTHING comes back, duty and freight included. The customer did
+//                      nothing wrong, and withholding costs on our own failure is the kind of
+//                      term s.2(46) of the Consumer Protection Act 2019 treats as unfair —
+//                      a forum would order the full amount anyway, months later. Selling a
+//                      counterfeit as genuine is also an unfair trade practice, so the
+//                      exposure is not limited to the refund.
+//   'pre_dispatch'   — cancelled or failed our inspection before anything was imported.
+//                      Everything comes back; no duty was ever paid for this buyer.
+//   'change_of_mind' — the customer simply changed their mind. Duty and freight are not
+//                      returned: duty went to customs on arrival and cannot be reclaimed,
+//                      and the freight has already been flown. This is standard practice
+//                      for individually imported goods.
 //
-// This split MUST be disclosed before purchase, not discovered afterwards. A term that only
-// appears once a customer is complaining is exactly the kind an Indian consumer forum treats
-// as an unfair contract term under s.2(46) of the Consumer Protection Act 2019.
-export function refundBreakdown(order) {
+// The change-of-mind split MUST be disclosed before purchase, not discovered during a
+// complaint. A term a customer only meets while arguing is the one that gets struck down.
+export const REFUND_REASONS = ['fault', 'pre_dispatch', 'change_of_mind'];
+
+export function refundBreakdown(order, reason = 'change_of_mind') {
   const amount = Number(order.amount) || 0;
   const duty = Number(order.duty) || 0;
   const shipping = Number(order.shipping) || 0;
-  const nonRefundable = duty + shipping;
+
+  const withholds = reason === 'change_of_mind';
+  const nonRefundable = withholds ? duty + shipping : 0;
+
   return {
+    reason,
     total: amount,
     refundable: Math.max(0, amount - nonRefundable),
     nonRefundable,
     duty,
     shipping,
+    withholds,
   };
 }
 

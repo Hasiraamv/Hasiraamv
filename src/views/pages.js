@@ -136,44 +136,46 @@ export function returnsPage(env) {
   legal advice, and the bracketed values below still need to be set by you.
 </div>
 
-<h3 class="serif" style="${H3}">What is refundable</h3>
+<h3 class="serif" style="${H3}">The standard we apply</h3>
 <p style="${P}">
-  The listed price is made up of the piece itself, our authentication fee, import duty, and freight.
-  <strong>Import duty and shipping are not refundable.</strong> Duty is paid to Indian customs the
-  moment the parcel lands and cannot be reclaimed by us, and the freight has already been flown.
-  That portion is shown on every product page before you buy.
+  <strong>If it is our fault, you get everything back — the piece, the authentication fee, import
+  duty and freight, no deductions.</strong> That covers a piece that is not authentic, arrives
+  damaged, or is not as described. You did nothing wrong, so nothing is withheld.
 </p>
 <p style="${P}">
-  Everything else — the price of the piece and the authentication fee — is refunded in full where a
-  refund is due, back to the account you paid from.
+  <strong>If you simply change your mind, duty and freight are not returned.</strong> The listed
+  price is the piece, our authentication fee, import duty and freight. Duty is paid to Indian
+  customs the moment the parcel lands and cannot be reclaimed by us, and the freight has already
+  been flown. That split is shown on every product page before you buy, not after.
 </p>
 
 <h3 class="serif" style="${H3}">If a piece is not authentic</h3>
 <p style="${P}">
-  If a piece fails our own inspection before dispatch, nothing ships and <strong>you are refunded
-  the entire amount including duty and shipping</strong>, because nothing was imported on your behalf.
+  If a piece fails our own inspection before dispatch, nothing ships and you are refunded the entire
+  amount including duty and shipping, because nothing was imported on your behalf.
 </p>
 <p style="${P}">
   If a piece we certified is later shown not to be authentic — by a credible independent
-  authentication you provide — we refund the price of the piece and the authentication fee, and we
-  collect the item at our cost. [CONFIRM WITH YOUR LAWYER WHETHER YOU ALSO RETURN DUTY AND FREIGHT
-  IN THIS CASE — see the note below.]
+  authentication you provide — <strong>we refund the full amount, duty and freight included</strong>,
+  and we collect the item at our cost. A failure on our side of the authentication promise is not a
+  cost we pass to you.
 </p>
 
 <h3 class="serif" style="${H3}">If a piece arrives damaged or is not as described</h3>
 <p style="${P}">
   Tell us within <strong>[YOUR WINDOW, e.g. 48 hours]</strong> of delivery, with photographs. If the
-  piece does not match its listed condition we arrange collection and refund the piece and
-  authentication fee. Do not wear or alter the item, and keep the seal and packaging — a broken seal
-  makes the claim much harder to assess.
+  piece does not match its listed condition we arrange collection and refund the full amount,
+  including duty and freight. Do not wear or alter the item, and keep the seal and packaging — a
+  broken seal makes the claim much harder to assess.
 </p>
 
 <h3 class="serif" style="${H3}">Change of mind</h3>
 <p style="${P}">
-  <strong>[SET YOUR POLICY HERE.]</strong> Every piece is individually imported with duty already
-  paid, so a change-of-mind return is expensive to absorb. Most marketplaces of this kind either do
-  not accept them, or accept them within a short window with the buyer covering return shipping.
-  Decide which you are, say so plainly here, and apply it consistently.
+  <strong>[SET YOUR WINDOW AND CONDITIONS HERE.]</strong> Within that window, the piece and
+  authentication fee are refunded; duty and freight are not, for the reasons above. Most
+  marketplaces of this kind either do not accept change-of-mind returns at all, or accept them
+  within a short window with this same duty-and-freight deduction. Pick one and apply it
+  consistently.
 </p>
 
 <h3 class="serif" style="${H3}">Cancellations</h3>

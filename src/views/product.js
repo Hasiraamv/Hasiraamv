@@ -150,11 +150,14 @@ export function productPage({ product, offers, images, related, selectedSize, en
         certificate, and insured delivery to your door. Nothing further is payable when it arrives.
       </div>
       <p class="refund-note" style="font-size:12px; color:var(--muted); line-height:1.6; margin:12px 0 0; padding-top:12px; border-top:1px solid #ddd5c2;">
-        <strong>On refunds:</strong> ${formatINR(
+        <strong>On refunds:</strong> if this piece is not authentic, damaged, or not as described,
+        you get the full ${formatINR(best.landed_price)} back — duty and freight included, no
+        deductions. If you simply change your mind, ${formatINR(
           best.duty + best.shipping
-        )} of this price is import duty and freight. Duty is paid to customs on arrival and cannot be
-        reclaimed, so it is not returned on a refund — you would be refunded
-        ${formatINR(best.landed_price - best.duty - best.shipping)}.
+        )} of this price is import duty and freight, paid to customs on arrival and not
+        reclaimable, so a change-of-mind refund would be ${formatINR(
+          best.landed_price - best.duty - best.shipping
+        )}.
         <a href="/returns">Full returns policy</a>.
       </p>
     </div>`
