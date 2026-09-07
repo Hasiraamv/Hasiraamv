@@ -1,0 +1,4 @@
+-- Google Sign-In support. Google-only accounts get a random unusable
+-- password_hash (column stays NOT NULL, no separate migration needed for that).
+ALTER TABLE users ADD COLUMN google_id TEXT;
+CREATE UNIQUE INDEX idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL;
