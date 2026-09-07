@@ -19,9 +19,27 @@ database_id = "8932b638-5ed4-4173-9fe3-c27c5203954c"
 
 [vars]
 SITE_NAME = "Mintmark"
-SITE_URL = "https://pocket37.com"
-SUPPORT_WHATSAPP = "+91 00000 00000"
+SITE_URL = "https://mintmark.rehanhussain859.workers.dev"
 CURRENCY = "INR"
+
+# DEMO_MODE shows a banner saying the catalogue is sample data and no orders are fulfilled.
+# Leave it "true" until you are selling real stock — the listings, sellers and prices below
+# are invented, and presenting them as a live shop would mislead buyers.
+DEMO_MODE = "true"
+
+# Business details. These appear in your policies, footer and contact page. Every page that
+# needs them reads from here, so fill them in once. Leaving a value blank shows a visible
+# placeholder rather than silently omitting a legally required detail.
+LEGAL_NAME = ""
+REGISTERED_ADDRESS = ""
+SUPPORT_EMAIL = ""
+SUPPORT_WHATSAPP = ""
+GSTIN = ""
+CIN = ""
+GRIEVANCE_OFFICER = ""
+GRIEVANCE_EMAIL = ""
+GRIEVANCE_PHONE = ""
+JURISDICTION_CITY = ""
 
 # Secrets (set with `wrangler secret put <NAME>`, never commit them):
 #   ADMIN_PASSWORD   password for /admin

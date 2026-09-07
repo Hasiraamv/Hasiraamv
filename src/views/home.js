@@ -49,7 +49,7 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
       <div style="display:flex; gap:14px; padding:26px 30px; ${
         i < 3 ? 'border-right:1px solid var(--line);' : ''
       } align-items:flex-start;">
-        ${icon(ic, '#a17c3a', 19)}
+        ${icon(ic, '#80632e', 19)}
         <div>
           <div style="font-size:13.5px; font-weight:600; margin-bottom:3px;">${title}</div>
           <div style="font-size:12.5px; color:var(--muted); line-height:1.5;">${sub}</div>
@@ -179,8 +179,15 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
           <div class="field"><input name="size" placeholder="Size" maxlength="40"></div>
           <div class="field"><input name="budget" placeholder="Budget ceiling (₹)" inputmode="numeric" maxlength="12"></div>
         </div>
-        <div class="field"><input name="contact" placeholder="Email or WhatsApp number" required maxlength="120"></div>
+        <div class="field">
+          <label for="sourcing-contact" class="visually-hidden">Email or WhatsApp number</label>
+          <input id="sourcing-contact" name="contact" placeholder="Email or WhatsApp number" required maxlength="120">
+        </div>
         <button class="btn btn-block" type="submit">Submit a sourcing request</button>
+        <p style="font-size:11.5px; color:var(--muted); margin:12px 0 0; line-height:1.55;">
+          We use these details only to search for this piece and reply to you about it. Nothing else.
+          See our <a href="/privacy">privacy policy</a>.
+        </p>
       </form>
     </div>
   </div>

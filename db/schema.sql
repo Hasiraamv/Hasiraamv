@@ -1,5 +1,6 @@
 -- Mintmark schema. All money columns are whole rupees (INTEGER), never floats.
 
+DROP TABLE IF EXISTS seller_applications;
 DROP TABLE IF EXISTS verification_log;
 DROP TABLE IF EXISTS certificates;
 DROP TABLE IF EXISTS authenticators;
@@ -183,6 +184,25 @@ CREATE TABLE verification_log (
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_verlog_cert ON verification_log(certificate_no, created_at DESC);
+
+-- People applying to sell on the marketplace. Approving one creates a sellers row.
+CREATE TABLE seller_applications (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  business_name  TEXT NOT NULL,
+  contact_name   TEXT NOT NULL,
+  email          TEXT NOT NULL,
+  phone          TEXT,
+  city           TEXT NOT NULL,
+  country        TEXT NOT NULL,
+  categories     TEXT,
+  volume         TEXT,
+  authentication TEXT,      -- how they authenticate today
+  website        TEXT,
+  notes          TEXT,
+  status         TEXT NOT NULL DEFAULT 'new',  -- new | reviewing | approved | declined
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_seller_apps_created ON seller_applications(created_at DESC);
 
 CREATE TABLE sourcing_requests (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,

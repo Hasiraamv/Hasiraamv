@@ -61,7 +61,8 @@ export async function adminRouter(request, env, path) {
   }
 
   if (path === '/admin') return dashboard(env);
-  if (path === '/admin/orders') return ordersPage(env);
+  if (path === '/admin/orders')
+    return ordersPage(env, new URL(request.url).searchParams.get('issued'));
   if (path === '/admin/orders/advance' && method === 'POST') return advanceOrder(request, env);
   if (path === '/admin/certificates') return certificatesPage(env);
   if (path === '/admin/certificates/issue' && method === 'POST') return issueCert(request, env);
@@ -73,6 +74,8 @@ export async function adminRouter(request, env, path) {
   if (path === '/admin/images/upload' && method === 'POST') return uploadImage(request, env);
   if (path === '/admin/images/delete' && method === 'POST') return removeImage(request, env);
   if (path === '/admin/sourcing') return sourcingPage(env);
+  if (path === '/admin/sellers') return sellerApplicationsPage(env);
+  if (path === '/admin/sellers/decide' && method === 'POST') return decideApplication(request, env);
 
   return adminHtml('<div class="notice">Unknown admin page.</div>', 404);
 }
@@ -94,6 +97,7 @@ function adminHtml(body, status = 200, extraHeaders = {}) {
     <a href="/admin/orders">Orders</a>
     <a href="/admin/certificates">Certificates</a>
     <a href="/admin/products">Products &amp; offers</a>
+    <a href="/admin/sellers">Seller applications</a>
     <a href="/admin/sourcing">Sourcing requests</a>
   </nav>
   <div class="nav-right"><a href="/" target="_blank">View site</a><a href="/admin/logout">Sign out</a></div>
@@ -221,11 +225,42 @@ function ordersTable(orders) {
 </table>`;
 }
 
-async function ordersPage(env) {
+async function ordersPage(env, issuedNo) {
   const orders = await db.listOrders(env.DB, 100);
+
+  let banner = '';
+  if (issuedNo) {
+    const cert = await env.DB.prepare(
+      'SELECT certificate_no, verify_code FROM certificates WHERE certificate_no = ?'
+    )
+      .bind(String(issuedNo).toUpperCase())
+      .first();
+    if (cert) {
+      banner = `
+<div class="cert-card" style="margin-bottom:24px;">
+  <div class="notice notice-good" style="margin-bottom:18px;">Certificate issued automatically on authentication.</div>
+  <div class="tag" style="color:var(--gold-light)">Certificate number</div>
+  <div class="serif" style="font-size:28px; letter-spacing:.08em; margin:6px 0 20px;">${escapeHtml(
+    cert.certificate_no
+  )}</div>
+  <div class="tag" style="color:var(--gold-light)">Verification code — print this and seal it inside the package</div>
+  <div class="serif" style="font-size:28px; letter-spacing:.22em; margin-top:6px;">${escapeHtml(
+    cert.verify_code
+  )}</div>
+  <div style="margin-top:20px; display:flex; gap:12px; flex-wrap:wrap;">
+    <a class="btn btn-gold" href="/certificate/${encodeURIComponent(cert.certificate_no)}" target="_blank">Print certificate</a>
+  </div>
+</div>`;
+    }
+  }
+
   return adminHtml(`
 <h2 class="serif" style="font-size:32px; margin:0 0 8px;">Orders</h2>
-<p class="muted" style="margin:0 0 22px; font-size:13.5px;">Advancing an order adds a stage to the buyer's tracking timeline immediately.</p>
+<p class="muted" style="margin:0 0 22px; font-size:13.5px;">
+  Advancing an order adds a stage to the buyer's tracking timeline immediately. Moving one to
+  <strong>authenticated</strong> issues its certificate automatically.
+</p>
+${banner}
 ${ordersTable(orders)}`);
 }
 
@@ -245,12 +280,60 @@ async function advanceOrder(request, env) {
   };
 
   await db.addOrderEvent(env.DB, orderId, status, notes[status] || null);
+
+  // Passing authentication is what earns a certificate, so issue it here rather than
+  // leaving it as a separate step someone can forget.
+  if (status === 'authenticated') {
+    const issued = await issueCertificateForOrder(env, orderId);
+    if (issued) {
+      return redirect(`/admin/orders?issued=${encodeURIComponent(issued.certificateNo)}`);
+    }
+  }
+
   if (status === 'delivered') {
     await env.DB.prepare("UPDATE offers SET status = 'sold' WHERE id = (SELECT offer_id FROM orders WHERE id = ?)")
       .bind(orderId)
       .run();
   }
   return redirect('/admin/orders');
+}
+
+// Issues a certificate for an order that does not have one yet. Returns null when the
+// order is missing or already certified, so advancing twice never mints a second number.
+async function issueCertificateForOrder(env, orderId, { authenticatorId, sellerReportRef, notes } = {}) {
+  const order = await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();
+  if (!order || order.certificate_no) return null;
+
+  const offer = await db.getOfferById(env.DB, order.offer_id);
+  const product = await env.DB.prepare('SELECT * FROM products WHERE id = ?')
+    .bind(order.product_id)
+    .first();
+  if (!offer || !product) return null;
+
+  const category = await env.DB.prepare('SELECT slug FROM categories WHERE id = ?')
+    .bind(product.category_id)
+    .first();
+  const seller = await env.DB.prepare('SELECT * FROM sellers WHERE id = ?').bind(offer.seller_id).first();
+
+  // Fall back to the first active authenticator so an automatic issue is still signed.
+  let signedBy = authenticatorId;
+  if (!signedBy) {
+    const fallback = await env.DB.prepare(
+      'SELECT id FROM authenticators WHERE active = 1 ORDER BY id LIMIT 1'
+    ).first();
+    signedBy = fallback?.id || null;
+  }
+
+  return issueCertificate(env.DB, {
+    order,
+    product,
+    offer,
+    seller,
+    categorySlug: category?.slug,
+    authenticatorId: signedBy,
+    sellerReportRef: sellerReportRef || null,
+    notes: notes || null,
+  });
 }
 
 async function certificatesPage(env) {
@@ -361,27 +444,12 @@ async function issueCert(request, env) {
   const orderId = Number(form.get('order_id'));
   if (!Number.isInteger(orderId)) return redirect('/admin/certificates');
 
-  const order = await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();
-  if (!order || order.certificate_no) return redirect('/admin/certificates');
-
-  const offer = await db.getOfferById(env.DB, order.offer_id);
-  const product = await env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(order.product_id).first();
-  const category = await env.DB.prepare('SELECT slug FROM categories WHERE id = ?')
-    .bind(product.category_id)
-    .first();
-  const seller = await env.DB.prepare('SELECT * FROM sellers WHERE id = ?').bind(offer.seller_id).first();
-
-  const authenticatorId = Number(form.get('authenticator_id')) || null;
-  const issued = await issueCertificate(env.DB, {
-    order,
-    product,
-    offer,
-    seller,
-    categorySlug: category?.slug,
-    authenticatorId,
+  const issued = await issueCertificateForOrder(env, orderId, {
+    authenticatorId: Number(form.get('authenticator_id')) || null,
     sellerReportRef: String(form.get('report') || '').trim() || null,
     notes: String(form.get('notes') || '').trim() || null,
   });
+  if (!issued) return redirect('/admin/certificates');
 
   return adminHtml(`
 <div class="notice notice-good">
@@ -481,7 +549,13 @@ ${
       </div>
       <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="3" maxlength="1200"></textarea></div>
       <div class="field"><label for="condition">Condition notes</label><input id="condition" name="condition" maxlength="200"></div>
-      <div class="field"><label for="image">Image URL (optional)</label><input id="image" name="image" maxlength="400" placeholder="https://..."></div>
+      <div class="field"><label for="image">Image URL (optional)</label><input id="image" name="image" maxlength="400" placeholder="https://...">
+        <span class="hint">
+          Only use photographs you took or have written permission to use. Brand press images,
+          another reseller's photos and images lifted from search results are someone else's
+          copyright, and using them is how a shop like this gets a takedown notice.
+        </span>
+      </div>
       <button class="btn btn-block" type="submit">Add product</button>
     </form>
   </div>
@@ -544,7 +618,7 @@ ${
                   <img src="${escapeHtml(im.url)}" alt="" style="width:44px; height:44px; object-fit:cover; border:1px solid var(--line);">
                   <form method="post" action="/admin/images/delete" style="display:inline;">
                     <input type="hidden" name="image_id" value="${im.id}">
-                    <button type="submit" title="Delete photo" style="position:absolute; top:-6px; right:-6px; width:18px; height:18px; line-height:1; border:1px solid var(--line); background:var(--card); cursor:pointer; font-size:11px; padding:0;">×</button>
+                    <button type="submit" title="Delete photo" aria-label="Delete this photo" style="position:absolute; top:-6px; right:-6px; width:18px; height:18px; line-height:1; border:1px solid var(--line); background:var(--card); cursor:pointer; font-size:11px; padding:0;">×</button>
                   </form>
                 </span>`
               )
@@ -697,6 +771,105 @@ async function removeImage(request, env) {
     await deleteImage(env, row.url);
   }
   return redirect('/admin/products');
+}
+
+async function sellerApplicationsPage(env) {
+  const { results: apps } = await env.DB.prepare(
+    'SELECT * FROM seller_applications ORDER BY created_at DESC LIMIT 100'
+  ).all();
+
+  if (!(apps || []).length) {
+    return adminHtml(`
+<h2 class="serif" style="font-size:32px; margin:0 0 8px;">Seller applications</h2>
+<p class="muted" style="margin:0 0 22px; font-size:13.5px;">Applications from <a href="/sell" target="_blank">/sell</a> land here.</p>
+<div class="notice">No applications yet.</div>`);
+  }
+
+  return adminHtml(`
+<h2 class="serif" style="font-size:32px; margin:0 0 8px;">Seller applications</h2>
+<p class="muted" style="margin:0 0 22px; font-size:13.5px;">
+  Approving an application creates a seller you can attach offers to. It does not verify anyone —
+  collect and check their KYC documents yourself first.
+</p>
+<table class="table">
+  <thead><tr><th>Business</th><th>Contact</th><th>Sells</th><th>Volume</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+    ${apps
+      .map(
+        (a) => `<tr>
+      <td data-label="Business">
+        <strong>${escapeHtml(a.business_name)}</strong>
+        <div style="font-size:11.5px; color:var(--faint);">${escapeHtml(a.city)}, ${escapeHtml(a.country)}${
+          a.website ? ` · ${escapeHtml(a.website)}` : ''
+        }</div>
+      </td>
+      <td data-label="Contact">
+        ${escapeHtml(a.contact_name)}
+        <div style="font-size:11.5px; color:var(--faint);">${escapeHtml(a.email)}${
+          a.phone ? `<br>${escapeHtml(a.phone)}` : ''
+        }</div>
+      </td>
+      <td data-label="Sells">${escapeHtml(a.categories || '—')}
+        ${a.authentication ? `<div style="font-size:11.5px; color:var(--faint);">Auth: ${escapeHtml(a.authentication)}</div>` : ''}
+      </td>
+      <td data-label="Volume">${escapeHtml(a.volume || '—')}</td>
+      <td data-label="Status">${escapeHtml(a.status)}</td>
+      <td>
+        ${
+          a.status === 'new' || a.status === 'reviewing'
+            ? `<div style="display:flex; gap:6px;">
+                 <form method="post" action="/admin/sellers/decide">
+                   <input type="hidden" name="id" value="${a.id}">
+                   <input type="hidden" name="decision" value="approved">
+                   <button class="chip" type="submit" style="cursor:pointer;">Approve</button>
+                 </form>
+                 <form method="post" action="/admin/sellers/decide">
+                   <input type="hidden" name="id" value="${a.id}">
+                   <input type="hidden" name="decision" value="declined">
+                   <button class="chip" type="submit" style="cursor:pointer;">Decline</button>
+                 </form>
+               </div>`
+            : '<span class="faint">—</span>'
+        }
+      </td>
+    </tr>`
+      )
+      .join('')}
+  </tbody>
+</table>`);
+}
+
+async function decideApplication(request, env) {
+  const form = await request.formData();
+  const id = Number(form.get('id'));
+  const decision = String(form.get('decision') || '');
+  if (!Number.isInteger(id) || !['approved', 'declined'].includes(decision)) {
+    return redirect('/admin/sellers');
+  }
+
+  const app = await env.DB.prepare('SELECT * FROM seller_applications WHERE id = ?').bind(id).first();
+  if (!app) return redirect('/admin/sellers');
+
+  await env.DB.prepare('UPDATE seller_applications SET status = ? WHERE id = ?')
+    .bind(decision, id)
+    .run();
+
+  // Approving creates the seller record so offers can be attached straight away. They start
+  // unverified: KYC is a document check you do off the site, then tick here.
+  if (decision === 'approved') {
+    const existing = await env.DB.prepare('SELECT id FROM sellers WHERE name = ?')
+      .bind(app.business_name)
+      .first();
+    if (!existing) {
+      await env.DB.prepare(
+        'INSERT INTO sellers (name, city, country, kyc_verified, legit_check) VALUES (?, ?, ?, 0, 0)'
+      )
+        .bind(app.business_name, app.city, app.country)
+        .run();
+    }
+  }
+
+  return redirect('/admin/sellers');
 }
 
 async function sourcingPage(env) {

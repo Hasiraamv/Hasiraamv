@@ -44,7 +44,7 @@ export function productPage({ product, offers, images, related, selectedSize, en
   <div>
     <div style="aspect-ratio:1/1; background:var(--tile); position:relative;">
       ${hero ? `<img src="${escapeHtml(hero.url)}" alt="${escapeHtml(product.title)}" style="width:100%;height:100%;object-fit:cover">` : ''}
-      <span class="badge">${icon('check', '#a17c3a', 12)} DUAL AUTHENTICATED</span>
+      <span class="badge">${icon('check', '#80632e', 12)} DUAL AUTHENTICATED</span>
       ${underRetail ? `<span class="badge badge-right badge-under">UNDER RETAIL</span>` : ''}
     </div>
     ${
@@ -56,7 +56,7 @@ export function productPage({ product, offers, images, related, selectedSize, en
                  (im) =>
                    `<div style="aspect-ratio:1/1; background:var(--tile);"><img src="${escapeHtml(
                      im.url
-                   )}" alt="" style="width:100%;height:100%;object-fit:cover"></div>`
+                   )}" alt="${escapeHtml(product.title)}" style="width:100%;height:100%;object-fit:cover"></div>`
                )
                .join('')}
            </div>`
@@ -109,7 +109,7 @@ export function productPage({ product, offers, images, related, selectedSize, en
         ${sizes
           .map((s) => {
             const o = bySize.get(s);
-            return `<a class="size${s === activeSize ? ' active' : ''}" href="?size=${encodeURIComponent(s)}">
+            return `<a class="size${s === activeSize ? ' active' : ''}" href="?size=${encodeURIComponent(s)}"${s === activeSize ? ' aria-current="true"' : ''} aria-label="Size ${escapeHtml(s)}, ${formatINR(o.landed_price)}">
               <div class="n">${escapeHtml(s)}</div>
               <div class="p">${formatINR(o.landed_price)}</div>
             </a>`;
@@ -144,15 +144,14 @@ export function productPage({ product, offers, images, related, selectedSize, en
     </div>
 
     <div style="margin-top:16px; border:1px solid var(--line); background:var(--paper-alt); padding:18px 20px;">
-      <div style="font-size:13.5px; font-weight:600; margin-bottom:12px;">What's in the ${formatINR(best.landed_price)}</div>
-      <div style="display:flex; flex-direction:column; gap:8px; font-size:12.5px; color:#5c5748;">
-        <div style="display:flex; justify-content:space-between;"><span>Seller price</span><span>${formatINR(best.seller_price)}</span></div>
-        <div style="display:flex; justify-content:space-between;"><span>Import duty &amp; customs clearance</span><span>${formatINR(best.duty)}</span></div>
-        <div style="display:flex; justify-content:space-between;"><span>Dual authentication &amp; certificate</span><span>${formatINR(best.auth_fee)}</span></div>
-        <div style="display:flex; justify-content:space-between;"><span>Insured international shipping</span><span>${formatINR(best.shipping)}</span></div>
-        <div style="display:flex; justify-content:space-between; padding-top:9px; border-top:1px solid #ddd5c2; font-weight:600; color:var(--text); font-size:13.5px;"><span>You pay</span><span>${formatINR(best.landed_price)}</span></div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+        ${icon('check', '#3f5f45', 16)}
+        <span style="font-size:13.5px; font-weight:600;">${formatINR(best.landed_price)} is everything</span>
       </div>
-      <div style="font-size:11.5px; color:var(--faint); margin-top:12px; line-height:1.5;">No surprise charges at delivery — duties are paid by us before the parcel enters the country.</div>
+      <div style="font-size:12.5px; color:#5c5748; line-height:1.65;">
+        The listed price includes import duty, customs clearance, dual authentication with a numbered
+        certificate, and insured delivery to your door. Nothing further is payable when it arrives.
+      </div>
     </div>`
         : `<div class="notice" style="margin-top:20px;">No live offers for this piece right now. <a href="/#sourcing">Ask us to source it</a> and we will put it to our seller network.</div>`
     }
@@ -188,15 +187,17 @@ ${
                 o.kyc_verified
                   ? `<span style="display:inline-flex; align-items:center; gap:4px; background:var(--paper-alt); border:1px solid #ddd5c2; padding:2px 6px; font-size:9.5px; color:var(--gold); font-weight:700;">${icon(
                       'check',
-                      '#a17c3a',
+                      '#80632e',
                       9
                     )} KYC</span>`
                   : ''
               }
             </div>
-            <div style="font-size:11.5px; color:var(--faint); margin-top:3px;">${o.rating} ★ · ${
-            o.sales_count
-          } sales${o.legit_check ? ' · legit check on file' : ''}</div>
+            <div style="font-size:11.5px; color:var(--faint); margin-top:3px;">${
+              o.completed_sales > 0
+                ? `${o.completed_sales} completed sale${o.completed_sales === 1 ? '' : 's'} through us`
+                : 'New to the marketplace'
+            }${o.legit_check ? ' · authentication report on file' : ''}</div>
           </td>
           <td data-label="Condition">${escapeHtml(o.condition)}</td>
           <td data-label="Ships from">${escapeHtml(o.ships_from)}</td>
@@ -208,7 +209,7 @@ ${
           <td class="num">
             <form method="post" action="/cart/add">
               <input type="hidden" name="offer_id" value="${o.id}">
-              <button class="btn btn-outline" style="padding:10px 18px; font-size:12.5px;" type="submit">Buy</button>
+              <button class="btn btn-outline" style="padding:10px 18px; font-size:12.5px;" type="submit" aria-label="Buy from ${escapeHtml(o.seller_name)} for ${formatINR(o.landed_price)} landed">Buy</button>
             </form>
           </td>
         </tr>`;

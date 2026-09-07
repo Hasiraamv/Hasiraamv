@@ -8,6 +8,17 @@ import { verifyPage, certificatePage } from './views/verify.js';
 import { adminRouter } from './admin.js';
 import { verifyCertificate } from './certificates.js';
 import { serveImage } from './images.js';
+import {
+  authenticationPage,
+  shippingPage,
+  returnsPage,
+  termsPage,
+  privacyPage,
+  aboutPage,
+  contactPage,
+  cookiesPage,
+  sellPage,
+} from './views/pages.js';
 import { readCart, writeCart, sameOrigin, publicRef } from './session.js';
 
 export default {
@@ -85,10 +96,12 @@ async function route(request, env, ctx) {
 
   if (path === '/sourcing-requests' && method === 'POST') return sourcingSubmit(request, env);
 
+  if (path === '/sell' && method === 'POST') return sellerApply(request, env, cart);
+
   const staticPage = STATIC_PAGES[path];
   if (staticPage) {
     return html(
-      layout({ title: staticPage.title, env, cartCount: cart.length, body: staticPage.body(env) })
+      layout({ title: staticPage.title, env, cartCount: cart.length, body: staticPage.body(env, url) })
     );
   }
 
@@ -486,119 +499,79 @@ async function sourcingSubmit(request, env) {
 // Simple content pages ------------------------------------------------------
 
 const STATIC_PAGES = {
-  '/authentication': {
-    title: 'Authentication',
-    body: () => `
-<section class="section" style="max-width:820px;">
-  <span class="tag gold">Our guarantee</span>
-  <h2 class="serif" style="font-size:38px; margin:10px 0 16px;">Two checks, one seal, full traceability.</h2>
-  <p style="font-size:16px; line-height:1.75; color:#4a463c;">
-    Nothing is listed until it has been inspected in hand overseas, and nothing ships until it has
-    been re-checked here. Each piece travels in a tamper-evident seal with a numbered certificate
-    you can verify online.
-  </p>
-  <ol style="font-size:15px; line-height:1.8; color:#4a463c; padding-left:20px;">
-    <li><strong>Seller legit check.</strong> Every KYC-verified seller authenticates a piece and uploads the report before we let it go live.</li>
-    <li><strong>In-house inspection.</strong> On arrival at our facility an authenticator runs an independent 30-point check.</li>
-    <li><strong>Certificate and seal.</strong> We issue a numbered certificate and seal the package. The number encodes the year, the source city and the category.</li>
-    <li><strong>Refund if it fails.</strong> If a piece ever fails an independent check, we refund it in full.</li>
-  </ol>
-  <a class="btn" href="/verify">Verify a certificate</a>
-</section>`,
-  },
-  '/shipping': {
-    title: 'Shipping & import',
-    body: () => `
-<section class="section" style="max-width:820px;">
-  <span class="tag gold">Shipping &amp; import</span>
-  <h2 class="serif" style="font-size:38px; margin:10px 0 16px;">Why it takes two to four weeks.</h2>
-  <p style="font-size:16px; line-height:1.75; color:#4a463c;">
-    Everything here is sourced abroad. A typical order spends 1–2 days with the seller, 2–3 days in
-    authentication, 6–8 days in transit and customs, and 2–3 days with the local courier. We show
-    the window on every listing before you buy, not after.
-  </p>
-  <p style="font-size:16px; line-height:1.75; color:#4a463c;">
-    <strong>Duties are included in the price you see.</strong> We pay them before the parcel enters
-    the country, so nothing further is payable on delivery. Shipments are insured door to door and
-    tracked at every stage.
-  </p>
-</section>`,
-  },
-  '/returns': {
-    title: 'Returns',
-    body: () => `
-<section class="section" style="max-width:820px;">
-  <span class="tag gold">Returns</span>
-  <h2 class="serif" style="font-size:38px; margin:10px 0 16px;">Returns policy</h2>
-  <div class="notice">This page still needs your real policy before launch. The text below is a placeholder.</div>
-  <p style="font-size:16px; line-height:1.75; color:#4a463c; margin-top:18px;">
-    If a piece fails an independent authentication check, we refund it in full, including shipping.
-    [YOUR RETURNS WINDOW AND CONDITIONS GO HERE.]
-  </p>
-</section>`,
-  },
+  '/authentication': { title: 'Authentication', body: (env) => authenticationPage(env) },
+  '/shipping': { title: 'Shipping & import', body: (env) => shippingPage(env) },
+  '/returns': { title: 'Returns', body: (env) => returnsPage(env) },
+  '/terms': { title: 'Terms', body: (env) => termsPage(env) },
+  '/privacy': { title: 'Privacy', body: (env) => privacyPage(env) },
+  '/cookies': { title: 'Cookies', body: (env) => cookiesPage(env) },
+  '/about': { title: 'About', body: (env) => aboutPage(env) },
+  '/contact': { title: 'Contact', body: (env) => contactPage(env) },
   '/sell': {
     title: 'Sell with us',
-    body: () => `
-<section class="section" style="max-width:820px;">
-  <span class="tag gold">Sellers</span>
-  <h2 class="serif" style="font-size:38px; margin:10px 0 16px;">Sell with us</h2>
-  <p style="font-size:16px; line-height:1.75; color:#4a463c;">
-    We work with a vetted network of dealers and boutiques. Sellers are KYC-verified, must upload an
-    authentication report for every listing, and are paid out after the piece clears our in-house check.
-  </p>
-  <h3 class="serif" id="requirements" style="font-size:24px; margin:28px 0 10px;">Requirements</h3>
-  <ul style="font-size:15px; line-height:1.8; color:#4a463c; padding-left:20px;">
-    <li>Business or trader KYC documentation</li>
-    <li>An authentication report per listing</li>
-    <li>Dispatch within two business days of a sale</li>
-  </ul>
-  <h3 class="serif" id="payouts" style="font-size:24px; margin:28px 0 10px;">Payouts</h3>
-  <p style="font-size:15px; line-height:1.8; color:#4a463c;">
-    Paid after the piece passes our inspection. [YOUR COMMISSION AND PAYOUT TERMS GO HERE.]
-  </p>
-</section>`,
-  },
-  '/about': {
-    title: 'About',
-    body: (env) => `
-<section class="section" style="max-width:820px;">
-  <span class="tag gold">About</span>
-  <h2 class="serif" style="font-size:38px; margin:10px 0 16px;">${escapeHtml(env?.SITE_NAME || 'Mintmark')}</h2>
-  <p style="font-size:16px; line-height:1.75; color:#4a463c;">
-    A mint mark is the stamp struck into a coin that says which mint made it — the mark that proves
-    where something genuinely came from. That is the whole business: rare pieces, sourced abroad,
-    proven before they ship.
-  </p>
-  <div class="notice" style="margin-top:18px;">Add your real story, team and registered business details before launch.</div>
-</section>`,
-  },
-  '/contact': {
-    title: 'Contact',
-    body: (env) => `
-<section class="section" style="max-width:820px;">
-  <span class="tag gold">Contact</span>
-  <h2 class="serif" style="font-size:38px; margin:10px 0 16px;">Talk to us</h2>
-  <p style="font-size:16px; line-height:1.75; color:#4a463c;">
-    WhatsApp ${escapeHtml(env?.SUPPORT_WHATSAPP || '[YOUR NUMBER]')} · Monday to Saturday, 10:30am–7:00pm.
-  </p>
-  <p style="font-size:16px; line-height:1.75; color:#4a463c;">[YOUR EMAIL] · [YOUR REGISTERED ADDRESS]</p>
-</section>`,
-  },
-  '/privacy': {
-    title: 'Privacy',
-    body: () => `
-<section class="section" style="max-width:820px;">
-  <h2 class="serif" style="font-size:38px; margin:0 0 16px;">Privacy</h2>
-  <div class="notice">Placeholder. You need a real privacy policy before launch — you are collecting names, addresses and phone numbers.</div>
-</section>`,
-  },
-  '/terms': {
-    title: 'Terms',
-    body: () => `
-<section class="section" style="max-width:820px;">
-  <h2 class="serif" style="font-size:38px; margin:0 0 16px;">Terms</h2>
-  <div class="notice">Placeholder. Have these drafted before you take money.</div>
-</section>`,
+    body: (env, url) => sellPage({ submitted: url?.searchParams.get('applied') === '1', env }),
   },
 };
+
+async function sellerApply(request, env, cart) {
+  const form = await request.formData();
+  const get = (k, max) => String(form.get(k) || '').trim().slice(0, max);
+
+  const data = {
+    business: get('business', 140),
+    contact: get('contact', 120),
+    email: get('email', 160),
+    phone: get('phone', 30),
+    city: get('city', 80),
+    country: get('country', 80),
+    categories: get('categories', 200),
+    volume: get('volume', 40),
+    authentication: get('authentication', 200),
+    website: get('website', 200),
+    notes: get('notes', 1000),
+  };
+
+  const valid =
+    data.business &&
+    data.contact &&
+    data.city &&
+    data.country &&
+    /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.email);
+
+  if (!valid) {
+    return html(
+      layout({
+        title: 'Sell with us',
+        env,
+        cartCount: cart.length,
+        body: sellPage({
+          error: 'Please fill in the business name, your name, a valid email, city and country.',
+          env,
+        }),
+      }),
+      400
+    );
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO seller_applications
+       (business_name, contact_name, email, phone, city, country, categories, volume, authentication, website, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(
+      data.business,
+      data.contact,
+      data.email,
+      data.phone || null,
+      data.city,
+      data.country,
+      data.categories || null,
+      data.volume || null,
+      data.authentication || null,
+      data.website || null,
+      data.notes || null
+    )
+    .run();
+
+  return redirect('/sell?applied=1#apply');
+}

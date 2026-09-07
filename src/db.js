@@ -100,11 +100,18 @@ export async function getProductImages(db, productId) {
 }
 
 // All live offers for a product, cheapest first — the competing-sellers table.
+//
+// completed_sales is counted from delivered orders, not from a column someone can type a
+// number into. A seller with no delivered orders shows as new rather than borrowing
+// credibility it has not earned.
 export async function getOffersForProduct(db, productId) {
   const { results } = await db
     .prepare(
-      `SELECT o.*, s.name AS seller_name, s.city AS seller_city, s.rating, s.sales_count,
-              s.kyc_verified, s.legit_check
+      `SELECT o.*, s.name AS seller_name, s.city AS seller_city,
+              s.kyc_verified, s.legit_check,
+              (SELECT COUNT(*) FROM orders ord
+                 JOIN offers of2 ON of2.id = ord.offer_id
+                WHERE of2.seller_id = s.id AND ord.status = 'delivered') AS completed_sales
          FROM offers o JOIN sellers s ON s.id = o.seller_id
         WHERE o.product_id = ? AND o.status = 'active'
         ORDER BY o.landed_price ASC`

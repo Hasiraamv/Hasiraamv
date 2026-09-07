@@ -78,6 +78,46 @@ npm run dev
 
 `.dev.vars` is gitignored. Restart `wrangler dev` after creating it, or admin returns 503.
 
+## Compliance and accessibility status
+
+Audited with axe-core (WCAG 2.1 A and AA) across 15 public pages, 5 admin pages and mobile:
+**0 violations**. Colour contrast was measured rather than eyeballed — `--faint` and `--gold`
+were darkened from the original design because they measured 3.2–3.8:1 against the paper
+backgrounds and needed 4.5:1.
+
+| Item | State |
+| --- | --- |
+| Colour contrast | Fixed. All text pairings ≥ 4.5:1, verified by measurement |
+| Keyboard navigation | Skip link, visible 3px focus ring on every control, labelled fields |
+| Alt text | Product images use the product title; icons are `aria-hidden` (decorative) |
+| Button labels | Icon-only and repeated buttons carry `aria-label` naming what they act on |
+| Fake reviews | **Removed.** Seller sales counts now derive from delivered orders. A seller with none shows "New to the marketplace" rather than an invented rating |
+| Unsupported claims | Homepage stats now read from the database. A demo banner runs while the catalogue is sample data |
+| Tracking | None. No analytics, pixels, session recording or social embeds |
+| Third-party embeds | Google Fonts only, disclosed on `/cookies` |
+| Cookie consent | Not required — only two strictly necessary cookies. Explained on `/cookies` rather than a pointless banner |
+| Form consent | Checkout, sourcing and seller forms state what data is used for and link to the privacy policy |
+| Data minimisation | Only what delivery and contact require |
+| Policies | Terms, privacy, cookies, returns, shipping — drafted, **need legal review** |
+| Business details | Set once in `wrangler.toml`; unset values render as visible `[SET ...]` markers |
+| Image copyright | Warned at the point of upload |
+
+### Still yours to do
+
+1. **Fill in the business details** in `wrangler.toml` — legal name, address, GSTIN, CIN,
+   grievance officer, support email and phone. Until you do, `[SET ...]` markers appear on the
+   live policy pages. That is deliberate: a policy silently missing a legally required detail
+   looks finished when it is not.
+2. **Get the policies reviewed by an Indian lawyer.** They are honest, plain-language drafts
+   covering what the Consumer Protection (E-Commerce) Rules 2020 and the DPDP Act 2023 expect,
+   including the mandatory grievance officer. They are not legal advice and I am not a lawyer.
+3. **Set the open policy decisions** — returns window, change-of-mind stance, refund timeframe,
+   commission, payout terms. Search for `[YOUR` to find them.
+4. **Make the claims true before you make them.** The site says every piece gets a 30-point
+   in-house inspection, ships sealed with a certificate, and is insured door to door. Those are
+   good promises; they become false advertising the day you take money without doing them.
+5. **Turn off demo mode** (`DEMO_MODE = "false"`) only once the catalogue is real stock.
+
 ## Before taking real money
 
 1. **Payments are not connected.** Checkout records an order and reserves the offer, then tells

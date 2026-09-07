@@ -30,7 +30,7 @@ export function cartPage({ items, total }) {
               ${it.size_label !== 'One size' ? `Size ${escapeHtml(it.size_label)} · ` : ''}${escapeHtml(it.condition)}
             </div>
             <div style="font-size:12.5px; color:var(--muted); margin-top:4px; display:flex; align-items:center; gap:6px;">
-              ${icon('pin', '#8a8271', 11)} ${escapeHtml(it.seller_name)}, ${escapeHtml(it.ships_from)} · arrives ${e.from}–${e.to}
+              ${icon('pin', '#6e675a', 11)} ${escapeHtml(it.seller_name)}, ${escapeHtml(it.ships_from)} · arrives ${e.from}–${e.to}
             </div>
           </div>
           <div style="text-align:right;">
@@ -48,25 +48,19 @@ export function cartPage({ items, total }) {
     <div class="panel" style="padding:24px;">
       <h3 class="serif" style="font-size:22px; margin:0 0 16px;">Summary</h3>
       <div style="display:flex; flex-direction:column; gap:9px; font-size:13px; color:#5c5748;">
-        <div style="display:flex; justify-content:space-between;"><span>Seller prices</span><span>${formatINR(
-          items.reduce((s, i) => s + i.seller_price, 0)
-        )}</span></div>
-        <div style="display:flex; justify-content:space-between;"><span>Duty &amp; customs</span><span>${formatINR(
-          items.reduce((s, i) => s + i.duty, 0)
-        )}</span></div>
-        <div style="display:flex; justify-content:space-between;"><span>Authentication</span><span>${formatINR(
-          items.reduce((s, i) => s + i.auth_fee, 0)
-        )}</span></div>
-        <div style="display:flex; justify-content:space-between;"><span>Insured shipping</span><span>${formatINR(
-          items.reduce((s, i) => s + i.shipping, 0)
-        )}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>${items.length} item${
+    items.length === 1 ? '' : 's'
+  }</span><span>${formatINR(total)}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>Import duty &amp; customs</span><span style="color:var(--green); font-weight:600;">Included</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>Authentication &amp; certificate</span><span style="color:var(--green); font-weight:600;">Included</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>Insured delivery</span><span style="color:var(--green); font-weight:600;">Included</span></div>
         <div style="display:flex; justify-content:space-between; padding-top:12px; margin-top:4px; border-top:1px solid var(--line); font-weight:600; color:var(--text); font-size:16px;">
           <span>Total</span><span class="serif" style="font-size:22px;">${formatINR(total)}</span>
         </div>
       </div>
       <a class="btn btn-block" href="/checkout" style="margin-top:18px;">Checkout</a>
       <p style="font-size:11.5px; color:var(--faint); margin:12px 0 0; line-height:1.5;">
-        Duties are included. Nothing further is payable on delivery.
+        The price you see is the price you pay. Nothing further is payable on delivery.
       </p>
     </div>
   </div>
@@ -105,6 +99,14 @@ export function checkoutPage({ items, total, error }) {
       </div>
 
       <div class="notice" style="margin-top:16px;">
+        <strong>What we do with these details.</strong> We use your name, address and phone number to
+        import and deliver this order, and your email to send order updates and your certificate. We
+        share only what delivery requires — with the seller, our customs broker and the courier. We do
+        not use them for marketing and we do not sell them. Read the
+        <a href="/privacy">privacy policy</a>.
+      </div>
+
+      <div class="notice" style="margin-top:12px;">
         <strong>Payment is not yet connected.</strong> Placing this order records it and reserves the
         piece; you will be contacted to pay. Wire a gateway before taking real money — see README.
       </div>
@@ -125,12 +127,16 @@ export function checkoutPage({ items, total, error }) {
         </div>`;
         })
         .join('')}
-      <div style="display:flex; justify-content:space-between; font-weight:600; font-size:16px;">
+      <div style="font-size:12.5px; color:#5c5748; margin-bottom:12px; line-height:1.6;">
+        Import duty, customs, authentication and insured delivery are all included in this total.
+      </div>
+      <div style="display:flex; justify-content:space-between; font-weight:600; font-size:16px; padding-top:12px; border-top:1px solid var(--line);">
         <span>Total</span><span class="serif" style="font-size:22px;">${formatINR(total)}</span>
       </div>
       <button class="btn btn-block" type="submit" style="margin-top:18px;">Place order</button>
       <p style="font-size:11.5px; color:var(--faint); margin:12px 0 0; line-height:1.5;">
-        Duties included. Every piece is authenticated before dispatch; if it fails, you are refunded in full.
+        Nothing further is payable on delivery. Every piece is authenticated before dispatch; if it
+        fails, you are refunded in full.
       </p>
     </div>
   </form>

@@ -27,6 +27,35 @@ export function formatINR(amount) {
   return (n < 0 ? '-₹' : '₹') + out;
 }
 
+// True until the catalogue is real stock. Controlled by the DEMO_MODE var in wrangler.toml.
+export function isDemo(env) {
+  return String(env?.DEMO_MODE ?? 'true').toLowerCase() !== 'false';
+}
+
+// Business details come from configuration so they are filled in once. An unset value
+// renders as a visible placeholder rather than disappearing, because a policy page that
+// silently omits a legally required detail looks finished when it is not.
+const DETAIL_LABELS = {
+  LEGAL_NAME: 'REGISTERED COMPANY NAME',
+  REGISTERED_ADDRESS: 'REGISTERED ADDRESS',
+  SUPPORT_EMAIL: 'SUPPORT EMAIL',
+  SUPPORT_WHATSAPP: 'WHATSAPP NUMBER',
+  GSTIN: 'GSTIN',
+  CIN: 'CIN',
+  GRIEVANCE_OFFICER: 'GRIEVANCE OFFICER NAME',
+  GRIEVANCE_EMAIL: 'GRIEVANCE EMAIL',
+  GRIEVANCE_PHONE: 'GRIEVANCE PHONE',
+  JURISDICTION_CITY: 'CITY',
+};
+
+export function detail(env, key) {
+  const value = env?.[key];
+  if (value && String(value).trim()) return escapeHtml(String(value).trim());
+  return `<mark style="background:#f6e7c8; color:#5a4410; padding:1px 5px; font-size:0.95em;">[SET ${
+    DETAIL_LABELS[key] || key
+  }]</mark>`;
+}
+
 export function leadWindow(offer) {
   if (!offer) return '';
   return `${offer.lead_days_min}–${offer.lead_days_max} days`;
@@ -49,16 +78,49 @@ export const STYLES = `
   --ink-soft: #22201a;
   --text: #22201a;
   --muted: #6f6959;
-  --faint: #8a8271;
+  /* --faint and --gold are darkened from the original palette so every text pairing clears
+     WCAG AA (4.5:1) on all four light backgrounds. The originals measured 3.2-3.8. */
+  --faint: #6e675a;
   --line: #e0d9c8;
   --line-dark: #2e281f;
-  --gold: #a17c3a;
+  --gold: #80632e;
   --gold-light: #cba25a;
   --green: #3f5f45;
   --tile: #ece6d9;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
+
+/* Accessibility ------------------------------------------------------ */
+/* Every interactive element must show where keyboard focus is. :focus-visible keeps it
+   off mouse clicks but always on for keyboard and switch users. */
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid #16130f;
+  outline-offset: 2px;
+}
+.dark a:focus-visible, .dark button:focus-visible { outline-color: #cba25a; }
+
+.skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  background: var(--ink); color: #f2ede2; padding: 12px 20px; font-weight: 600;
+}
+.skip-link:focus { left: 0; color: #f2ede2; }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.demo-banner {
+  background: #4a3c14; color: #f7e9c4; text-align: center;
+  padding: 10px 16px; font-size: 13px; line-height: 1.5;
+}
+.demo-banner strong { color: #fff6df; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
 body {
   margin: 0;
   background: var(--paper);
@@ -69,7 +131,14 @@ body {
 }
 .serif { font-family: 'Newsreader', Georgia, serif; font-weight: 400; }
 a { color: var(--gold); text-decoration: none; }
-a:hover { color: #7d5f28; }
+a:hover { color: #6b5225; }
+/* WCAG 1.4.1: a link sitting inside a run of text must not be identified by colour alone,
+   so prose links are underlined. Navigation, cards and buttons are structurally obvious
+   and stay clean. */
+p a, li a, td a, .hint a, .notice a, .cert-row a, dd a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 img { max-width: 100%; display: block; }
 button, input, select, textarea { font: inherit; color: inherit; }
 
@@ -304,7 +373,7 @@ export function icon(name, color = 'currentColor', size = 16) {
 }
 
 export function verifiedBadge() {
-  return `<span class="badge">${icon('check', '#a17c3a', 11)} VERIFIED</span>`;
+  return `<span class="badge">${icon('check', '#80632e', 11)} VERIFIED</span>`;
 }
 
 export function productCard(p) {
@@ -328,7 +397,7 @@ export function productCard(p) {
   </span>
   <span>
     <span class="title">${escapeHtml(p.title)}</span>
-    <span class="meta">${icon('pin', '#8a8271', 11)} ${escapeHtml(p.ships_from || '—')}${
+    <span class="meta">${icon('pin', '#6e675a', 11)} ${escapeHtml(p.ships_from || '—')}${
     p.lead_days_min ? ` · arrives in ${p.lead_days_min}–${p.lead_days_max} days` : ''
   }</span>
     <span style="display:block">
@@ -357,6 +426,15 @@ export function layout({ title, description, body, env, cartCount = 0, activeNav
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to main content</a>
+${
+  isDemo(env)
+    ? `<div class="demo-banner no-print" role="status">
+         <strong>Demo site.</strong> The catalogue, sellers and prices here are sample data for
+         testing. Nothing is for sale and no order will be fulfilled.
+       </div>`
+    : ''
+}
 <div class="announce no-print">
   <span class="tag">Dual authentication on every order</span>
   <span class="sep">—</span>
@@ -365,8 +443,8 @@ export function layout({ title, description, body, env, cartCount = 0, activeNav
 
 <header class="no-print">
   <div class="nav">
-    <a class="logo" href="/">${escapeHtml(site.toUpperCase())}</a>
-    <nav class="nav-links">
+    <a class="logo" href="/" aria-label="${escapeHtml(site)} home">${escapeHtml(site.toUpperCase())}</a>
+    <nav class="nav-links" aria-label="Categories">
       <a href="/c/sneakers">Sneakers</a>
       <a href="/c/streetwear">Streetwear</a>
       <a href="/c/watches">Watches</a>
@@ -375,15 +453,20 @@ export function layout({ title, description, body, env, cartCount = 0, activeNav
       <a href="/c/collectibles">Collectibles</a>
     </nav>
     <div class="nav-right">
-      <form class="search" action="/search" method="get">
-        ${icon('search', '#8a8271', 14)}
-        <input type="search" name="q" placeholder="Search listings" aria-label="Search listings">
+      <form class="search" action="/search" method="get" role="search">
+        ${icon('search', '#6e675a', 14)}
+        <label for="site-search" class="visually-hidden">Search listings</label>
+        <input id="site-search" type="search" name="q" placeholder="Search listings">
       </form>
       <a href="/track">Track order</a>
-      <a href="/cart">${icon('bag', '#3a362c', 15)} Bag (${cartCount})</a>
+      <a href="/cart" aria-label="Your bag, ${cartCount} item${cartCount === 1 ? '' : 's'}">${icon(
+    'bag',
+    '#3a362c',
+    15
+  )} Bag (${cartCount})</a>
     </div>
   </div>
-  <div class="subnav">
+  <nav class="subnav" aria-label="Price and delivery filters">
     <a href="/c/all?max=25000"${activeNav === 'u25' ? ' class="active"' : ''}>Under ₹25,000</a>
     <a href="/c/all?max=50000">Under ₹50,000</a>
     <a href="/c/all?under_retail=1">Under retail</a>
@@ -391,10 +474,10 @@ export function layout({ title, description, body, env, cartCount = 0, activeNav
     <a href="/c/all?lead=14">Arriving in 2 weeks</a>
     <a href="/verify">Verify a certificate</a>
     <a href="/sell">Sell with us</a>
-  </div>
+  </nav>
 </header>
 
-<main>
+<main id="main">
 ${body}
 </main>
 
@@ -405,10 +488,14 @@ ${body}
         <div class="logo" style="color:#f2ede2; font-size:23px; margin-bottom:14px;">${escapeHtml(
           site.toUpperCase()
         )}</div>
-        <div style="font-size:12.5px; line-height:1.7;">An authenticated marketplace for imported rare goods. [YOUR REGISTERED ADDRESS]</div>
-        <div style="font-size:12.5px; line-height:1.7; margin-top:10px;">WhatsApp support · ${escapeHtml(
-          env?.SUPPORT_WHATSAPP || '[YOUR NUMBER]'
-        )}<br>Mon–Sat, 10:30am–7:00pm</div>
+        <div style="font-size:12.5px; line-height:1.7;">
+          An authenticated marketplace for imported rare goods.<br>
+          ${detail(env, 'LEGAL_NAME')}<br>${detail(env, 'REGISTERED_ADDRESS')}
+        </div>
+        <div style="font-size:12.5px; line-height:1.7; margin-top:10px;">
+          WhatsApp ${detail(env, 'SUPPORT_WHATSAPP')}<br>
+          ${detail(env, 'SUPPORT_EMAIL')}<br>Mon–Sat, 10:30am–7:00pm
+        </div>
       </div>
       <div class="col"><h4>Shop</h4>
         <a href="/c/sneakers">Sneakers</a><a href="/c/streetwear">Streetwear</a><a href="/c/watches">Watches</a><a href="/c/all?under_retail=1">Under retail</a>
@@ -425,8 +512,9 @@ ${body}
     </div>
     <div class="bottom">
       <span>© ${new Date().getFullYear()} ${escapeHtml(site)}. All rights reserved.</span>
-      <span style="display:flex; gap:18px;">
-        <a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/shipping">Import &amp; customs policy</a>
+      <span style="display:flex; gap:18px; flex-wrap:wrap;">
+        <a href="/privacy">Privacy</a><a href="/cookies">Cookies</a><a href="/terms">Terms</a>
+        <a href="/returns">Returns</a><a href="/shipping">Import &amp; customs</a>
       </span>
     </div>
   </div>
