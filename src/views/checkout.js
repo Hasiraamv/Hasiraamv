@@ -30,7 +30,7 @@ export function cartPage({ items, total }) {
               ${it.size_label !== 'One size' ? `Size ${escapeHtml(it.size_label)} · ` : ''}${escapeHtml(it.condition)}
             </div>
             <div style="font-size:12.5px; color:var(--muted); margin-top:4px; display:flex; align-items:center; gap:6px;">
-              ${icon('pin', '#6e675a', 11)} ${escapeHtml(it.seller_name)}, ${escapeHtml(it.ships_from)} · arrives ${e.from}–${e.to}
+              ${icon('clock', '#6e675a', 11)} Arrives ${e.from}–${e.to}
             </div>
           </div>
           <div style="text-align:right;">
@@ -122,7 +122,7 @@ export function checkoutPage({ items, total, error }) {
           <div style="font-size:13.5px; font-weight:600;">${escapeHtml(it.product_title)}</div>
           <div style="font-size:12px; color:var(--muted); margin-top:4px;">${
             it.size_label !== 'One size' ? `Size ${escapeHtml(it.size_label)} · ` : ''
-          }${escapeHtml(it.ships_from)} · arrives ${e.from}–${e.to}</div>
+          }Arrives ${e.from}–${e.to}</div>
           <div class="serif" style="font-size:18px; margin-top:6px;">${formatINR(it.landed_price)}</div>
         </div>`;
         })
@@ -143,19 +143,37 @@ export function checkoutPage({ items, total, error }) {
 </section>`;
 }
 
-const STAGES = [
-  ['placed', 'Order placed', 'Seller notified and the piece reserved'],
-  ['seller_shipped', 'Seller shipped', 'On its way to our authentication facility'],
-  ['authenticating', 'Authentication', '30-point inspection in progress'],
-  ['authenticated', 'Certificate issued', 'Sealed with a numbered certificate'],
-  ['in_transit', 'Import & customs', 'Duties paid, clearing customs'],
+// What the buyer sees. The internal pipeline has more steps than this — seller dispatch,
+// inspection, customs — but those are our operations, not the customer's business, and they
+// would reveal where a piece is coming from. Nothing shows as "Shipped" until it has passed
+// authentication, so the status can never run ahead of the guarantee.
+const PUBLIC_STAGES = [
+  ['placed', 'Order placed', 'Reserved for you and on its way to our facility'],
+  ['shipped', 'Shipped', 'Authenticated, sealed and dispatched to you'],
   ['out_for_delivery', 'Out for delivery', 'With the local courier'],
   ['delivered', 'Delivered', 'Signed for'],
 ];
 
+// Internal stage -> the stage the buyer is shown. Everything before authentication reads as
+// "Order placed": the piece is genuinely still being processed, and saying more would leak
+// sourcing.
+const PUBLIC_STAGE_OF = {
+  placed: 'placed',
+  seller_shipped: 'placed',
+  authenticating: 'placed',
+  authenticated: 'shipped',
+  in_transit: 'shipped',
+  out_for_delivery: 'out_for_delivery',
+  delivered: 'delivered',
+};
+
+export function publicStageIndex(internalStatus) {
+  const key = PUBLIC_STAGE_OF[internalStatus] || 'placed';
+  return PUBLIC_STAGES.findIndex(([k]) => k === key);
+}
+
 export function orderPage({ order, events, certificate }) {
-  const reached = new Set(events.map((e) => e.status));
-  const currentIndex = STAGES.reduce((acc, [k], i) => (reached.has(k) ? i : acc), 0);
+  const current = publicStageIndex(order.status);
 
   return `
 <section class="section">
@@ -183,9 +201,9 @@ export function orderPage({ order, events, certificate }) {
 
   <div class="panel" style="padding:28px;">
     <div class="timeline" style="flex-wrap:wrap; gap:10px;">
-      ${STAGES.map(([key, label, sub], i) => {
-        const cls = i < currentIndex ? 'done' : i === currentIndex ? 'done current' : '';
-        return `<div class="stage ${cls}" style="min-width:120px;">
+      ${PUBLIC_STAGES.map(([key, label, sub], i) => {
+        const cls = i < current ? 'done' : i === current ? 'done current' : '';
+        return `<div class="stage ${cls}" style="min-width:150px;">
           <div class="bar"></div>
           <div class="label">${label}</div>
           <div class="sub">${sub}</div>
@@ -193,6 +211,16 @@ export function orderPage({ order, events, certificate }) {
       }).join('')}
     </div>
   </div>
+
+  ${
+    current === 0
+      ? `<div class="notice" style="margin-top:18px;">
+           Your piece is being prepared and authenticated. We do not mark an order as shipped until
+           it has passed our inspection, so this step takes a little longer than you may be used to —
+           that wait is the guarantee doing its job.
+         </div>`
+      : ''
+  }
 
   ${
     certificate
@@ -212,26 +240,6 @@ export function orderPage({ order, events, certificate }) {
          </div>`
       : ''
   }
-
-  <h3 class="serif" style="font-size:22px; margin:34px 0 14px;">History</h3>
-  <table class="table">
-    <thead><tr><th>Date</th><th>Stage</th><th>Note</th></tr></thead>
-    <tbody>
-      ${events
-        .slice()
-        .reverse()
-        .map(
-          (e) => `<tr>
-            <td data-label="Date">${escapeHtml(String(e.created_at).slice(0, 16))}</td>
-            <td data-label="Stage">${escapeHtml(
-              (STAGES.find((s) => s[0] === e.status) || [, e.status])[1]
-            )}</td>
-            <td data-label="Note">${escapeHtml(e.note || '')}</td>
-          </tr>`
-        )
-        .join('')}
-    </tbody>
-  </table>
 </section>`;
 }
 

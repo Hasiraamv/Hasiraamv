@@ -1,12 +1,15 @@
 // Mintmark in-house certification.
 //
-// Number format:  MM-26-TYO-SNK-04821-K
+// Number format:  MM-26-SNK-04821-K
 //   MM     issuer prefix
 //   26     two-digit year of issue
-//   TYO    source city code
 //   SNK    category code
 //   04821  sequence, unique within the year
 //   K      check character (Luhn mod 36)
+//
+// The number deliberately does NOT encode where the piece was sourced. The certificate is
+// handed to the buyer, so anything encoded in it is public, and the source city is
+// commercially sensitive. It is still recorded against the certificate internally.
 //
 // The check character means a mistyped or invented number is rejected before it ever
 // reaches the database. It is not a secret — anyone can compute it — so it stops typos
@@ -59,10 +62,10 @@ function checkCharacter(payload) {
   return ALPHABET[(BASE - (sum % BASE)) % BASE];
 }
 
-export function buildCertificateNumber({ year, sequence, source, category }) {
+export function buildCertificateNumber({ year, sequence, category }) {
   const yy = String(year % 100).padStart(2, '0');
   const seq = String(sequence).padStart(5, '0');
-  const body = `MM-${yy}-${source}-${category}-${seq}`;
+  const body = `MM-${yy}-${category}-${seq}`;
   return `${body}-${checkCharacter(body)}`;
 }
 
@@ -70,17 +73,16 @@ export function buildCertificateNumber({ year, sequence, source, category }) {
 export function parseCertificateNumber(input) {
   if (!input) return null;
   const normalised = String(input).trim().toUpperCase().replace(/\s+/g, '');
-  const match = /^MM-(\d{2})-([A-Z]{3})-([A-Z]{3})-(\d{5})-([0-9A-Z])$/.exec(normalised);
+  const match = /^MM-(\d{2})-([A-Z]{3})-(\d{5})-([0-9A-Z])$/.exec(normalised);
   if (!match) return null;
 
-  const [, yy, source, category, seq, check] = match;
-  const body = `MM-${yy}-${source}-${category}-${seq}`;
+  const [, yy, category, seq, check] = match;
+  const body = `MM-${yy}-${category}-${seq}`;
   if (checkCharacter(body) !== check) return null;
 
   return {
     certificateNo: normalised,
     year: 2000 + Number(yy),
-    source,
     category,
     sequence: Number(seq),
   };
@@ -112,7 +114,7 @@ export async function issueCertificate(db, { order, product, offer, seller, cate
     .first();
   const sequence = row?.next || 1;
 
-  const certificateNo = buildCertificateNumber({ year, sequence, source, category });
+  const certificateNo = buildCertificateNumber({ year, sequence, category });
 
   await db
     .prepare(

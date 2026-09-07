@@ -1,5 +1,7 @@
 -- Mintmark schema. All money columns are whole rupees (INTEGER), never floats.
 
+DROP TABLE IF EXISTS source_cities;
+DROP TABLE IF EXISTS category_rates;
 DROP TABLE IF EXISTS seller_applications;
 DROP TABLE IF EXISTS verification_log;
 DROP TABLE IF EXISTS certificates;
@@ -62,6 +64,7 @@ CREATE INDEX idx_images_product ON product_images(product_id);
 -- landed_price is what the buyer pays, and it is the sum of the four parts below it.
 CREATE TABLE offers (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  stock_code     TEXT UNIQUE,            -- internal shelf number, generated: MM-SNK-00042
   product_id     INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   seller_id      INTEGER NOT NULL REFERENCES sellers(id),
   size_label     TEXT NOT NULL DEFAULT 'One size',
@@ -184,6 +187,29 @@ CREATE TABLE verification_log (
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_verlog_cert ON verification_log(certificate_no, created_at DESC);
+
+-- Rate rules ------------------------------------------------------------------------
+-- These turn a seller price into a landed price without anyone doing arithmetic by hand.
+-- Duty is the number that decides whether you make money on an order, so it lives in one
+-- editable place rather than being retyped per offer.
+CREATE TABLE category_rates (
+  category_id  INTEGER PRIMARY KEY REFERENCES categories(id) ON DELETE CASCADE,
+  duty_pct     REAL NOT NULL DEFAULT 0,   -- percent of seller price
+  auth_fee     INTEGER NOT NULL DEFAULT 0, -- flat, in rupees
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Where we source from: what it costs to ship in, and how long it takes.
+CREATE TABLE source_cities (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  city           TEXT NOT NULL UNIQUE,
+  country        TEXT,
+  shipping_cost  INTEGER NOT NULL DEFAULT 0,
+  lead_days_min  INTEGER NOT NULL DEFAULT 14,
+  lead_days_max  INTEGER NOT NULL DEFAULT 28,
+  active         INTEGER NOT NULL DEFAULT 1,
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 -- People applying to sell on the marketplace. Approving one creates a sellers row.
 CREATE TABLE seller_applications (

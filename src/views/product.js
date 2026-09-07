@@ -75,7 +75,7 @@ export function productPage({ product, offers, images, related, selectedSize, en
   </div>
 
   <div>
-    <span class="tag gold">Sourced from ${escapeHtml(best ? best.ships_from : '—')}</span>
+    <span class="tag gold">Imported &amp; authenticated</span>
     <h1 class="serif" style="font-size:38px; margin:8px 0; line-height:1.2;">${escapeHtml(product.title)}</h1>
 
     ${
@@ -132,13 +132,10 @@ export function productPage({ product, offers, images, related, selectedSize, en
       </div>
       <div style="padding:18px 20px;">
         <div class="timeline">
-          <div class="stage done"><div class="bar"></div><div class="label">Seller ships</div><div class="sub">1–2 days · ${escapeHtml(best.ships_from)}</div></div>
-          <div class="stage current"><div class="bar"></div><div class="label">Authentication</div><div class="sub">2–3 days · our facility</div></div>
-          <div class="stage"><div class="bar"></div><div class="label">Import &amp; customs</div><div class="sub">${Math.max(
-            best.lead_days_min - 8,
-            4
-          )}–${Math.max(best.lead_days_max - 8, 6)} days</div></div>
-          <div class="stage"><div class="bar"></div><div class="label">Last mile</div><div class="sub">2–3 days · to you</div></div>
+          <div class="stage done"><div class="bar"></div><div class="label">Sourced</div><div class="sub">Reserved for you</div></div>
+          <div class="stage current"><div class="bar"></div><div class="label">Authentication</div><div class="sub">Checked and sealed</div></div>
+          <div class="stage"><div class="bar"></div><div class="label">Imported</div><div class="sub">Duties paid for you</div></div>
+          <div class="stage"><div class="bar"></div><div class="label">Delivered</div><div class="sub">To your door</div></div>
         </div>
       </div>
     </div>
@@ -172,17 +169,21 @@ ${
   </div>
   <table class="table">
     <thead>
-      <tr><th>Seller</th><th>Condition</th><th>Ships from</th><th>Delivered by</th><th class="num">Landed price</th><th></th></tr>
+      <tr><th>Seller</th><th>Condition</th><th>Delivered by</th><th class="num">Price</th><th></th></tr>
     </thead>
     <tbody>
       ${sizeOffers
         .map((o, i) => {
           const e = etaDates(o.lead_days_min, o.lead_days_max);
+          // Sellers are shown anonymously. Their names identify the dealers we buy from —
+          // publishing them hands our sourcing network to anyone who reads the page, and
+          // several of them are named after the city they trade in.
+          const label = `Verified seller ${String.fromCharCode(65 + i)}`;
           return `
         <tr${i === 0 ? ' class="best"' : ''}>
           <td data-label="Seller">
             <div style="display:flex; align-items:center; gap:8px;">
-              <strong style="font-size:14px;">${escapeHtml(o.seller_name)}</strong>
+              <strong style="font-size:14px;">${label}</strong>
               ${
                 o.kyc_verified
                   ? `<span style="display:inline-flex; align-items:center; gap:4px; background:var(--paper-alt); border:1px solid #ddd5c2; padding:2px 6px; font-size:9.5px; color:var(--gold); font-weight:700;">${icon(
@@ -200,7 +201,6 @@ ${
             }${o.legit_check ? ' · authentication report on file' : ''}</div>
           </td>
           <td data-label="Condition">${escapeHtml(o.condition)}</td>
-          <td data-label="Ships from">${escapeHtml(o.ships_from)}</td>
           <td data-label="Delivered by">${e.from} – ${e.to}</td>
           <td data-label="Landed price" class="num">
             <div class="serif" style="font-size:20px;">${formatINR(o.landed_price)}</div>
@@ -209,7 +209,7 @@ ${
           <td class="num">
             <form method="post" action="/cart/add">
               <input type="hidden" name="offer_id" value="${o.id}">
-              <button class="btn btn-outline" style="padding:10px 18px; font-size:12.5px;" type="submit" aria-label="Buy from ${escapeHtml(o.seller_name)} for ${formatINR(o.landed_price)} landed">Buy</button>
+              <button class="btn btn-outline" style="padding:10px 18px; font-size:12.5px;" type="submit" aria-label="Buy from ${label} for ${formatINR(o.landed_price)} landed">Buy</button>
             </form>
           </td>
         </tr>`;

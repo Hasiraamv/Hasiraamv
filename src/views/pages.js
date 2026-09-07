@@ -25,29 +25,28 @@ export function authenticationPage(env) {
   return page({
     eyebrow: 'Our guarantee',
     title: 'Two checks, one seal, full traceability.',
-    intro: `Nothing is listed until it has been inspected in hand overseas, and nothing ships until it
-      has been checked again here. Every piece travels in a tamper-evident seal with a numbered
+    intro: `Nothing is listed until it has been inspected in hand at source, and nothing ships until
+      it has been checked again here. Every piece travels in a tamper-evident seal with a numbered
       certificate you can verify online at any time.`,
     body: `
 <h3 class="serif" style="${H3}">How a piece is authenticated</h3>
 <ol style="${P} padding-left:20px;">
   <li><strong>Seller legit check.</strong> Every KYC-verified seller authenticates the piece and uploads their report before we allow it to go live. No report, no listing.</li>
   <li><strong>In-house inspection.</strong> When it reaches our facility, one of our authenticators runs an independent 30-point check — construction, materials, hardware, markings, serials and packaging.</li>
-  <li><strong>Certificate and seal.</strong> On passing, we issue a numbered certificate and seal the package. The number encodes the year, the source city and the category.</li>
+  <li><strong>Certificate and seal.</strong> On passing, we issue a numbered certificate and seal the package. The number encodes the year, the category and a sequence, and carries a check character.</li>
   <li><strong>Refund if it fails.</strong> If a piece fails our check, your order is cancelled and refunded in full before anything ships. If a piece we certified ever fails an independent check, we refund it in full.</li>
 </ol>
 
 <h3 class="serif" style="${H3}">Reading a certificate number</h3>
-<div class="serif" style="font-size:24px; letter-spacing:0.06em; margin:14px 0;">MM-26-TYO-SNK-00248-M</div>
+<div class="serif" style="font-size:24px; letter-spacing:0.06em; margin:14px 0;">MM-26-SNK-00248-G</div>
 <table class="table" style="background:none;">
   <tbody>
     ${[
       ['MM', 'Issued by us'],
       ['26', 'Year of issue'],
-      ['TYO', 'Where the piece was sourced — here, Tokyo'],
       ['SNK', 'Category — sneakers'],
       ['00248', 'Sequence within that year'],
-      ['M', 'Check character — a mistyped or invented number fails immediately'],
+      ['G', 'Check character — a mistyped or invented number fails immediately'],
     ]
       .map(
         ([k, v]) =>
@@ -66,8 +65,8 @@ export function authenticationPage(env) {
 <p style="${P}">
   Inside every sealed package is a short verification code. Entering the certificate number alone
   confirms the certificate exists and what it covers. Adding the sealed code proves you hold the
-  package, and unlocks the full record — the authenticator, the seller and the inspection notes.
-  We never show buyer details on a public lookup.
+  package, and unlocks the full record — the authenticator and the inspection notes. We never
+  publish buyer details, and we never publish which dealer a piece came from.
 </p>
 <p style="${P}">
   We log every verification. If one number starts being checked far more than it should, that tells
@@ -96,9 +95,10 @@ export function shippingPage(env) {
   </tbody>
 </table>
 <p style="${P}">
-  The window shown on each listing reflects that piece's actual source city. Tokyo and Seoul are
-  quicker than Geneva or Florence. You see the estimate before you buy, on the product page, not
-  after payment.
+  The window shown on each listing reflects where that particular piece is coming from and how it
+  travels. You see the estimate before you buy, on the product page, not after payment. We do not
+  publish our sourcing routes — those relationships took time to build — but the date we give you
+  is the real one.
 </p>
 
 <h3 class="serif" style="${H3}">Duties are included</h3>
@@ -214,7 +214,8 @@ export function termsPage(env) {
 
 <h3 class="serif" style="${H3}">Delivery estimates</h3>
 <p style="${P}">
-  Delivery windows shown on listings are good-faith estimates based on the source city, not
+  Delivery windows shown on listings are good-faith estimates based on where the piece is
+  travelling from, not
   guarantees. Customs can delay a shipment. See <a href="/shipping">shipping and import</a>.
 </p>
 
@@ -344,6 +345,7 @@ export function aboutPage(env) {
   <li><strong>Two authentications, not one.</strong> The seller's report is required before a listing goes live; ours happens on arrival, independently.</li>
   <li><strong>A certificate that can be checked.</strong> Numbered, verifiable online by anyone, revocable by us if it is ever compromised.</li>
   <li><strong>Honest dates and honest prices.</strong> Import takes weeks and we say so upfront. Duty is in the price, not a surprise at your door.</li>
+  <li><strong>Sourcing stays ours.</strong> We name what a piece is and prove it is real. We do not publish which dealer or country it came from — that network is the business.</li>
 </ul>
 
 <div class="notice" style="margin-top:24px;">
@@ -453,8 +455,8 @@ export function sellPage({ submitted, error, env }) {
       <h2 class="serif" style="font-size:30px; margin:34px 0 14px; font-weight:400;">What we are looking for</h2>
       <p style="${P}">
         Sneakers, streetwear, watches, bags and leather, jewellery and collectibles — deadstock,
-        archive and well-kept pre-owned. We are actively adding sellers in Tokyo, Seoul, Milan, Geneva,
-        Paris, London and Florence, and will consider anywhere we can import from reliably.
+        archive and well-kept pre-owned. We work with sellers across Asia, Europe and the UK, and
+        will consider anywhere we can import from reliably.
       </p>
     </div>
 

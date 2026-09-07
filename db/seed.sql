@@ -1,6 +1,9 @@
 -- Sample catalogue. Replace with real stock before launch.
 -- Every offer satisfies: landed_price = seller_price + duty + auth_fee + shipping.
 
+DELETE FROM source_cities;
+DELETE FROM category_rates;
+DELETE FROM seller_applications;
 DELETE FROM verification_log;
 DELETE FROM certificates;
 DELETE FROM authenticators;
@@ -14,10 +17,10 @@ DELETE FROM categories;
 DELETE FROM sourcing_requests;
 
 INSERT INTO categories (slug, name, blurb, sort_order) VALUES
-  ('sneakers',    'Sneakers',        'Deadstock and worn-once pairs, sourced from Tokyo and Seoul.', 1),
-  ('streetwear',  'Streetwear',      'Archive pieces and collaborations from six regions.', 2),
+  ('sneakers',    'Sneakers',        'Deadstock and worn-once pairs, imported and authenticated.', 1),
+  ('streetwear',  'Streetwear',      'Archive pieces and collaborations, checked twice before dispatch.', 2),
   ('watches',     'Watches',         'Vintage and modern references, inspected by a watchmaker.', 3),
-  ('bags',        'Bags & Leather',  'Italian and French leather goods, condition graded in hand.', 4),
+  ('bags',        'Bags & Leather',  'Leather goods, condition graded in hand.', 4),
   ('jewelry',     'Jewelry',         'Gold, stones and signed pieces, assayed before dispatch.', 5),
   ('collectibles','Collectibles',    'Objects, print and rare ephemera.', 6);
 
@@ -37,7 +40,7 @@ INSERT INTO sellers (name, city, country, rating, sales_count, kyc_verified, leg
 
 INSERT INTO products (slug, title, category_id, sku, release_year, description, condition_notes, retail_price, size_type) VALUES
   ('deadstock-runner-og', 'Deadstock Runner, OG Colorway', 1, 'SKU-100014', 2019,
-   'An original-colourway runner in deadstock condition, sourced from a Tokyo archive dealer. Box and both sets of laces included.',
+   'An original-colourway runner in deadstock condition, held by an archive dealer. Box and both sets of laces included.',
    'Deadstock, unworn. Original box with minor shelf wear.', 108000, 'uk'),
 
   ('vintage-chronograph-steel', 'Vintage Chronograph, Steel', 3, 'SKU-300042', 1978,
@@ -45,11 +48,11 @@ INSERT INTO products (slug, title, category_id, sku, release_year, description, 
    'Excellent. Case unpolished, movement serviced 2026.', NULL, 'none'),
 
   ('full-grain-weekender-bag', 'Full-Grain Weekender Bag', 4, 'SKU-400008', 2023,
-   'Vegetable-tanned full-grain leather weekender from a Florentine workshop, with brass hardware.',
+   'Vegetable-tanned full-grain leather weekender from a specialist workshop, with brass hardware.',
    'As new. Patina beginning at the handles.', NULL, 'none'),
 
   ('hand-knit-cashmere-overcoat', 'Hand-Knit Cashmere Overcoat', 2, 'SKU-200019', 2024,
-   'A hand-knit cashmere overcoat in charcoal, sourced from a Milanese boutique closing its archive.',
+   'A hand-knit cashmere overcoat in charcoal, sourced from a boutique closing its archive.',
    'As new, tags attached.', NULL, 'apparel'),
 
   ('mesh-trainer-grey-suede', 'Mesh Trainer, Grey Suede', 1, 'SKU-100027', 2021,
@@ -57,15 +60,15 @@ INSERT INTO products (slug, title, category_id, sku, release_year, description, 
    'Worn twice. Soles clean, no creasing.', 52000, 'uk'),
 
   ('souvenir-jacket-reversible', 'Souvenir Jacket, Reversible', 2, 'SKU-200031', 2022,
-   'A reversible embroidered souvenir jacket sourced in Tokyo, black to burgundy.',
+   'A reversible embroidered souvenir jacket, black to burgundy.',
    'Excellent. No pulls in the embroidery.', NULL, 'apparel'),
 
   ('selvedge-denim-raw', 'Selvedge Denim, Raw', 2, 'SKU-200044', 2025,
-   'Raw selvedge denim, unwashed, from a Japanese mill run of 300 pairs.',
+   'Raw selvedge denim, unwashed, from a mill run of 300 pairs.',
    'Deadstock, unwashed.', NULL, 'apparel'),
 
   ('field-watch-36mm', 'Field Watch, 36mm', 3, 'SKU-300055', 2020,
-   'A 36mm automatic field watch on a sailcloth strap, sourced from a Tokyo dealer.',
+   'A 36mm automatic field watch on a sailcloth strap.',
    'Excellent. Light hairlines on the caseback.', NULL, 'none');
 
 -- Deadstock Runner: eight competing offers across five sizes.
@@ -103,3 +106,34 @@ INSERT INTO offers (product_id, seller_id, size_label, condition, ships_from, se
   (6, 1, 'M',     'Excellent',   'Tokyo',  47600,  6900, 1800, 1700,  58000, 12, 16),
   (7, 1, 'W32',   'Deadstock',   'Tokyo',  19900,  2900,  900,  800,  24500, 12, 16),
   (8, 1, 'One size', 'Excellent', 'Tokyo', 110000, 16000, 3000, 3000, 132000, 14, 18);
+
+-- Rate rules ---------------------------------------------------------------------------
+-- PLACEHOLDER DUTY RATES. These are NOT researched Indian customs rates. Get the real rate
+-- per category from a customs broker and set them under Admin -> Rates before listing
+-- anything. Too low and every order loses money quietly.
+INSERT INTO category_rates (category_id, duty_pct, auth_fee) VALUES
+  (1, 14.5, 2400),   -- sneakers
+  (2, 15.0, 1800),   -- streetwear
+  (3, 15.5, 6900),   -- watches
+  (4, 15.5, 4100),   -- bags
+  (5, 15.0, 3400),   -- jewelry
+  (6, 12.0, 1500);   -- collectibles
+
+-- Where stock comes from. Internal only: never shown to buyers, used to work out shipping
+-- cost and how long an order realistically takes.
+INSERT INTO source_cities (city, country, shipping_cost, lead_days_min, lead_days_max) VALUES
+  ('Tokyo',    'Japan',       2500, 12, 16),
+  ('Seoul',    'South Korea', 2500, 14, 18),
+  ('London',   'UK',          2500, 14, 20),
+  ('Milan',    'Italy',       2500, 16, 22),
+  ('Paris',    'France',      2500, 16, 22),
+  ('Geneva',   'Switzerland', 8000, 18, 24),
+  ('Florence', 'Italy',       3500, 20, 28);
+
+-- Internal shelf numbers for the sample offers.
+UPDATE offers SET stock_code = 'MM-' || (
+  SELECT CASE c.slug
+    WHEN 'sneakers' THEN 'SNK' WHEN 'streetwear' THEN 'STW' WHEN 'watches' THEN 'WCH'
+    WHEN 'bags' THEN 'BAG' WHEN 'jewelry' THEN 'JWL' ELSE 'COL' END
+  FROM products p JOIN categories c ON c.id = p.category_id WHERE p.id = offers.product_id
+) || '-' || substr('00000' || offers.id, -5);

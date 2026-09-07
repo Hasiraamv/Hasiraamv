@@ -15,7 +15,7 @@ export function verifyPage({ query, code, result }) {
     <div class="form-row">
       <div class="field">
         <label for="no">Certificate number</label>
-        <input id="no" name="no" value="${escapeHtml(query || '')}" placeholder="MM-26-TYO-SNK-00248-M" required maxlength="30" autocapitalize="characters">
+        <input id="no" name="no" value="${escapeHtml(query || '')}" placeholder="MM-26-SNK-00248-G" required maxlength="30" autocapitalize="characters">
       </div>
       <div class="field">
         <label for="code">Verification code (optional)</label>
@@ -30,16 +30,15 @@ export function verifyPage({ query, code, result }) {
 
   <div class="panel" style="padding:24px; margin-top:26px;">
     <h3 class="serif" style="font-size:20px; margin:0 0 12px;">How to read a certificate number</h3>
-    <div class="serif" style="font-size:22px; letter-spacing:0.06em; margin-bottom:14px;">MM-26-TYO-SNK-00248-M</div>
+    <div class="serif" style="font-size:22px; letter-spacing:0.06em; margin-bottom:14px;">MM-26-SNK-00248-G</div>
     <table class="table" style="background:none;">
       <tbody>
         ${[
           ['MM', 'Issued by us'],
           ['26', 'Year of issue'],
-          ['TYO', 'Where the piece was sourced — here, Tokyo'],
           ['SNK', 'Category — sneakers'],
           ['00248', 'Sequence within the year'],
-          ['M', 'Check character — a mistyped or invented number fails here'],
+          ['G', 'Check character — a mistyped or invented number fails here'],
         ]
           .map(
             ([k, v]) =>
@@ -100,7 +99,6 @@ function renderResult(result) {
   <div class="cert-row"><span class="k">Item</span><span>${escapeHtml(c.product_title)}</span></div>
   ${c.size_label && c.size_label !== 'One size' ? `<div class="cert-row"><span class="k">Size</span><span>${escapeHtml(c.size_label)}</span></div>` : ''}
   ${c.condition ? `<div class="cert-row"><span class="k">Condition at inspection</span><span>${escapeHtml(c.condition)}</span></div>` : ''}
-  <div class="cert-row"><span class="k">Sourced from</span><span>${escapeHtml(c.sourced_from)}</span></div>
   <div class="cert-row"><span class="k">Inspection</span><span>${c.inspection_points}-point, in-house</span></div>
   <div class="cert-row"><span class="k">Issued</span><span>${escapeHtml(c.issued_on)}</span></div>
   ${
@@ -109,7 +107,6 @@ function renderResult(result) {
   <div class="cert-row"><span class="k">Authenticator</span><span>${escapeHtml(
     c.authenticator_name || c.authenticator_initials || '—'
   )}</span></div>
-  ${c.seller_name ? `<div class="cert-row"><span class="k">Seller</span><span>${escapeHtml(c.seller_name)}</span></div>` : ''}
   ${
     c.seller_report_ref
       ? `<div class="cert-row"><span class="k">Seller report</span><span>${escapeHtml(c.seller_report_ref)}</span></div>`
@@ -126,8 +123,8 @@ function renderResult(result) {
           c.certificate_no
         )}" style="color:#f2ede2; border-color:#4a4336;">Printable certificate</a></div>`
       : `<p style="font-size:12px; color:#8b8474; margin:18px 0 0; line-height:1.6;">
-           Add the verification code from inside the package to see the authenticator, the seller and
-           the inspection notes. We never show buyer details here.
+           Add the verification code from inside the package to see the authenticator and the
+           inspection notes. We never show buyer or supplier details here.
          </p>`
   }
 </div>
@@ -166,7 +163,6 @@ export function certificatePage({ cert, siteName }) {
       <div class="cert-row"><span class="k">Item</span><span>${escapeHtml(cert.product_title)}</span></div>
       ${cert.size_label && cert.size_label !== 'One size' ? `<div class="cert-row"><span class="k">Size</span><span>${escapeHtml(cert.size_label)}</span></div>` : ''}
       ${cert.condition ? `<div class="cert-row"><span class="k">Condition</span><span>${escapeHtml(cert.condition)}</span></div>` : ''}
-      <div class="cert-row"><span class="k">Sourced from</span><span>${escapeHtml(cert.sourced_from)}</span></div>
       <div class="cert-row"><span class="k">Inspection</span><span>${cert.inspection_points}-point, in-house</span></div>
       <div class="cert-row"><span class="k">Authenticator</span><span>${escapeHtml(
         cert.authenticator_initials || '—'

@@ -2,6 +2,7 @@ import { escapeHtml, formatINR, html, redirect } from './render.js';
 import * as db from './db.js';
 import { issueCertificate } from './certificates.js';
 import { storeImage, deleteImage } from './images.js';
+import { computeOfferPricing, listCategoryRates, listSourceCities, nextStockCode } from './pricing.js';
 import {
   parseCookies,
   cookieHeader,
@@ -73,6 +74,10 @@ export async function adminRouter(request, env, path) {
   if (path === '/admin/offers/create' && method === 'POST') return createOffer(request, env);
   if (path === '/admin/images/upload' && method === 'POST') return uploadImage(request, env);
   if (path === '/admin/images/delete' && method === 'POST') return removeImage(request, env);
+  if (path === '/admin/rates')
+    return ratesPage(env, new URL(request.url).searchParams.get('saved'));
+  if (path === '/admin/rates/categories' && method === 'POST') return saveCategoryRates(request, env);
+  if (path === '/admin/rates/cities' && method === 'POST') return saveCity(request, env);
   if (path === '/admin/sourcing') return sourcingPage(env);
   if (path === '/admin/sellers') return sellerApplicationsPage(env);
   if (path === '/admin/sellers/decide' && method === 'POST') return decideApplication(request, env);
@@ -97,6 +102,7 @@ function adminHtml(body, status = 200, extraHeaders = {}) {
     <a href="/admin/orders">Orders</a>
     <a href="/admin/certificates">Certificates</a>
     <a href="/admin/products">Products &amp; offers</a>
+    <a href="/admin/rates">Rates</a>
     <a href="/admin/sellers">Seller applications</a>
     <a href="/admin/sourcing">Sourcing requests</a>
   </nav>
@@ -581,18 +587,26 @@ ${
         <div class="field"><label for="ships_from">Ships from</label><input id="ships_from" name="ships_from" required maxlength="60" placeholder="Tokyo"></div>
         <div class="field"><label for="condition_o">Condition</label><input id="condition_o" name="condition" value="Deadstock" maxlength="60"></div>
       </div>
-      <div class="form-row">
-        <div class="field"><label for="seller_price">Seller price (₹)</label><input id="seller_price" name="seller_price" required inputmode="numeric" maxlength="12"></div>
-        <div class="field"><label for="duty">Duty (₹)</label><input id="duty" name="duty" inputmode="numeric" maxlength="12" value="0"></div>
+      <div class="field"><label for="seller_price">Seller price (₹)</label><input id="seller_price" name="seller_price" required inputmode="numeric" maxlength="12">
+        <span class="hint">Duty, authentication, shipping and lead time are worked out from your
+        <a href="/admin/rates">rates</a>. Leave the overrides below blank unless this one is unusual.</span>
       </div>
-      <div class="form-row">
-        <div class="field"><label for="auth_fee">Authentication (₹)</label><input id="auth_fee" name="auth_fee" inputmode="numeric" maxlength="12" value="0"></div>
-        <div class="field"><label for="shipping">Shipping (₹)</label><input id="shipping" name="shipping" inputmode="numeric" maxlength="12" value="0"></div>
-      </div>
-      <div class="form-row">
-        <div class="field"><label for="lead_min">Lead days min</label><input id="lead_min" name="lead_min" inputmode="numeric" value="14" maxlength="3"></div>
-        <div class="field"><label for="lead_max">Lead days max</label><input id="lead_max" name="lead_max" inputmode="numeric" value="28" maxlength="3"></div>
-      </div>
+
+      <details style="margin-bottom:14px;">
+        <summary style="cursor:pointer; font-size:12.5px; color:var(--muted); padding:6px 0;">Override the calculated values</summary>
+        <div style="padding-top:12px;">
+          <div class="form-row">
+            <div class="field"><label for="duty">Duty (₹)</label><input id="duty" name="duty" inputmode="numeric" maxlength="12" placeholder="auto"></div>
+            <div class="field"><label for="auth_fee">Authentication (₹)</label><input id="auth_fee" name="auth_fee" inputmode="numeric" maxlength="12" placeholder="auto"></div>
+          </div>
+          <div class="form-row">
+            <div class="field"><label for="shipping">Shipping (₹)</label><input id="shipping" name="shipping" inputmode="numeric" maxlength="12" placeholder="auto"></div>
+            <div class="field"><label for="lead_min">Lead days min</label><input id="lead_min" name="lead_min" inputmode="numeric" maxlength="3" placeholder="auto"></div>
+          </div>
+          <div class="field" style="max-width:180px;"><label for="lead_max">Lead days max</label><input id="lead_max" name="lead_max" inputmode="numeric" maxlength="3" placeholder="auto"></div>
+        </div>
+      </details>
+
       <button class="btn btn-block" type="submit">Add offer</button>
     </form>
   </div>
@@ -695,41 +709,214 @@ async function createProduct(request, env) {
 
 async function createOffer(request, env) {
   const form = await request.formData();
-  const num = (k) => Number(String(form.get(k) || '').replace(/[^\d]/g, '')) || 0;
+  const raw = (k) => String(form.get(k) || '').replace(/[^\d]/g, '');
 
   const productId = Number(form.get('product_id'));
   const sellerId = Number(form.get('seller_id'));
   if (!Number.isInteger(productId) || !Number.isInteger(sellerId)) return redirect('/admin/products');
 
-  const sellerPrice = num('seller_price');
-  const duty = num('duty');
-  const authFee = num('auth_fee');
-  const shipping = num('shipping');
-  if (sellerPrice <= 0) return redirect('/admin/products');
-  const landed = sellerPrice + duty + authFee + shipping;
+  const sellerPrice = Number(raw('seller_price')) || 0;
+  if (sellerPrice <= 0) {
+    return redirect('/admin/products?error=' + encodeURIComponent('Enter a seller price.'));
+  }
+
+  const product = await env.DB.prepare(
+    'SELECT p.id, p.category_id, c.slug AS category_slug FROM products p JOIN categories c ON c.id = p.category_id WHERE p.id = ?'
+  )
+    .bind(productId)
+    .first();
+  if (!product) return redirect('/admin/products');
+
+  const city = String(form.get('ships_from') || '').trim();
+
+  // Duty, fees, shipping and lead time all come from the rate rules. Only values the
+  // operator actually typed are treated as overrides.
+  const priced = await computeOfferPricing(env.DB, {
+    categoryId: product.category_id,
+    city,
+    sellerPrice,
+    overrides: {
+      duty: raw('duty'),
+      auth_fee: raw('auth_fee'),
+      shipping: raw('shipping'),
+      lead_days_min: raw('lead_min'),
+      lead_days_max: raw('lead_max'),
+    },
+  });
+
+  const stockCode = await nextStockCode(env.DB, product.category_slug);
 
   await env.DB.prepare(
-    `INSERT INTO offers (product_id, seller_id, size_label, condition, ships_from,
+    `INSERT INTO offers (stock_code, product_id, seller_id, size_label, condition, ships_from,
                          seller_price, duty, auth_fee, shipping, landed_price, lead_days_min, lead_days_max)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
+      stockCode,
       productId,
       sellerId,
       String(form.get('size_label') || 'One size').trim() || 'One size',
       String(form.get('condition') || 'Deadstock').trim(),
-      String(form.get('ships_from') || '').trim(),
-      sellerPrice,
-      duty,
-      authFee,
-      shipping,
-      landed,
-      num('lead_min') || 14,
-      num('lead_max') || 28
+      city,
+      priced.seller_price,
+      priced.duty,
+      priced.auth_fee,
+      priced.shipping,
+      priced.landed_price,
+      priced.lead_days_min,
+      priced.lead_days_max
     )
     .run();
 
-  return redirect('/admin/products');
+  const warn = !priced.rate_found
+    ? '?error=' + encodeURIComponent('Offer added, but no duty rate is set for that category — duty was charged at 0. Set it under Rates.')
+    : !priced.city_found
+    ? '?error=' + encodeURIComponent(`Offer added, but "${city}" is not in your source cities — shipping was charged at 0. Add it under Rates.`)
+    : '';
+
+  return redirect('/admin/products' + warn);
+}
+
+// Rates -----------------------------------------------------------------------
+
+async function ratesPage(env, message) {
+  const [rates, cities] = await Promise.all([listCategoryRates(env.DB), listSourceCities(env.DB)]);
+
+  return adminHtml(`
+<h2 class="serif" style="font-size:32px; margin:0 0 8px;">Rates</h2>
+<p class="muted" style="margin:0 0 20px; font-size:13.5px; max-width:760px;">
+  These turn a seller price into a landed price automatically. Change a rate here and every
+  new offer uses it — existing offers keep the numbers they were created with, so a rate
+  change never silently reprices something a customer is already looking at.
+</p>
+
+<div class="notice notice-bad" style="margin-bottom:24px; max-width:760px;">
+  <strong>Duty rates decide whether you make money.</strong> The values below are placeholders,
+  not researched Indian customs rates. Get the real rate for each category from a customs broker
+  and put it in here before you list anything. If duty is set too low, every order loses money
+  quietly — the sale still completes, the shortfall just comes out of your margin.
+</div>
+
+${message ? `<div class="notice notice-good" style="margin-bottom:20px;">${escapeHtml(message)}</div>` : ''}
+
+<div class="grid grid-2" style="gap:28px; align-items:start;">
+  <div>
+    <h3 class="serif" style="font-size:22px; margin:0 0 12px;">Duty and authentication by category</h3>
+    <form method="post" action="/admin/rates/categories">
+      <table class="table">
+        <thead><tr><th>Category</th><th class="num">Duty %</th><th class="num">Authentication ₹</th></tr></thead>
+        <tbody>
+          ${rates
+            .map(
+              (r) => `<tr>
+            <td data-label="Category">${escapeHtml(r.name)}</td>
+            <td data-label="Duty %" class="num">
+              <label class="visually-hidden" for="duty-${r.id}">Duty percent for ${escapeHtml(r.name)}</label>
+              <input id="duty-${r.id}" name="duty_${r.id}" value="${r.duty_pct}" inputmode="decimal" maxlength="6" style="width:80px; text-align:right; padding:8px; border:1px solid var(--line);">
+            </td>
+            <td data-label="Authentication" class="num">
+              <label class="visually-hidden" for="auth-${r.id}">Authentication fee for ${escapeHtml(r.name)}</label>
+              <input id="auth-${r.id}" name="auth_${r.id}" value="${r.auth_fee}" inputmode="numeric" maxlength="8" style="width:100px; text-align:right; padding:8px; border:1px solid var(--line);">
+            </td>
+          </tr>`
+            )
+            .join('')}
+        </tbody>
+      </table>
+      <button class="btn" type="submit" style="margin-top:14px;">Save category rates</button>
+    </form>
+  </div>
+
+  <div>
+    <h3 class="serif" style="font-size:22px; margin:0 0 12px;">Shipping and lead time by city</h3>
+    <table class="table">
+      <thead><tr><th>City</th><th class="num">Shipping ₹</th><th class="num">Lead days</th></tr></thead>
+      <tbody>
+        ${
+          cities.length
+            ? cities
+                .map(
+                  (c) => `<tr>
+              <td data-label="City">${escapeHtml(c.city)}${c.country ? `<div style="font-size:11.5px; color:var(--faint);">${escapeHtml(c.country)}</div>` : ''}</td>
+              <td data-label="Shipping" class="num">${formatINR(c.shipping_cost)}</td>
+              <td data-label="Lead days" class="num">${c.lead_days_min}–${c.lead_days_max}</td>
+            </tr>`
+                )
+                .join('')
+            : '<tr><td colspan="3">No source cities yet.</td></tr>'
+        }
+      </tbody>
+    </table>
+
+    <div class="panel" style="padding:20px; margin-top:16px;">
+      <h4 class="serif" style="font-size:18px; margin:0 0 12px; font-weight:400;">Add or update a city</h4>
+      <form method="post" action="/admin/rates/cities">
+        <div class="form-row">
+          <div class="field"><label for="city">City</label><input id="city" name="city" required maxlength="60"></div>
+          <div class="field"><label for="country">Country</label><input id="country" name="country" maxlength="60"></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label for="ship">Shipping cost (₹)</label><input id="ship" name="shipping_cost" inputmode="numeric" maxlength="8" required></div>
+          <div class="field"><label for="lmin">Lead days min</label><input id="lmin" name="lead_days_min" inputmode="numeric" maxlength="3" value="14"></div>
+        </div>
+        <div class="field" style="max-width:180px;"><label for="lmax">Lead days max</label><input id="lmax" name="lead_days_max" inputmode="numeric" maxlength="3" value="28"></div>
+        <button class="btn btn-block" type="submit">Save city</button>
+      </form>
+    </div>
+  </div>
+</div>`);
+}
+
+async function saveCategoryRates(request, env) {
+  const form = await request.formData();
+  const categories = await db.getCategories(env.DB);
+
+  const writes = [];
+  for (const c of categories) {
+    const duty = Number(String(form.get(`duty_${c.id}`) || '').replace(/[^\d.]/g, ''));
+    const auth = Number(String(form.get(`auth_${c.id}`) || '').replace(/[^\d]/g, ''));
+    writes.push(
+      env.DB.prepare(
+        `INSERT INTO category_rates (category_id, duty_pct, auth_fee, updated_at)
+         VALUES (?, ?, ?, datetime('now'))
+         ON CONFLICT(category_id) DO UPDATE SET
+           duty_pct = excluded.duty_pct, auth_fee = excluded.auth_fee, updated_at = datetime('now')`
+      ).bind(c.id, Number.isFinite(duty) ? duty : 0, Number.isFinite(auth) ? auth : 0)
+    );
+  }
+  await env.DB.batch(writes);
+
+  return redirect('/admin/rates?saved=' + encodeURIComponent('Category rates saved.'));
+}
+
+async function saveCity(request, env) {
+  const form = await request.formData();
+  const city = String(form.get('city') || '').trim().slice(0, 60);
+  if (!city) return redirect('/admin/rates');
+
+  const num = (k, fallback) => {
+    const n = Number(String(form.get(k) || '').replace(/[^\d]/g, ''));
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+  };
+
+  await env.DB.prepare(
+    `INSERT INTO source_cities (city, country, shipping_cost, lead_days_min, lead_days_max, updated_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(city) DO UPDATE SET
+       country = excluded.country, shipping_cost = excluded.shipping_cost,
+       lead_days_min = excluded.lead_days_min, lead_days_max = excluded.lead_days_max,
+       updated_at = datetime('now')`
+  )
+    .bind(
+      city,
+      String(form.get('country') || '').trim().slice(0, 60) || null,
+      num('shipping_cost', 0),
+      num('lead_days_min', 14),
+      num('lead_days_max', 28)
+    )
+    .run();
+
+  return redirect('/admin/rates?saved=' + encodeURIComponent(`Saved ${city}.`));
 }
 
 async function uploadImage(request, env) {

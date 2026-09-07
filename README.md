@@ -78,6 +78,43 @@ npm run dev
 
 `.dev.vars` is gitignored. Restart `wrangler dev` after creating it, or admin returns 503.
 
+## What is automatic
+
+Adding a listing means typing a title and a seller price. Everything below is derived.
+
+| Automatic | How |
+| --- | --- |
+| URL slug | From the product title, with a suffix if it collides |
+| Duty | Seller price × the category's duty rate, set under Admin → Rates |
+| Authentication fee | Flat per category, from the same rates |
+| Shipping and lead time | From the source city's row in Rates |
+| Landed price | The four parts added up — never typed, so it cannot disagree with them |
+| Internal stock code | `MM-SNK-00042`, assigned per offer. Sequence comes from the highest existing code, so deleting an offer never reissues a number already printed on a label |
+| Certificate number | `MM-26-SNK-00248-G` on authentication — year, category, sequence, check character |
+| Verification code | Random six characters at issue, shown once |
+| Order reference | `MM-7A6413` at checkout |
+| Delivery dates | From the offer's lead days |
+| "Under retail" badge | Whenever a retail price is set and the landed price is lower |
+| Category counts, "from ₹X" | Counted from live offers |
+| Seller sales counts | Counted from delivered orders |
+| Stock state | Bought reserves the offer, delivered marks it sold |
+
+Any of the calculated values can be overridden per offer for a one-off shipment. If a category
+has no duty rate, or a city is not in the list, the offer still saves but admin warns you rather
+than quietly charging zero.
+
+## Sourcing is not published
+
+The public site never names a source city, country or seller. Sellers appear as "Verified
+seller A/B/C" on the offers table, the certificate does not name the dealer, and the certificate
+number does not encode the source. All of it is still recorded internally and visible in admin —
+it just is not handed to competitors.
+
+The buyer-facing tracker has four stages: **Order placed → Shipped → Out for delivery →
+Delivered.** Internally there are seven. Nothing reads as "Shipped" until the piece has passed
+authentication, so the status can never run ahead of the guarantee, and the customer never sees
+the seller-dispatch or customs steps that would reveal where it came from.
+
 ## Compliance and accessibility status
 
 Audited with axe-core (WCAG 2.1 A and AA) across 15 public pages, 5 admin pages and mobile:

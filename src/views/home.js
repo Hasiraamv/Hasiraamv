@@ -14,7 +14,7 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
       </h1>
       <p style="max-width:470px; font-size:16.5px; line-height:1.72; color:#b3ab99; margin:0 0 26px;">
         We put every verified seller's price for a piece side by side, authenticate it twice
-        before it moves, and tell you exactly where it is coming from and when it lands.
+        before it moves, and tell you exactly when it will land.
       </p>
       <div style="display:flex; gap:14px; flex-wrap:wrap;">
         <a class="btn btn-gold" href="/c/all">Shop ${escapeHtml(env?.SITE_NAME || 'Mintmark')}</a>
@@ -128,7 +128,7 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
     <div class="cert" style="display:flex; align-items:center; gap:32px; margin-top:52px; flex-wrap:wrap;">
       <div>
         <div class="tag" style="color:var(--gold-light)">Certificate No.</div>
-        <div class="no">MM-26-TYO-SNK-00248-M</div>
+        <div class="no">MM-26-SNK-00248-G</div>
       </div>
       <div style="flex-grow:1; min-width:260px; font-size:13.5px; color:#b3ab99; line-height:1.6;">
         Every order ships with a numbered certificate and both inspection reports.
@@ -136,23 +136,6 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
       </div>
       <a class="btn btn-outline" href="/verify" style="color:#f2ede2; border-color:#4a4336;">Verify a certificate</a>
     </div>
-  </div>
-</section>
-
-<section class="section">
-  <div class="section-head">
-    <h2 class="serif" style="font-size:26px;">Where this week's pieces are coming from</h2>
-  </div>
-  <div class="grid grid-6">
-    ${regions
-      .map(
-        (r) => `
-      <div class="panel" style="padding:18px 20px;">
-        <div class="serif" style="font-size:19px;">${escapeHtml(r.city)}</div>
-        <div style="font-size:11.5px; color:var(--faint); margin-top:4px;">${r.lead_min}–${r.lead_max} days · ${r.listings} listings</div>
-      </div>`
-      )
-      .join('')}
   </div>
 </section>
 

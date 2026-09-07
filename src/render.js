@@ -397,9 +397,11 @@ export function productCard(p) {
   </span>
   <span>
     <span class="title">${escapeHtml(p.title)}</span>
-    <span class="meta">${icon('pin', '#6e675a', 11)} ${escapeHtml(p.ships_from || '—')}${
-    p.lead_days_min ? ` · arrives in ${p.lead_days_min}–${p.lead_days_max} days` : ''
-  }</span>
+    <span class="meta">${
+      p.lead_days_min
+        ? `${icon('clock', '#6e675a', 11)} Arrives in ${p.lead_days_min}–${p.lead_days_max} days`
+        : ''
+    }</span>
     <span style="display:block">
       <span class="price">${p.lowest_price ? formatINR(p.lowest_price) : '—'}</span>${sellers}
     </span>
@@ -438,7 +440,7 @@ ${
 <div class="announce no-print">
   <span class="tag">Dual authentication on every order</span>
   <span class="sep">—</span>
-  <span class="tag">Sourcing from Tokyo, Seoul, Milan, Geneva, Paris &amp; London</span>
+  <span class="tag">Duties included · Numbered certificate with every piece</span>
 </div>
 
 <header class="no-print">
