@@ -4,7 +4,7 @@ import { Apple, Plus, Trash2, Loader2, Camera, Droplet, Moon } from "lucide-reac
 import { api } from "../lib/api";
 import { Stagger, fadeUp, SPRING_SNAPPY } from "../lib/motion.jsx";
 import Sheet from "../components/Sheet.jsx";
-import { Label, Input, Select, PrimaryButton } from "../components/FormField.jsx";
+import { Field, Input, Select, PrimaryButton } from "../components/FormField.jsx";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -53,12 +53,10 @@ function AddFoodForm({ onDone, initial }) {
           AI estimate from your photo — check it before saving.
         </div>
       )}
-      <div>
-        <Label>Food</Label>
+      <Field label="Food">
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Grilled chicken" required />
-      </div>
-      <div>
-        <Label>Meal</Label>
+      </Field>
+      <Field label="Meal">
         <Select value={mealType} onChange={(e) => setMealType(e.target.value)}>
           <option value="breakfast">Breakfast</option>
           <option value="lunch">Lunch</option>
@@ -66,24 +64,20 @@ function AddFoodForm({ onDone, initial }) {
           <option value="snack">Snack</option>
           <option value="other">Other</option>
         </Select>
-      </div>
+      </Field>
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label>Calories</Label>
+        <Field label="Calories">
           <Input inputMode="numeric" value={calories} onChange={(e) => setCalories(e.target.value)} required />
-        </div>
-        <div>
-          <Label>Protein (g)</Label>
+        </Field>
+        <Field label="Protein (g)">
           <Input inputMode="decimal" value={protein} onChange={(e) => setProtein(e.target.value)} />
-        </div>
-        <div>
-          <Label>Carbs (g)</Label>
+        </Field>
+        <Field label="Carbs (g)">
           <Input inputMode="decimal" value={carbs} onChange={(e) => setCarbs(e.target.value)} />
-        </div>
-        <div>
-          <Label>Fat (g)</Label>
+        </Field>
+        <Field label="Fat (g)">
           <Input inputMode="decimal" value={fat} onChange={(e) => setFat(e.target.value)} />
-        </div>
+        </Field>
       </div>
       <PrimaryButton type="submit" disabled={saving} className="mt-2">
         {saving ? <Loader2 size={18} className="animate-spin" /> : "Log Food"}
@@ -139,6 +133,7 @@ function WaterCard({ waterMl, waterTarget, onAdd }) {
           inputMode="numeric"
           min="1"
           placeholder="Custom amount (ml)"
+          aria-label="Custom water amount in milliliters"
           value={custom}
           onChange={(e) => setCustom(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addCustom()}

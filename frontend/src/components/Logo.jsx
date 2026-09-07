@@ -4,7 +4,15 @@
  */
 export default function Logo({ size = 40, rounded = "28%" }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="FitPocket logo"
+    >
       <rect width="100" height="100" rx={rounded} fill="#FF7A00" />
       <circle cx="63" cy="27" r="10" fill="#2B1A0F" />
       <path

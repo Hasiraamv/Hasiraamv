@@ -14,15 +14,16 @@ import {
   Monitor,
   ShieldCheck,
   ScrollText,
+  Cookie,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth.jsx";
 import { useTheme } from "../lib/theme.jsx";
-import { PRIVACY_POLICY, TERMS_AND_CONDITIONS } from "../lib/legalContent.js";
+import { PRIVACY_POLICY, TERMS_AND_CONDITIONS, COOKIE_POLICY } from "../lib/legalContent.js";
 import { Stagger, fadeUp, SPRING_SNAPPY } from "../lib/motion.jsx";
 import Sheet from "../components/Sheet.jsx";
 import LegalSheet from "../components/LegalSheet.jsx";
-import { Label, Input, Select, PrimaryButton } from "../components/FormField.jsx";
+import { Field, Input, Select, PrimaryButton } from "../components/FormField.jsx";
 
 function AddExpenseForm({ onDone }) {
   const [categories, setCategories] = useState([]);
@@ -56,15 +57,13 @@ function AddExpenseForm({ onDone }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4 pb-2">
-      <div>
-        <Label>Type</Label>
+      <Field label="Type">
         <Select value={type} onChange={(e) => setType(e.target.value)}>
           <option value="expense">Expense</option>
           <option value="income">Income</option>
         </Select>
-      </div>
-      <div>
-        <Label>Category</Label>
+      </Field>
+      <Field label="Category">
         <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
           {categories
             .filter((c) => c.kind === type)
@@ -74,11 +73,10 @@ function AddExpenseForm({ onDone }) {
               </option>
             ))}
         </Select>
-      </div>
-      <div>
-        <Label>Amount (₹)</Label>
+      </Field>
+      <Field label="Amount (₹)">
         <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-      </div>
+      </Field>
       <PrimaryButton type="submit" disabled={saving} className="mt-2">
         {saving ? <Loader2 size={18} className="animate-spin" /> : "Save"}
       </PrimaryButton>
@@ -111,23 +109,19 @@ function TargetsForm({ current, onDone }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4 pb-2">
-      <div>
-        <Label>Daily calories</Label>
+      <Field label="Daily calories">
         <Input inputMode="numeric" value={calories} onChange={(e) => setCalories(e.target.value)} />
-      </div>
+      </Field>
       <div className="grid grid-cols-3 gap-3">
-        <div>
-          <Label>Protein (g)</Label>
+        <Field label="Protein (g)">
           <Input inputMode="numeric" value={protein} onChange={(e) => setProtein(e.target.value)} />
-        </div>
-        <div>
-          <Label>Carbs (g)</Label>
+        </Field>
+        <Field label="Carbs (g)">
           <Input inputMode="numeric" value={carbs} onChange={(e) => setCarbs(e.target.value)} />
-        </div>
-        <div>
-          <Label>Fat (g)</Label>
+        </Field>
+        <Field label="Fat (g)">
           <Input inputMode="numeric" value={fat} onChange={(e) => setFat(e.target.value)} />
-        </div>
+        </Field>
       </div>
       <PrimaryButton type="submit" disabled={saving} className="mt-2">
         {saving ? <Loader2 size={18} className="animate-spin" /> : "Save Targets"}
@@ -290,7 +284,7 @@ function ThemeToggle() {
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const [dashboard, setDashboard] = useState(null);
-  const [sheet, setSheet] = useState(null); // "expense" | "targets" | "import" | "privacy" | "terms" | null
+  const [sheet, setSheet] = useState(null); // "expense" | "targets" | "import" | "privacy" | "terms" | "cookies" | null
 
   const load = () => {
     api.dashboard().then(setDashboard);
@@ -319,7 +313,11 @@ export default function ProfileScreen() {
             <Wallet size={16} className="text-acc-lime" />
             This Month
           </span>
-          <button onClick={() => setSheet("expense")} className="glass-tint flex h-8 w-8 items-center justify-center rounded-full text-ink">
+          <button
+            onClick={() => setSheet("expense")}
+            aria-label="Add transaction"
+            className="glass-tint flex h-8 w-8 items-center justify-center rounded-full text-ink"
+          >
             <Plus size={14} />
           </button>
         </div>
@@ -405,6 +403,19 @@ export default function ProfileScreen() {
         variants={fadeUp}
         whileTap={{ scale: 0.98 }}
         transition={SPRING_SNAPPY}
+        onClick={() => setSheet("cookies")}
+        className="glass flex items-center gap-4 rounded-[24px] px-5 py-4 text-left"
+      >
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-ink/6">
+          <Cookie size={20} className="text-ink/60" />
+        </div>
+        <span className="flex-1 text-[14px] font-semibold text-ink">Cookie Policy</span>
+      </motion.button>
+
+      <motion.button
+        variants={fadeUp}
+        whileTap={{ scale: 0.98 }}
+        transition={SPRING_SNAPPY}
         onClick={logout}
         className="glass flex items-center gap-4 rounded-[24px] px-5 py-4 text-left text-acc-pink"
       >
@@ -448,6 +459,9 @@ export default function ProfileScreen() {
       </Sheet>
       <Sheet open={sheet === "terms"} onClose={() => setSheet(null)} title="Terms & Conditions">
         <LegalSheet text={TERMS_AND_CONDITIONS} />
+      </Sheet>
+      <Sheet open={sheet === "cookies"} onClose={() => setSheet(null)} title="Cookie Policy">
+        <LegalSheet text={COOKIE_POLICY} />
       </Sheet>
     </Stagger>
   );

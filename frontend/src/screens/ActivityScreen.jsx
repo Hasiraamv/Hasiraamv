@@ -4,7 +4,7 @@ import { Dumbbell, Plus, Trash2, Loader2, Check, Flame, Clock } from "lucide-rea
 import { api } from "../lib/api";
 import { Stagger, fadeUp, SPRING_SNAPPY } from "../lib/motion.jsx";
 import Sheet from "../components/Sheet.jsx";
-import { Label, Input, PrimaryButton } from "../components/FormField.jsx";
+import { Label, Field, Input, PrimaryButton } from "../components/FormField.jsx";
 
 function emptySet() {
   return { exercise_name: "", reps: "", weight_kg: "" };
@@ -45,29 +45,26 @@ function AddWorkoutForm({ onDone }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4 pb-2">
-      <div>
-        <Label>Workout name</Label>
+      <Field label="Workout name">
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Push Day"
           required
         />
-      </div>
+      </Field>
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label>Date</Label>
+        <Field label="Date">
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-        </div>
-        <div>
-          <Label>Duration (min)</Label>
+        </Field>
+        <Field label="Duration (min)">
           <Input
             inputMode="numeric"
             placeholder="e.g. 45"
             value={durationMinutes}
             onChange={(e) => setDurationMinutes(e.target.value)}
           />
-        </div>
+        </Field>
       </div>
 
       <div>
@@ -78,12 +75,14 @@ function AddWorkoutForm({ onDone }) {
               <Input
                 className="flex-1"
                 placeholder="Exercise"
+                aria-label={`Set ${i + 1} exercise name`}
                 value={s.exercise_name}
                 onChange={(e) => updateSet(i, "exercise_name", e.target.value)}
               />
               <Input
                 className="w-20 shrink-0 text-center"
                 placeholder="#"
+                aria-label={`Set ${i + 1} reps`}
                 inputMode="numeric"
                 value={s.reps}
                 onChange={(e) => updateSet(i, "reps", e.target.value)}
@@ -91,6 +90,7 @@ function AddWorkoutForm({ onDone }) {
               <Input
                 className="w-20 shrink-0 text-center"
                 placeholder="kg"
+                aria-label={`Set ${i + 1} weight in kilograms`}
                 inputMode="decimal"
                 value={s.weight_kg}
                 onChange={(e) => updateSet(i, "weight_kg", e.target.value)}

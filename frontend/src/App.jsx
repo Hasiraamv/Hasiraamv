@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Sparkles } from "lucide-react";
 
 import Backdrop from "./components/Backdrop";
+import CookieNotice from "./components/CookieNotice.jsx";
 import TabBar from "./components/TabBar";
 import AuthScreen from "./components/auth/AuthScreen.jsx";
 import CoachSheet from "./components/CoachSheet.jsx";
@@ -127,6 +128,7 @@ export default function App() {
           <div className="relative z-10 mx-auto w-full max-w-lg">
             <Gate />
           </div>
+          <CookieNotice />
         </div>
       </AuthProvider>
     </ThemeProvider>

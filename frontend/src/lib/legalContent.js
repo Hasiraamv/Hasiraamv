@@ -32,14 +32,51 @@ Your data is kept for as long as your account exists. You can delete individual 
 7. Your rights
 You can access, correct, or delete your data at any time through the app, or by contacting us. If you're in a region with additional data-protection rights (e.g. GDPR), you can also request a copy of your data or object to processing by contacting us.
 
-8. Children's privacy
+8. Cookies and local storage
+FitPocket uses a small number of cookies and browser-storage entries, all necessary for the app to work — none are used for advertising or cross-site tracking:
+• A session cookie / access token that keeps you signed in.
+• Your theme preference (light/dark/auto), stored on your device only.
+• If you sign in with Google, Google's own sign-in widget may set its own cookies under google.com, governed by Google's privacy policy, not ours.
+See our Cookie Policy for the full list and how to control them.
+
+9. No advertising or analytics tracking
+FitPocket does not use third-party analytics, advertising, or tracking scripts. We don't sell or share your data with advertisers.
+
+10. Children's privacy
 FitPocket is not directed at children under 13, and we do not knowingly collect data from them.
 
-9. Changes to this policy
+11. Changes to this policy
 We may update this policy as the app changes. Material changes will be reflected here with an updated date.
 
-10. Contact
+12. Business details
+FitPocket is operated by Pocket Projects. [Registered business address and registration number to be added here.]
+
+13. Contact
 Questions about this policy or your data: support@fitpocket.in`;
+
+export const COOKIE_POLICY = `Last updated: ${LAST_UPDATED}
+
+This Cookie Policy explains the cookies and similar browser storage FitPocket uses. We keep this list short on purpose — FitPocket doesn't use advertising or analytics cookies of any kind.
+
+1. Strictly necessary (always on, no consent required)
+• Session cookie (fitpocket_session) — keeps you signed in. Without it, you'd have to log in on every page load. Expires automatically after 30 days or when you sign out.
+
+2. Functional (stored on your device, not sent to our servers)
+• Theme preference — remembers whether you're using light, dark, or auto mode.
+• Session token — a copy of your sign-in token kept in your browser's local storage so the app can restore your session on reload.
+These live only in your browser and are cleared if you clear your browser's site data or sign out.
+
+3. Third-party cookies
+If you choose to sign in with Google, Google Identity Services may set its own cookies to run the sign-in flow. These are set and controlled by Google, not FitPocket — see Google's privacy policy for details. If you don't use Google Sign-In, none of these are set.
+
+4. Cookies we don't use
+No advertising cookies, no analytics/tracking cookies (e.g. Google Analytics, Meta Pixel), no cross-site tracking of any kind.
+
+5. Managing cookies
+You can clear cookies and site data for fitpocket.in at any time in your browser settings — this will sign you out and reset your theme preference, but won't delete your account data, which lives on our servers.
+
+6. Contact
+Questions about this policy: support@fitpocket.in`;
 
 export const TERMS_AND_CONDITIONS = `Last updated: ${LAST_UPDATED}
 
@@ -66,11 +103,17 @@ FitPocket is provided "as is." We may add, change, or remove features, and may s
 7. Termination
 You may stop using FitPocket and request account deletion at any time. We may suspend or terminate accounts that violate these Terms.
 
-8. Limitation of liability
+8. Payments and refunds
+FitPocket is currently free to use — there are no paid plans, subscriptions, or in-app purchases, so no refund policy applies. If we introduce paid features in the future, this section will be updated with a clear refund policy before any payment is taken.
+
+9. Limitation of liability
 To the fullest extent permitted by law, Pocket Projects is not liable for any indirect, incidental, or consequential damages arising from your use of FitPocket, including decisions made based on AI-generated estimates.
 
-9. Changes to these Terms
+10. Governing law
+These Terms are governed by the laws of India, without regard to conflict-of-law principles, unless a mandatory local consumer-protection law in your country provides otherwise.
+
+11. Changes to these Terms
 We may update these Terms as the app evolves. Continued use after changes means you accept the updated Terms.
 
-10. Contact
+12. Contact
 Questions about these Terms: support@fitpocket.in`;

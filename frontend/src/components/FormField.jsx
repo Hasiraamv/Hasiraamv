@@ -1,6 +1,8 @@
-export function Label({ children }) {
+import { cloneElement, useId } from "react";
+
+export function Label({ children, htmlFor }) {
   return (
-    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink/40">
+    <label htmlFor={htmlFor} className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink/40">
       {children}
     </label>
   );
@@ -23,6 +25,17 @@ export function Select({ children, ...props }) {
     >
       {children}
     </select>
+  );
+}
+
+/** Pairs a Label with its input/select via a generated id, so screen readers announce the label on focus. */
+export function Field({ label, children }) {
+  const id = useId();
+  return (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      {cloneElement(children, { id })}
+    </div>
   );
 }
 

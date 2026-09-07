@@ -142,6 +142,7 @@ export default function AuthScreen() {
   const [mode, setMode] = useState("login"); // login | signup
   const [forgotOpen, setForgotOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
 
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -267,6 +268,19 @@ export default function AuthScreen() {
               </button>
             )}
 
+            {mode === "signup" && (
+              <label className="flex items-start gap-2.5 text-[12px] leading-relaxed text-ink/60">
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                  required
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-acc-orange)]"
+                />
+                I agree to FitPocket's Terms & Conditions and Privacy Policy.
+              </label>
+            )}
+
             <AnimatePresence>
               {error && (
                 <motion.p
@@ -284,7 +298,7 @@ export default function AuthScreen() {
               whileTap={{ scale: 0.97 }}
               transition={SPRING_SNAPPY}
               type="submit"
-              disabled={submitting}
+              disabled={submitting || (mode === "signup" && !agreed)}
               className="mt-2 flex items-center justify-center gap-2 rounded-2xl bg-acc-orange px-4 py-3.5 text-[14px] font-bold text-white shadow-[0_8px_24px_rgba(255,122,0,0.3)] disabled:opacity-60"
             >
               {submitting ? (
