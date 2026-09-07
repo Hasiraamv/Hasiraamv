@@ -34,7 +34,7 @@ export function authenticationPage(env) {
   <li><strong>Seller legit check.</strong> Every KYC-verified seller authenticates the piece and uploads their report before we allow it to go live. No report, no listing.</li>
   <li><strong>In-house inspection.</strong> When it reaches our facility, one of our authenticators runs an independent 30-point check — construction, materials, hardware, markings, serials and packaging.</li>
   <li><strong>Certificate and seal.</strong> On passing, we issue a numbered certificate and seal the package. The number encodes the year, the category and a sequence, and carries a check character.</li>
-  <li><strong>Refund if it fails.</strong> If a piece fails our check, your order is cancelled and refunded in full before anything ships. If a piece we certified ever fails an independent check, we refund it in full.</li>
+  <li><strong>Refund if it fails.</strong> If a piece fails our check, nothing ships and your order is refunded in full — duty and freight included, because nothing was imported for you. If a piece we certified is later shown not to be authentic, see <a href="/returns">returns</a> for exactly what comes back.</li>
 </ol>
 
 <h3 class="serif" style="${H3}">Reading a certificate number</h3>
@@ -128,46 +128,65 @@ export function returnsPage(env) {
   return page({
     eyebrow: 'Returns &amp; refunds',
     title: 'Returns and refunds',
+    intro: `Read this before you buy, not after. Every piece is individually imported and the duty is
+      paid to customs on arrival, so what comes back on a refund is not always the whole amount.`,
     body: `
 <div class="notice" style="margin-bottom:22px;">
   <strong>Have a lawyer review this before you launch.</strong> This is a plain-language draft, not
   legal advice, and the bracketed values below still need to be set by you.
 </div>
 
-<h3 class="serif" style="${H3}">If a piece fails authentication</h3>
+<h3 class="serif" style="${H3}">What is refundable</h3>
 <p style="${P}">
-  You are refunded in full, including all charges, and nothing ships. This applies before dispatch.
-  If a piece we certified ever fails a credible independent authentication afterwards, contact us
-  with the report and we will refund it in full and collect the item at our cost.
+  The listed price is made up of the piece itself, our authentication fee, import duty, and freight.
+  <strong>Import duty and shipping are not refundable.</strong> Duty is paid to Indian customs the
+  moment the parcel lands and cannot be reclaimed by us, and the freight has already been flown.
+  That portion is shown on every product page before you buy.
+</p>
+<p style="${P}">
+  Everything else — the price of the piece and the authentication fee — is refunded in full where a
+  refund is due, back to the account you paid from.
+</p>
+
+<h3 class="serif" style="${H3}">If a piece is not authentic</h3>
+<p style="${P}">
+  If a piece fails our own inspection before dispatch, nothing ships and <strong>you are refunded
+  the entire amount including duty and shipping</strong>, because nothing was imported on your behalf.
+</p>
+<p style="${P}">
+  If a piece we certified is later shown not to be authentic — by a credible independent
+  authentication you provide — we refund the price of the piece and the authentication fee, and we
+  collect the item at our cost. [CONFIRM WITH YOUR LAWYER WHETHER YOU ALSO RETURN DUTY AND FREIGHT
+  IN THIS CASE — see the note below.]
 </p>
 
 <h3 class="serif" style="${H3}">If a piece arrives damaged or is not as described</h3>
 <p style="${P}">
   Tell us within <strong>[YOUR WINDOW, e.g. 48 hours]</strong> of delivery, with photographs. If the
-  piece does not match its listed condition, we arrange collection and refund you in full. Do not
-  wear or alter the item, and keep the seal and packaging — a broken seal makes the claim much harder
-  to assess.
+  piece does not match its listed condition we arrange collection and refund the piece and
+  authentication fee. Do not wear or alter the item, and keep the seal and packaging — a broken seal
+  makes the claim much harder to assess.
 </p>
 
 <h3 class="serif" style="${H3}">Change of mind</h3>
 <p style="${P}">
-  <strong>[SET YOUR POLICY HERE.]</strong> Be aware of the trade-off: every piece is individually
-  imported, with duty already paid, so a change-of-mind return is expensive to absorb. Most
-  marketplaces of this kind either do not accept them, or accept them within a short window with the
-  buyer covering return shipping and duty. Decide which you are, say so plainly here, and apply it
-  consistently.
+  <strong>[SET YOUR POLICY HERE.]</strong> Every piece is individually imported with duty already
+  paid, so a change-of-mind return is expensive to absorb. Most marketplaces of this kind either do
+  not accept them, or accept them within a short window with the buyer covering return shipping.
+  Decide which you are, say so plainly here, and apply it consistently.
 </p>
 
 <h3 class="serif" style="${H3}">Cancellations</h3>
 <p style="${P}">
-  You may cancel free of charge any time before the seller dispatches the piece. After dispatch,
-  cancellation is treated as a return under the terms above.
+  You may cancel free of charge, with a full refund of everything paid, any time before the piece is
+  dispatched to you — nothing has been imported yet at that point. After dispatch, cancellation is
+  treated as a return under the terms above.
 </p>
 
 <h3 class="serif" style="${H3}">How refunds are paid</h3>
 <p style="${P}">
-  Refunds go back to the original payment method within <strong>[YOUR TIMEFRAME, e.g. 7 working
-  days]</strong> of approval. We will confirm by email when it is issued.
+  Refunds go to the original payment method within <strong>[YOUR TIMEFRAME, e.g. 7 working
+  days]</strong> of approval. We confirm by email when it is issued.
 </p>
 
 <h3 class="serif" style="${H3}">How to start a return</h3>

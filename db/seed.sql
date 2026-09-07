@@ -108,16 +108,17 @@ INSERT INTO offers (product_id, seller_id, size_label, condition, ships_from, se
   (8, 1, 'One size', 'Excellent', 'Tokyo', 110000, 16000, 3000, 3000, 132000, 14, 18);
 
 -- Rate rules ---------------------------------------------------------------------------
--- PLACEHOLDER DUTY RATES. These are NOT researched Indian customs rates. Get the real rate
--- per category from a customs broker and set them under Admin -> Rates before listing
--- anything. Too low and every order loses money quietly.
+-- A flat 18% standard rate across categories, set deliberately. Indian customs duty is not
+-- actually flat -- it varies by HSN code, and footwear in particular runs higher -- so confirm
+-- the real rate per category with a customs broker and adjust under Admin -> Rates. Where the
+-- real rate is above 18% the shortfall comes out of margin on every order, quietly.
 INSERT INTO category_rates (category_id, duty_pct, auth_fee) VALUES
-  (1, 14.5, 2400),   -- sneakers
-  (2, 15.0, 1800),   -- streetwear
-  (3, 15.5, 6900),   -- watches
-  (4, 15.5, 4100),   -- bags
-  (5, 15.0, 3400),   -- jewelry
-  (6, 12.0, 1500);   -- collectibles
+  (1, 18.0, 2400),   -- sneakers
+  (2, 18.0, 1800),   -- streetwear
+  (3, 18.0, 6900),   -- watches
+  (4, 18.0, 4100),   -- bags
+  (5, 18.0, 3400),   -- jewelry
+  (6, 18.0, 1500);   -- collectibles
 
 -- Where stock comes from. Internal only: never shown to buyers, used to work out shipping
 -- cost and how long an order realistically takes.

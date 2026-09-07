@@ -149,6 +149,14 @@ export function productPage({ product, offers, images, related, selectedSize, en
         The listed price includes import duty, customs clearance, dual authentication with a numbered
         certificate, and insured delivery to your door. Nothing further is payable when it arrives.
       </div>
+      <p class="refund-note" style="font-size:12px; color:var(--muted); line-height:1.6; margin:12px 0 0; padding-top:12px; border-top:1px solid #ddd5c2;">
+        <strong>On refunds:</strong> ${formatINR(
+          best.duty + best.shipping
+        )} of this price is import duty and freight. Duty is paid to customs on arrival and cannot be
+        reclaimed, so it is not returned on a refund — you would be refunded
+        ${formatINR(best.landed_price - best.duty - best.shipping)}.
+        <a href="/returns">Full returns policy</a>.
+      </p>
     </div>`
         : `<div class="notice" style="margin-top:20px;">No live offers for this piece right now. <a href="/#sourcing">Ask us to source it</a> and we will put it to our seller network.</div>`
     }

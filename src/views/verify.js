@@ -174,7 +174,7 @@ export function certificatePage({ cert, siteName }) {
       This certificate records an independent ${cert.inspection_points}-point inspection carried out by
       ${escapeHtml(siteName)} after the seller's own authentication report. Verify it at any time at
       ${escapeHtml(siteName.toLowerCase())}/verify. If this piece ever fails an independent check, we
-      refund it in full.
+      refund it and collect it at our cost — see our returns policy.
     </p>
   </div>
 </section>`;

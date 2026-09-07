@@ -132,7 +132,7 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
       </div>
       <div style="flex-grow:1; min-width:260px; font-size:13.5px; color:#b3ab99; line-height:1.6;">
         Every order ships with a numbered certificate and both inspection reports.
-        If a piece ever fails an independent check, we refund it in full.
+        If a piece ever fails an independent check, we refund it and collect it at our cost.
       </div>
       <a class="btn btn-outline" href="/verify" style="color:#f2ede2; border-color:#4a4336;">Verify a certificate</a>
     </div>

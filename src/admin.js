@@ -2,7 +2,13 @@ import { escapeHtml, formatINR, html, redirect } from './render.js';
 import * as db from './db.js';
 import { issueCertificate } from './certificates.js';
 import { storeImage, deleteImage } from './images.js';
-import { computeOfferPricing, listCategoryRates, listSourceCities, nextStockCode } from './pricing.js';
+import {
+  computeOfferPricing,
+  listCategoryRates,
+  listSourceCities,
+  nextStockCode,
+  refundBreakdown,
+} from './pricing.js';
 import {
   parseCookies,
   cookieHeader,
@@ -204,7 +210,11 @@ function ordersTable(orders) {
         <td data-label="Buyer">${escapeHtml(o.buyer_name)}<div style="font-size:11.5px; color:var(--faint)">${escapeHtml(
           o.buyer_phone
         )}</div></td>
-        <td data-label="Amount" class="num">${formatINR(o.amount)}</td>
+        <td data-label="Amount" class="num">${formatINR(o.amount)}
+          <div style="font-size:11px; color:var(--faint);">refundable ${formatINR(
+            refundBreakdown(o).refundable
+          )}</div>
+        </td>
         <td data-label="Status">${escapeHtml(o.status.replace(/_/g, ' '))}</td>
         <td data-label="Certificate">${
           o.certificate_no

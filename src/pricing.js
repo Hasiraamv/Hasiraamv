@@ -76,6 +76,30 @@ export async function computeOfferPricing(db, { categoryId, city, sellerPrice, o
   return computed;
 }
 
+// What comes back to the buyer on a refund.
+//
+// Import duty is paid to the government the moment the parcel lands and cannot be reclaimed,
+// and the freight has already been flown. So the refundable part is the piece itself plus the
+// authentication fee — we charged for a check, and a refund means that check did not deliver
+// what it promised.
+//
+// This split MUST be disclosed before purchase, not discovered afterwards. A term that only
+// appears once a customer is complaining is exactly the kind an Indian consumer forum treats
+// as an unfair contract term under s.2(46) of the Consumer Protection Act 2019.
+export function refundBreakdown(order) {
+  const amount = Number(order.amount) || 0;
+  const duty = Number(order.duty) || 0;
+  const shipping = Number(order.shipping) || 0;
+  const nonRefundable = duty + shipping;
+  return {
+    total: amount,
+    refundable: Math.max(0, amount - nonRefundable),
+    nonRefundable,
+    duty,
+    shipping,
+  };
+}
+
 // Internal shelf number, one per physical item: MM-SNK-00042.
 // Unlike a certificate number this is for you, not the buyer, so it carries no check
 // character — it is read off a label in your own warehouse, not typed by a stranger.

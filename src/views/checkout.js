@@ -1,4 +1,5 @@
 import { escapeHtml, formatINR, icon, etaDates } from '../render.js';
+import { refundBreakdown } from '../pricing.js';
 
 export function cartPage({ items, total }) {
   if (!items.length) {
@@ -136,7 +137,8 @@ export function checkoutPage({ items, total, error }) {
       <button class="btn btn-block" type="submit" style="margin-top:18px;">Place order</button>
       <p style="font-size:11.5px; color:var(--faint); margin:12px 0 0; line-height:1.5;">
         Nothing further is payable on delivery. Every piece is authenticated before dispatch; if it
-        fails, you are refunded in full.
+        fails, nothing ships and you are refunded everything.
+        <a href="/returns">How refunds work</a>.
       </p>
     </div>
   </form>
@@ -174,6 +176,7 @@ export function publicStageIndex(internalStatus) {
 
 export function orderPage({ order, events, certificate }) {
   const current = publicStageIndex(order.status);
+  const refund = refundBreakdown(order);
 
   return `
 <section class="section">
@@ -221,6 +224,25 @@ export function orderPage({ order, events, certificate }) {
          </div>`
       : ''
   }
+
+  <div class="panel" style="margin-top:18px; padding:20px 24px;">
+    <div style="font-size:13.5px; font-weight:600; margin-bottom:10px;">If this order were refunded</div>
+    <div style="display:flex; flex-direction:column; gap:7px; font-size:12.5px; color:#5c5748; max-width:420px;">
+      <div style="display:flex; justify-content:space-between;"><span>Piece and authentication</span><span>${formatINR(
+        refund.refundable
+      )}</span></div>
+      <div style="display:flex; justify-content:space-between;"><span>Import duty and freight — not refundable</span><span>${formatINR(
+        refund.nonRefundable
+      )}</span></div>
+      <div style="display:flex; justify-content:space-between; padding-top:8px; border-top:1px solid var(--line); font-weight:600; color:var(--text);"><span>You would receive</span><span>${formatINR(
+        refund.refundable
+      )}</span></div>
+    </div>
+    <div style="font-size:11.5px; color:var(--muted); margin-top:10px; line-height:1.55;">
+      Duty is paid to customs on arrival and cannot be reclaimed. Before dispatch, nothing has been
+      imported yet and a cancellation returns the full amount. <a href="/returns">Returns policy</a>.
+    </div>
+  </div>
 
   ${
     certificate
