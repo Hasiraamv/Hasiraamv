@@ -1,0 +1,760 @@
+<title>RAREHAUS Identity Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,500;6..96,700&family=Archivo:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --obsidian:#111111; --ivory:#F4F0E8; --stone:#D6D0C5; --champagne:#B4935A; --oxblood:#481B24;
+  --ink:#1C1A17; --ink-muted:#5B5751; --ivory-dim:#E7E2D8; --obsidian-2:#1A1A1A; --obsidian-3:#2A2926;
+  --foil:linear-gradient(103deg,#8E6E3C 0%,#B4935A 26%,#E4CFA4 50%,#B4935A 74%,#8E6E3C 100%);
+  --display:"Bodoni Moda",Didot,"Bodoni MT",Georgia,serif;
+  --sans:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono",Menlo,monospace;
+  --shadow:0 24px 48px -26px rgba(17,17,17,.42);
+  --pad:clamp(24px,5vw,96px);
+}
+*{box-sizing:border-box}
+body{background:var(--ivory);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.sprite{position:absolute;width:0;height:0;overflow:hidden}
+
+/* ---------- primitives ---------- */
+.wrap{max-width:1200px;margin:0 auto;padding-inline:var(--pad)}
+.eyebrow{font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--ink-muted);font-weight:500;margin:0}
+.rule{height:1px;background:var(--stone);border:0;margin:0}
+.mono{font-family:var(--mono);font-size:12px;letter-spacing:.04em}
+h2.sec{font-family:var(--display);font-size:clamp(28px,4vw,44px);font-weight:400;line-height:1.05;margin:0;text-wrap:balance}
+h3{font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;margin:0;color:var(--ink)}
+p{margin:0}
+.note{font-size:13px;line-height:1.65;color:var(--ink-muted);max-width:62ch}
+.caption{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-muted);text-transform:uppercase}
+
+section{padding-block:clamp(48px,7vw,104px)}
+.sec-head{display:grid;grid-template-columns:auto 1fr;gap:clamp(24px,4vw,64px);align-items:start;padding-bottom:32px}
+.sec-num{font-family:var(--mono);font-size:12px;color:var(--champagne);letter-spacing:.1em;padding-top:.7em}
+.sec-intro{display:grid;gap:12px;max-width:70ch}
+.grid{display:grid;gap:clamp(16px,2vw,28px)}
+.g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+
+/* obsidian bands */
+.band{background:var(--obsidian);color:var(--ivory)}
+.band .eyebrow,.band .note,.band .caption{color:#9C968C}
+.band h3{color:var(--ivory)}
+.band .rule{background:var(--obsidian-3)}
+
+/* ---------- masthead ---------- */
+.masthead{background:var(--obsidian);color:var(--ivory);padding-block:clamp(56px,9vw,120px);text-align:center}
+.mast-mark{width:104px;height:104px;color:var(--champagne);margin-inline:auto;display:block}
+.wordmark{font-family:var(--display);font-weight:400;letter-spacing:.4em;text-indent:.4em;line-height:1;
+  font-size:clamp(30px,7.4vw,84px);margin:clamp(24px,4vw,40px) 0 0}
+.mast-tag{font-size:clamp(10px,1.3vw,13px);letter-spacing:.44em;text-indent:.44em;text-transform:uppercase;color:var(--champagne);margin-top:22px}
+.mast-meta{display:flex;flex-wrap:wrap;gap:8px 32px;justify-content:center;margin-top:clamp(40px,6vw,72px);
+  padding-top:24px;border-top:1px solid var(--obsidian-3);font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:#8A857C;text-transform:uppercase}
+
+/* ---------- logo plates ---------- */
+.plate{display:grid;place-items:center;padding:clamp(28px,4vw,52px);min-height:220px;border:1px solid var(--stone);background:var(--ivory)}
+.plate.dark{background:var(--obsidian);border-color:var(--obsidian)}
+.plate.stone{background:var(--stone);border-color:var(--stone)}
+.plate svg{width:100%;max-width:132px;height:auto}
+.plate .type-wordmark{font-size:clamp(13px,2.1vw,21px)}
+.plate-cap{display:flex;justify-content:space-between;gap:16px;margin-top:10px;align-items:baseline}
+.type-wordmark{font-family:var(--display);letter-spacing:.36em;text-indent:.36em;font-size:clamp(17px,2.4vw,26px);line-height:1}
+.foil{background:var(--foil);-webkit-background-clip:text;background-clip:text;color:transparent}
+.foil-stroke{color:var(--champagne)}
+
+/* clear space diagram */
+.clearspace{position:relative;display:grid;place-items:center;padding:64px;background:var(--ivory-dim);border:1px solid var(--stone)}
+.clearspace .box{position:relative;padding:48px;outline:1px dashed var(--champagne);outline-offset:0}
+.clearspace svg{width:96px;height:96px;color:var(--obsidian);display:block}
+.cs-tick{position:absolute;font-family:var(--mono);font-size:10px;color:var(--champagne);letter-spacing:.08em}
+.cs-tick.t{top:16px;left:50%;transform:translateX(-50%)}
+.cs-tick.l{left:12px;top:50%;transform:translateY(-50%)}
+
+/* misuse */
+.misuse{display:grid;place-items:center;height:132px;border:1px solid var(--stone);background:var(--ivory);position:relative;overflow:hidden}
+.misuse svg{width:74px;height:74px;color:var(--obsidian)}
+.misuse::after{content:"";position:absolute;inset:0;background:linear-gradient(to top left,transparent calc(50% - .5px),var(--oxblood) calc(50% - .5px),var(--oxblood) calc(50% + .5px),transparent calc(50% + .5px))}
+.m-stretch svg{width:120px;height:62px}
+.m-rot svg{transform:rotate(-14deg)}
+.m-tint svg{color:#7BA7C9}
+.m-busy{background:repeating-linear-gradient(45deg,#B8B2A6 0 8px,#CFC9BD 8px 16px)}
+
+/* ---------- colour ---------- */
+.swatch{display:flex;flex-direction:column;min-height:200px;border:1px solid var(--stone)}
+.swatch .fill{flex:1;min-height:112px}
+.swatch .meta{padding:14px 16px;background:var(--ivory);display:grid;gap:3px}
+.swatch .name{font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase}
+.swatch .hex{font-family:var(--mono);font-size:11px;color:var(--ink-muted);letter-spacing:.06em}
+.swatch .use{font-size:12px;color:var(--ink-muted);line-height:1.45}
+.ratio-row{display:flex;height:56px;border:1px solid var(--stone);overflow:hidden}
+.ratio-row div{display:grid;place-items:end start;padding:8px;font-family:var(--mono);font-size:10px;letter-spacing:.08em}
+
+/* ---------- type ---------- */
+.specimen{border-top:1px solid var(--stone);padding-top:22px;display:grid;gap:14px}
+.spec-line{font-family:var(--display);font-size:clamp(34px,7vw,84px);line-height:1;font-weight:400;letter-spacing:-.01em}
+.glyphs{font-family:var(--display);font-size:clamp(20px,2.6vw,30px);letter-spacing:.08em;line-height:1.5;color:var(--ink)}
+.scale-table{width:100%;border-collapse:collapse;font-size:13px}
+.scale-table th{text-align:left;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-muted);font-weight:600;padding:0 12px 10px 0;border-bottom:1px solid var(--stone)}
+.scale-table td{padding:11px 12px 11px 0;border-bottom:1px solid var(--ivory-dim);vertical-align:baseline;font-family:var(--mono);font-size:12px;color:var(--ink-muted)}
+.scale-table td.sample{font-size:inherit;color:var(--ink)}
+.tbl-scroll{overflow-x:auto}
+
+/* ---------- objects / mockups ---------- */
+.object{display:grid;gap:10px}
+.stage{background:var(--ivory-dim);border:1px solid var(--stone);padding:clamp(20px,3vw,40px);display:grid;place-items:center;min-height:260px}
+.stage.dark{background:#0C0C0C;border-color:#0C0C0C}
+
+/* rigid box */
+.box3d{width:min(100%,300px);aspect-ratio:1/.72;position:relative;filter:drop-shadow(0 26px 30px rgba(0,0,0,.45))}
+.box-lid{position:absolute;inset:0;background:linear-gradient(160deg,#1E1E1E 0%,#111 45%,#0A0A0A 100%);border-radius:2px;
+  display:grid;place-items:center;border:1px solid #262626}
+.box-lid .emboss{width:56%;text-align:center;color:#0B0B0B;text-shadow:0 1px 0 rgba(255,255,255,.13),0 -1px 0 rgba(0,0,0,.6)}
+.box-lid .emboss .type-wordmark{font-size:clamp(13px,2vw,19px)}
+.box-side{position:absolute;left:0;right:0;bottom:-13%;height:16%;background:linear-gradient(180deg,#0E0E0E,#050505);border-radius:0 0 2px 2px}
+
+/* tissue */
+.tissue{width:min(100%,300px);aspect-ratio:1/.72;border:1px solid var(--stone);position:relative;overflow:hidden;
+  background-color:#F7F4EE;background-repeat:repeat;background-size:74px 74px}
+.tissue::after{content:"";position:absolute;inset:0;background:linear-gradient(112deg,rgba(255,255,255,.55),transparent 40%,rgba(17,17,17,.07))}
+
+/* shopping bag */
+.bag{width:min(100%,215px);aspect-ratio:1/1.22;background:linear-gradient(100deg,#161616,#0D0D0D 60%);position:relative;
+  border-radius:1px;box-shadow:var(--shadow);display:grid;place-items:center}
+.bag::before{content:"";position:absolute;top:-26px;left:26%;right:26%;height:30px;border:2px solid var(--obsidian-3);border-bottom:0;border-radius:60px 60px 0 0}
+.bag .gusset{position:absolute;right:0;top:0;bottom:0;width:17%;background:linear-gradient(90deg,rgba(0,0,0,.55),rgba(255,255,255,.05))}
+.bag svg{width:56px;height:56px;color:var(--champagne)}
+
+/* ribbon + wax seal */
+.ribbon-stage{position:relative;width:min(100%,300px);aspect-ratio:1/.72;background:linear-gradient(160deg,#1C1C1C,#0B0B0B);border-radius:2px;box-shadow:var(--shadow)}
+.ribbon-v{position:absolute;top:0;bottom:0;left:44%;width:13%;background:linear-gradient(90deg,#000,#2B2B2B 45%,#141414)}
+.wax{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:78px;height:78px;border-radius:50%;
+  background:radial-gradient(circle at 34% 30%,#6B2B36,var(--oxblood) 62%,#33121A);display:grid;place-items:center;box-shadow:0 6px 14px rgba(0,0,0,.55)}
+.wax svg{width:38px;height:38px;color:#D9C7A4}
+
+/* cards */
+.card{background:var(--ivory);border:1px solid var(--stone);padding:20px;display:grid;gap:14px;box-shadow:var(--shadow);width:min(100%,340px)}
+.card.dark{background:var(--obsidian);border-color:#000;color:var(--ivory)}
+.card-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.card-top svg{width:30px;height:30px}
+.verified{display:inline-flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--champagne);font-weight:600}
+.verified::before{content:"";width:6px;height:6px;background:var(--champagne);display:block;transform:rotate(45deg)}
+.dl{display:grid;grid-template-columns:auto 1fr;gap:7px 18px;font-family:var(--mono);font-size:11px;letter-spacing:.04em}
+.dl dt{color:#8A857C;text-transform:uppercase;letter-spacing:.1em;margin:0}
+.dl dd{margin:0;text-align:right}
+.card.dark .dl dd{color:var(--ivory)}
+.card .dl dd{color:var(--ink)}
+
+/* hang tag */
+.tag{width:132px;aspect-ratio:.6;background:var(--ivory);border:1px solid var(--stone);border-radius:2px;position:relative;
+  display:grid;align-content:space-between;padding:34px 14px 14px;text-align:center;box-shadow:var(--shadow)}
+.tag::before{content:"";position:absolute;top:14px;left:50%;transform:translateX(-50%);width:11px;height:11px;border-radius:50%;
+  border:1px solid var(--stone);background:var(--ivory-dim)}
+.tag svg{width:30px;height:30px;color:var(--obsidian);margin-inline:auto}
+.tag.dark{background:var(--obsidian);border-color:#000;color:var(--ivory)}
+.tag.dark svg{color:var(--champagne)}
+
+/* business card duplex */
+.bcard{width:min(100%,266px);aspect-ratio:85/55;border-radius:2px;box-shadow:var(--shadow);padding:18px;display:grid;align-content:space-between}
+.bcard.front{background:var(--obsidian);color:var(--ivory);place-items:center;align-content:center;gap:12px}
+.bcard.front svg{width:46px;height:46px;color:var(--champagne)}
+.bcard.back{background:var(--ivory);border:1px solid var(--stone);color:var(--ink)}
+
+/* ---------- digital ---------- */
+.browser{border:1px solid var(--stone);background:var(--obsidian);box-shadow:var(--shadow);overflow:hidden}
+.browser-bar{display:flex;align-items:center;gap:7px;padding:9px 12px;background:var(--ivory-dim);border-bottom:1px solid var(--stone)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--stone)}
+.url{margin-left:10px;font-family:var(--mono);font-size:10px;color:var(--ink-muted);letter-spacing:.04em}
+.site-nav{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;padding:16px 22px;border-bottom:1px solid var(--obsidian-3)}
+.site-nav .brand{font-family:var(--display);letter-spacing:.3em;font-size:15px;color:var(--ivory);margin-right:auto}
+.site-nav a{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#9C968C;text-decoration:none}
+.site-hero{padding:clamp(30px,5vw,64px) 22px;text-align:center;border-bottom:1px solid var(--obsidian-3)}
+.site-hero .k{font-family:var(--display);font-size:clamp(26px,4.6vw,52px);line-height:1.02;color:var(--ivory);margin:0;text-wrap:balance}
+.site-hero .k em{font-style:italic;color:var(--champagne)}
+.site-hero .sub{font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:#8A857C;margin-top:16px}
+.site-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(126px,1fr));gap:1px;background:var(--obsidian-3)}
+.tile{background:var(--obsidian-2);padding:14px;display:grid;gap:9px}
+.tile .frame{aspect-ratio:1;background:radial-gradient(120% 90% at 30% 20%,#242320,#0F0F0E);display:grid;place-items:center;position:relative}
+.tile .frame svg{width:34px;height:34px;color:#4A473F}
+.tile .nm{font-size:11px;color:var(--ivory);line-height:1.3}
+.tile .ask{font-family:var(--mono);font-size:11px;color:var(--champagne)}
+.tile .sku{font-family:var(--mono);font-size:9px;color:#6E695F;letter-spacing:.08em}
+
+/* phone */
+.phone{width:min(100%,260px);border:9px solid #0A0A0A;border-radius:30px;background:var(--obsidian);box-shadow:var(--shadow);overflow:hidden}
+.phone-status{display:flex;justify-content:space-between;padding:9px 16px 4px;font-family:var(--mono);font-size:9px;color:#8A857C}
+.phone-body{padding:10px 14px 16px;display:grid;gap:12px}
+.p-hero{aspect-ratio:1.14;background:radial-gradient(120% 90% at 34% 22%,#26251F,#0D0D0C);display:grid;place-items:center;position:relative}
+.p-hero svg{width:60px;height:60px;color:#4A473F}
+.p-badge{position:absolute;top:9px;left:9px;font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--champagne);border:1px solid rgba(180,147,90,.5);padding:3px 7px}
+.p-row{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+.p-name{font-family:var(--display);font-size:16px;color:var(--ivory);line-height:1.15}
+.p-meta{font-family:var(--mono);font-size:9px;color:#7C776E;letter-spacing:.06em;margin-top:5px}
+.p-split{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--obsidian-3);border:1px solid var(--obsidian-3)}
+.p-cell{background:var(--obsidian-2);padding:9px 10px;display:grid;gap:3px}
+.p-cell .lbl{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:#7C776E}
+.p-cell .val{font-family:var(--mono);font-size:14px;color:var(--ivory)}
+.p-cta{background:var(--champagne);color:#171310;text-align:center;padding:11px;font-size:10px;letter-spacing:.24em;text-transform:uppercase;font-weight:600}
+.p-nav{display:flex;justify-content:space-between;padding:11px 4px 3px;border-top:1px solid var(--obsidian-3);font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:#6E695F}
+.p-nav span:first-child{color:var(--champagne)}
+
+/* instagram */
+.ig{border:1px solid var(--stone);background:var(--ivory);width:min(100%,340px);box-shadow:var(--shadow)}
+.ig-head{display:flex;gap:16px;padding:16px;align-items:center;border-bottom:1px solid var(--ivory-dim)}
+.ig-avatar{width:62px;height:62px;border-radius:50%;background:var(--obsidian);display:grid;place-items:center;flex:none}
+.ig-avatar svg{width:32px;height:32px;color:var(--champagne)}
+.ig-stats{display:flex;gap:18px;font-size:11px;color:var(--ink-muted)}
+.ig-stats b{display:block;color:var(--ink);font-family:var(--mono);font-size:12px}
+.ig-handle{font-size:12px;font-weight:600;letter-spacing:.08em}
+.ig-bio{padding:0 16px 14px;font-size:11px;line-height:1.55;color:var(--ink-muted)}
+.ig-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
+.ig-cell{aspect-ratio:1;background:var(--obsidian);display:grid;place-items:center}
+.ig-cell svg{width:26px;height:26px;color:#3A3833}
+.ig-cell.type{background:var(--ivory-dim);color:var(--ink);font-family:var(--display);font-size:11px;letter-spacing:.14em;text-align:center;padding:8px;line-height:1.3}
+.ig-cell.foilcell{background:var(--obsidian);color:var(--champagne);font-family:var(--display);font-size:10px;letter-spacing:.18em;text-align:center;padding:8px}
+
+/* QC */
+.qc-step{border-top:1px solid var(--stone);padding-top:14px;display:grid;gap:6px}
+.qc-step .n{font-family:var(--mono);font-size:11px;color:var(--champagne);letter-spacing:.1em}
+.qc-step .t{font-size:13px;font-weight:600;letter-spacing:.02em}
+.qc-step .d{font-size:12.5px;color:var(--ink-muted);line-height:1.55}
+.band .qc-step{border-color:var(--obsidian-3)}
+.band .qc-step .t{color:var(--ivory)}
+.band .qc-step .d{color:#9C968C}
+
+/* voice */
+.vlist{display:grid;gap:12px}
+.vrow{display:grid;grid-template-columns:14px 1fr;gap:12px;align-items:start;font-size:13.5px;line-height:1.55}
+.vrow .m{font-family:var(--mono);font-size:12px;line-height:1.6}
+.say .m{color:var(--champagne)}
+.dont .m{color:var(--oxblood)}
+.dont span{color:var(--ink-muted)}
+
+/* prompt appendix */
+.prompt{background:var(--obsidian-2);border:1px solid var(--obsidian-3);padding:20px;font-family:var(--mono);
+  font-size:11.5px;line-height:1.75;color:#C9C3B7;white-space:pre-wrap;overflow-x:auto;letter-spacing:.01em}
+footer{background:var(--obsidian);color:#8A857C;padding-block:56px;text-align:center}
+footer .type-wordmark{color:var(--ivory);font-size:17px}
+@media (prefers-reduced-motion:no-preference){a{transition:color .2s}}
+a:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--champagne);outline-offset:3px}
+</style>
+
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="mark" viewBox="30 53 141 94">
+    <g fill="none" stroke="currentColor" stroke-width="13">
+      <path d="M37 60V140"/><path d="M37 60h31a16 16 0 0 1 0 32H37"/><path d="M56 92l32 48"/>
+      <path d="M116 60v80"/><path d="M164 60v80"/><path d="M116 100h48"/>
+    </g>
+  </symbol>
+  <symbol id="seal" viewBox="0 0 200 200">
+    <path d="M33 178V100a67 67 0 0 1 134 0v78" fill="none" stroke="currentColor" stroke-width="10"/>
+    <g transform="translate(100 112) scale(.6) translate(-100.5 -100)" fill="none" stroke="currentColor" stroke-width="13">
+      <path d="M37 60V140"/><path d="M37 60h31a16 16 0 0 1 0 32H37"/><path d="M56 92l32 48"/>
+      <path d="M116 60v80"/><path d="M164 60v80"/><path d="M116 100h48"/>
+    </g>
+  </symbol>
+  <symbol id="sneaker" viewBox="0 0 100 60">
+    <g fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round">
+      <path d="M6 44V22h13l11 8 20 3 16 6 22 5v6a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4z"/>
+      <path d="M19 22l7 12M32 30l6 10M50 33l4 9M6 44h82"/>
+    </g>
+  </symbol>
+  <symbol id="watch" viewBox="0 0 60 100">
+    <g fill="none" stroke="currentColor" stroke-width="3">
+      <rect x="16" y="30" width="28" height="40" rx="4"/><path d="M22 30V12h16v18M22 70v18h16V70M44 46h5"/>
+    </g>
+  </symbol>
+  <symbol id="bagicon" viewBox="0 0 80 80">
+    <g fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round">
+      <path d="M14 28h52l-5 40H19z"/><path d="M28 28v-8a12 12 0 0 1 24 0v8"/>
+    </g>
+  </symbol>
+</svg>
+
+<header class="masthead">
+  <svg class="mast-mark" role="img" aria-label="RAREHAUS vault seal"><use href="#seal"/></svg>
+  <h1 class="wordmark">RAREHAUS</h1>
+  <p class="mast-tag">The Home of Rare</p>
+  <div class="mast-meta">
+    <span>Identity System</span><span>Edition 01</span><span>Obsidian · Ivory · Champagne</span><span>RH-BRAND-0001</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+<section id="positioning">
+  <div class="sec-head">
+    <p class="sec-num">01</p>
+    <div class="sec-intro">
+      <p class="eyebrow">Positioning</p>
+      <h2 class="sec">A private archive that happens to be open to buyers.</h2>
+      <p class="note">RAREHAUS acquires, authenticates and resells rare sneakers, watches, bags and collectible fashion. Every piece is examined in-house, graded, serialised and released with a record of its condition. The identity is built to feel like a collection catalogue — restrained, exact, and quiet about how much it knows.</p>
+    </div>
+  </div>
+  <div class="grid g4">
+    <div><h3>Exclusive</h3><p class="note" style="margin-top:8px">Scarcity is stated as fact, never shouted. Inventory counts do the work.</p></div>
+    <div><h3>Verified</h3><p class="note" style="margin-top:8px">Every claim is backed by a serial, a grade and a named authenticator.</p></div>
+    <div><h3>Cultured</h3><p class="note" style="margin-top:8px">Fluent in the objects. Release years, colourways, references, movements.</p></div>
+    <div><h3>Selective</h3><p class="note" style="margin-top:8px">What we decline defines us more than what we list.</p></div>
+  </div>
+</section>
+<hr class="rule">
+
+<section id="logo">
+  <div class="sec-head">
+    <p class="sec-num">02</p>
+    <div class="sec-intro">
+      <p class="eyebrow">Logo system</p>
+      <h2 class="sec">The seal, the monogram, the wordmark.</h2>
+      <p class="note">The mark is an arch open at the foot — a vault door and a gallery doorway at once — holding a geometric RH built from a single 13-unit stroke. It reduces to a 16&nbsp;px favicon and survives blind embossing at 8&nbsp;mm.</p>
+    </div>
+  </div>
+
+  <div class="grid g3">
+    <div class="object">
+      <div class="plate"><svg role="img" aria-label="Vault seal, obsidian"><use href="#seal"/></svg></div>
+      <div class="plate-cap"><span class="caption">Primary seal</span><span class="caption">Obsidian</span></div>
+    </div>
+    <div class="object">
+      <div class="plate dark" style="color:var(--ivory)"><svg role="img" aria-label="Vault seal, ivory"><use href="#seal"/></svg></div>
+      <div class="plate-cap"><span class="caption">Reversed</span><span class="caption">Ivory</span></div>
+    </div>
+    <div class="object">
+      <div class="plate dark foil-stroke"><svg role="img" aria-label="Vault seal, champagne foil"><use href="#seal"/></svg></div>
+      <div class="plate-cap"><span class="caption">Foil application</span><span class="caption">Champagne</span></div>
+    </div>
+    <div class="object">
+      <div class="plate"><svg style="max-width:140px" role="img" aria-label="RH monogram"><use href="#mark"/></svg></div>
+      <div class="plate-cap"><span class="caption">Monogram</span><span class="caption">Uncontained</span></div>
+    </div>
+    <div class="object">
+      <div class="plate"><span class="type-wordmark">RAREHAUS</span></div>
+      <div class="plate-cap"><span class="caption">Wordmark</span><span class="caption">Bodoni Moda · 0.36em</span></div>
+    </div>
+    <div class="object">
+      <div class="plate dark" style="color:var(--ivory)">
+        <div style="display:grid;gap:16px;justify-items:center">
+          <svg style="max-width:58px" role="img" aria-label="Seal"><use href="#seal"/></svg>
+          <span class="type-wordmark foil">RAREHAUS</span>
+          <span style="font-size:9px;letter-spacing:.34em;color:#8A857C">THE HOME OF RARE</span>
+        </div>
+      </div>
+      <div class="plate-cap"><span class="caption">Stacked lockup</span><span class="caption">Foil on obsidian</span></div>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:40px">
+    <div class="object">
+      <div class="clearspace">
+        <span class="cs-tick t">X = arch width ÷ 4</span>
+        <span class="cs-tick l">X</span>
+        <div class="box"><svg role="img" aria-label="Clear space diagram"><use href="#seal"/></svg></div>
+      </div>
+      <p class="caption">Clear space — no type, rule or image inside X on any side</p>
+    </div>
+    <div class="object">
+      <div class="grid" style="grid-template-columns:repeat(2,1fr);gap:12px">
+        <div><div class="misuse m-stretch"><svg preserveAspectRatio="none"><use href="#seal"/></svg></div><p class="caption" style="margin-top:8px">Never distort</p></div>
+        <div><div class="misuse m-rot"><svg><use href="#seal"/></svg></div><p class="caption" style="margin-top:8px">Never rotate</p></div>
+        <div><div class="misuse m-tint"><svg><use href="#seal"/></svg></div><p class="caption" style="margin-top:8px">Never recolour</p></div>
+        <div><div class="misuse m-busy"><svg><use href="#seal"/></svg></div><p class="caption" style="margin-top:8px">Never place on pattern</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g4" style="margin-top:40px">
+    <div><h3>Minimum size</h3><p class="note" style="margin-top:8px">Seal 16&nbsp;px / 8&nbsp;mm. Wordmark 90&nbsp;px / 24&nbsp;mm.</p></div>
+    <div><h3>App icon</h3><p class="note" style="margin-top:8px">Seal centred on obsidian, 42% optical width, champagne stroke.</p></div>
+    <div><h3>Emboss</h3><p class="note" style="margin-top:8px">Blind deboss at 0.35&nbsp;mm depth on 600&nbsp;gsm and above.</p></div>
+    <div><h3>Avatar</h3><p class="note" style="margin-top:8px">Monogram only inside a circular crop; the arch feet crop away.</p></div>
+  </div>
+</section>
+</div>
+
+<div class="band">
+<div class="wrap">
+<section id="colour">
+  <div class="sec-head">
+    <p class="sec-num" style="color:var(--champagne)">03</p>
+    <div class="sec-intro">
+      <p class="eyebrow">Colour</p>
+      <h2 class="sec" style="color:var(--ivory)">Two grounds, one metal, one reserve.</h2>
+      <p class="note">Obsidian and ivory carry everything. Champagne appears only where the brand makes a claim — verification, foil, the price a piece actually holds. Oxblood is reserved for Reserve-tier lots and wax seals; it never becomes a UI colour.</p>
+    </div>
+  </div>
+  <div class="grid g3">
+    <div class="swatch"><div class="fill" style="background:#111111;border-bottom:1px solid #2A2926"></div>
+      <div class="meta"><span class="name">Obsidian</span><span class="hex">#111111 · PANTONE Black 6 C</span><span class="use">Primary ground, packaging, display type</span></div></div>
+    <div class="swatch"><div class="fill" style="background:#F4F0E8"></div>
+      <div class="meta"><span class="name">Warm Ivory</span><span class="hex">#F4F0E8 · Materica Gesso</span><span class="use">Paper stock, reversed type, presentation ground</span></div></div>
+    <div class="swatch"><div class="fill" style="background:#D6D0C5"></div>
+      <div class="meta"><span class="name">Stone</span><span class="hex">#D6D0C5</span><span class="use">Rules, dividers, secondary surface</span></div></div>
+    <div class="swatch"><div class="fill" style="background:var(--foil)"></div>
+      <div class="meta"><span class="name">Champagne</span><span class="hex">#B4935A · Foil 871</span><span class="use">Verification, foil stamping, accent only</span></div></div>
+    <div class="swatch"><div class="fill" style="background:#481B24"></div>
+      <div class="meta"><span class="name">Deep Oxblood</span><span class="hex">#481B24</span><span class="use">Reserve tier, wax seal, rare flags</span></div></div>
+    <div class="swatch"><div class="fill" style="background:#5B5751"></div>
+      <div class="meta"><span class="name">Warm Ink</span><span class="hex">#5B5751</span><span class="use">Captions, metadata, SKU labels</span></div></div>
+  </div>
+  <div style="margin-top:32px;display:grid;gap:10px">
+    <div class="ratio-row">
+      <div style="flex:60;background:#111111;color:#8A857C">OBSIDIAN 60</div>
+      <div style="flex:30;background:#F4F0E8;color:#5B5751">IVORY 30</div>
+      <div style="flex:7;background:#D6D0C5;color:#5B5751">STONE 7</div>
+      <div style="flex:3;background:#B4935A;color:#171310">3</div>
+    </div>
+    <p class="note">Working ratio. Champagne never exceeds 3% of a surface; oxblood sits outside this ratio and appears once per touchpoint at most.</p>
+  </div>
+</section>
+</div>
+</div>
+
+<div class="wrap">
+<section id="type">
+  <div class="sec-head">
+    <p class="sec-num">04</p>
+    <div class="sec-intro">
+      <p class="eyebrow">Typography</p>
+      <h2 class="sec">Didone for the object. Grotesque for the transaction.</h2>
+      <p class="note">Bodoni Moda names the piece; Archivo runs the marketplace; IBM Plex Mono carries anything that must be read back exactly — serials, SKUs, grades, dimensions.</p>
+    </div>
+  </div>
+
+  <div class="specimen">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <h3>Bodoni Moda — Display</h3><span class="caption">400 / 500 · optical 96 · tracking −0.01em</span>
+    </div>
+    <p class="spec-line">Rare, held briefly.</p>
+    <p class="glyphs">AaBbEeGgKkRrSs&nbsp; 0123456789 &nbsp;&amp;?!</p>
+  </div>
+
+  <div class="specimen" style="margin-top:32px">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <h3>Archivo — Interface</h3><span class="caption">300 / 400 / 500 / 600 · tracking 0.24em on labels</span>
+    </div>
+    <p style="font-size:clamp(19px,2.6vw,27px);line-height:1.35;max-width:22ch;font-weight:300">Authenticated in-house before it is ever listed.</p>
+    <p style="font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink-muted);font-weight:600">Archive · Sneakers · Watches · Bags · Atelier</p>
+  </div>
+
+  <div class="specimen" style="margin-top:32px">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <h3>IBM Plex Mono — Record</h3><span class="caption">400 / 500 · tabular</span>
+    </div>
+    <p class="mono" style="font-size:14px;line-height:2;color:var(--ink)">RH-SNK-04127-A &nbsp; GRADE: DS &nbsp; SIZE: UK 9<br>RH-WCH-00318-R &nbsp; GRADE: EXC &nbsp; REF: 16610LV<br>RH-BAG-01204-A &nbsp; GRADE: VNDS &nbsp; YEAR: 2004</p>
+  </div>
+
+  <div class="tbl-scroll" style="margin-top:40px">
+    <table class="scale-table">
+      <thead><tr><th>Step</th><th>Size</th><th>Role</th><th>Sample</th></tr></thead>
+      <tbody>
+        <tr><td>D1</td><td>4.209rem</td><td>Campaign headline</td><td class="sample" style="font-family:var(--display);font-size:30px;line-height:1.1">The Home of Rare</td></tr>
+        <tr><td>D2</td><td>2.369rem</td><td>Section head</td><td class="sample" style="font-family:var(--display);font-size:22px">Archive release 04</td></tr>
+        <tr><td>D3</td><td>1.333rem</td><td>Product name</td><td class="sample" style="font-family:var(--display);font-size:17px">Air Max 1 &lsquo;Patta&rsquo;</td></tr>
+        <tr><td>U1</td><td>1rem</td><td>Body</td><td class="sample" style="font-size:15px">Examined, graded and serialised.</td></tr>
+        <tr><td>U2</td><td>0.8125rem</td><td>Label / nav</td><td class="sample" style="font-size:11px;letter-spacing:.24em;text-transform:uppercase">Authentication</td></tr>
+        <tr><td>M1</td><td>0.6875rem</td><td>Serial / SKU</td><td class="sample mono">RH-SNK-04127-A</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+<hr class="rule">
+
+<section id="packaging">
+  <div class="sec-head">
+    <p class="sec-num">05</p>
+    <div class="sec-intro">
+      <p class="eyebrow">Packaging</p>
+      <h2 class="sec">The box is the first authentication.</h2>
+      <p class="note">Matte obsidian rigid board, blind-debossed lid, champagne foil only on the seal. Inside: ivory tissue in a half-drop monogram, a 25&nbsp;mm black satin ribbon, and an oxblood wax seal that has to be broken to open.</p>
+    </div>
+  </div>
+  <div class="grid g2">
+    <div class="object">
+      <div class="stage dark"><div class="box3d"><div class="box-lid"><div class="emboss"><span class="type-wordmark">RAREHAUS</span></div></div><div class="box-side"></div></div></div>
+      <div class="plate-cap"><span class="caption">Rigid box · 340×250×130 mm</span><span class="caption">Blind deboss</span></div>
+    </div>
+    <div class="object">
+      <div class="stage"><div class="tissue" style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22><g fill=%22none%22 stroke=%22%23B4935A%22 stroke-width=%2213%22 opacity=%22.45%22 transform=%22translate(30 40) scale(.32) translate(-30 -53)%22><path d=%22M37 60V140%22/><path d=%22M37 60h31a16 16 0 0 1 0 32H37%22/><path d=%22M56 92l32 48%22/><path d=%22M116 60v80%22/><path d=%22M164 60v80%22/><path d=%22M116 100h48%22/></g><g fill=%22none%22 stroke=%22%23B4935A%22 stroke-width=%2213%22 opacity=%22.45%22 transform=%22translate(130 140) scale(.32) translate(-30 -53)%22><path d=%22M37 60V140%22/><path d=%22M37 60h31a16 16 0 0 1 0 32H37%22/><path d=%22M56 92l32 48%22/><path d=%22M116 60v80%22/><path d=%22M164 60v80%22/><path d=%22M116 100h48%22/></g></svg>')"></div></div>
+      <div class="plate-cap"><span class="caption">Tissue · 17 gsm, half-drop</span><span class="caption">Champagne on ivory</span></div>
+    </div>
+    <div class="object">
+      <div class="stage dark"><div class="bag"><div class="gusset"></div><svg role="img" aria-label="Seal on shopping bag"><use href="#seal"/></svg></div></div>
+      <div class="plate-cap"><span class="caption">Shopping bag · soft-touch laminate</span><span class="caption">Cotton rope handle</span></div>
+    </div>
+    <div class="object">
+      <div class="stage dark"><div class="ribbon-stage"><div class="ribbon-v"></div><div class="wax"><svg role="img" aria-label="Wax seal"><use href="#mark"/></svg></div></div></div>
+      <div class="plate-cap"><span class="caption">Ribbon 25 mm satin · oxblood wax</span><span class="caption">Break to open</span></div>
+    </div>
+  </div>
+</section>
+<hr class="rule">
+
+<section id="print">
+  <div class="sec-head">
+    <p class="sec-num">06</p>
+    <div class="sec-intro">
+      <p class="eyebrow">Collateral</p>
+      <h2 class="sec">Every piece leaves with its paperwork.</h2>
+      <p class="note">The authentication card is the only item that carries champagne foil on ivory. It is numbered to the piece, not to the order — it stays with the object through every future resale.</p>
+    </div>
+  </div>
+  <div class="grid g2">
+    <div class="object">
+      <div class="stage">
+        <div class="card">
+          <div class="card-top"><svg style="color:var(--obsidian)" role="img" aria-label="Seal"><use href="#seal"/></svg><span class="verified">Verified</span></div>
+          <div>
+            <p style="font-family:var(--display);font-size:20px;line-height:1.2">Certificate of Authentication</p>
+            <p class="note" style="font-size:11.5px;margin-top:6px">Examined in-house at the RAREHAUS atelier against reference samples held on site.</p>
+          </div>
+          <dl class="dl">
+            <dt>Serial</dt><dd>RH-SNK-04127-A</dd>
+            <dt>Category</dt><dd>Sneakers</dd>
+            <dt>Grade</dt><dd>DS — Deadstock</dd>
+            <dt>Examined</dt><dd>08.09.2026</dd>
+            <dt>Authenticator</dt><dd>A. MØLLER · #014</dd>
+          </dl>
+        </div>
+      </div>
+      <div class="plate-cap"><span class="caption">Authentication card · 90×140 mm</span><span class="caption">600 gsm · champagne foil</span></div>
+    </div>
+    <div class="object">
+      <div class="stage">
+        <div class="card dark">
+          <div class="card-top"><svg class="foil-stroke" role="img" aria-label="Seal"><use href="#seal"/></svg><span class="caption" style="color:#8A857C">Lot 04 / 12</span></div>
+          <div>
+            <p style="font-family:var(--display);font-size:20px;line-height:1.2;color:var(--ivory)">Thank you for keeping it rare.</p>
+            <p class="note" style="font-size:11.5px;margin-top:6px;color:#9C968C">Your piece has been logged to its serial. Resell it through us and the record follows it on.</p>
+          </div>
+          <p class="mono" style="color:#8A857C;font-size:10px;letter-spacing:.12em">RAREHAUS.COM · THE HOME OF RARE</p>
+        </div>
+      </div>
+      <div class="plate-cap"><span class="caption">Thank-you card · 148×105 mm</span><span class="caption">Obsidian duplex</span></div>
+    </div>
+  </div>
+
+  <div class="grid g4" style="margin-top:28px">
+    <div class="object">
+      <div class="stage" style="min-height:220px">
+        <div class="tag">
+          <svg role="img" aria-label="Monogram"><use href="#mark"/></svg>
+          <div style="display:grid;gap:5px">
+            <span class="mono" style="font-size:9px;letter-spacing:.1em">RH-SNK-04127-A</span>
+            <span style="font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-muted)">Grade DS</span>
+          </div>
+        </div>
+      </div>
+      <p class="caption">Product tag · 45×75 mm</p>
+    </div>
+    <div class="object">
+      <div class="stage" style="min-height:220px">
+        <div class="tag dark">
+          <svg role="img" aria-label="Monogram"><use href="#mark"/></svg>
+          <div style="display:grid;gap:5px">
+            <span style="font-family:var(--display);font-size:11px;letter-spacing:.2em">RAREHAUS</span>
+            <span style="font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:#8A857C">Garment</span>
+          </div>
+        </div>
+      </div>
+      <p class="caption">Garment tag · woven label</p>
+    </div>
+    <div class="object">
+      <div class="stage" style="min-height:220px"><div class="bcard front"><svg role="img" aria-label="Seal"><use href="#seal"/></svg><span class="type-wordmark foil" style="font-size:13px">RAREHAUS</span></div></div>
+      <p class="caption">Business card · face</p>
+    </div>
+    <div class="object">
+      <div class="stage" style="min-height:220px">
+        <div class="bcard back">
+          <div><p style="font-size:12px;font-weight:600;letter-spacing:.04em">Aline Møller</p><p style="font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-muted);margin-top:3px">Head of Authentication</p></div>
+          <p class="mono" style="font-size:9px;color:var(--ink-muted);letter-spacing:.06em">aline@rarehaus.com<br>RAREHAUS.COM</p>
+        </div>
+      </div>
+      <p class="caption">Business card · reverse · 85×55 mm</p>
+    </div>
+  </div>
+</section>
+</div>
+
+<div class="band">
+<div class="wrap">
+<section id="digital">
+  <div class="sec-head">
+    <p class="sec-num" style="color:var(--champagne)">07</p>
+    <div class="sec-intro">
+      <p class="eyebrow">Digital</p>
+      <h2 class="sec" style="color:var(--ivory)">A catalogue with a live price on it.</h2>
+      <p class="note">The site behaves like an archive index: the object first, the record second, the price last. Bid and ask sit in mono so they read as data, not as a sales pitch. Product photography drops into obsidian frames with no rounding and no drop shadow.</p>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns:minmax(0,2fr) minmax(240px,1fr);align-items:start">
+    <div class="object">
+      <div class="browser">
+        <div class="browser-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">rarehaus.com/archive</span></div>
+        <nav class="site-nav">
+          <span class="brand">RAREHAUS</span>
+          <a href="#digital">Archive</a><a href="#digital">Sneakers</a><a href="#digital">Watches</a><a href="#digital">Bags</a><a href="#digital">Authentication</a><a href="#digital">Sell</a>
+        </nav>
+        <div class="site-hero">
+          <p class="k">Fewer pieces.<br><em>Longer held.</em></p>
+          <p class="sub">Archive Release 04 · 12 lots · Opens 18:00 CET</p>
+        </div>
+        <div class="site-grid">
+          <div class="tile"><div class="frame"><svg><use href="#sneaker"/></svg></div><span class="nm">Air Max 1 &lsquo;Patta&rsquo;</span><span class="ask">Ask £2,450</span><span class="sku">RH-SNK-04127-A · DS</span></div>
+          <div class="tile"><div class="frame"><svg><use href="#watch"/></svg></div><span class="nm">Ref. 16610LV Steel</span><span class="ask">Ask £14,200</span><span class="sku">RH-WCH-00318-R · EXC</span></div>
+          <div class="tile"><div class="frame"><svg><use href="#bagicon"/></svg></div><span class="nm">Archive Shoulder, 2004</span><span class="ask">Ask £3,980</span><span class="sku">RH-BAG-01204-A · VNDS</span></div>
+          <div class="tile"><div class="frame"><svg><use href="#sneaker"/></svg></div><span class="nm">Samba OG, deadstock</span><span class="ask">Ask £610</span><span class="sku">RH-SNK-04188-A · DS</span></div>
+        </div>
+      </div>
+      <p class="caption">Homepage · archive index</p>
+    </div>
+
+    <div class="object">
+      <div class="phone">
+        <div class="phone-status"><span>9:41</span><span>RAREHAUS</span></div>
+        <div class="phone-body">
+          <div class="p-hero"><span class="p-badge">Verified</span><svg><use href="#sneaker"/></svg></div>
+          <div class="p-row">
+            <div><p class="p-name">Air Max 1 &lsquo;Patta&rsquo;</p><p class="p-meta">UK 9 · DS · RH-SNK-04127-A</p></div>
+          </div>
+          <div class="p-split">
+            <div class="p-cell"><span class="lbl">Lowest ask</span><span class="val">£2,450</span></div>
+            <div class="p-cell"><span class="lbl">Highest bid</span><span class="val">£2,190</span></div>
+          </div>
+          <div class="p-cta">Buy now</div>
+          <div class="p-nav"><span>Archive</span><span>Search</span><span>Bids</span><span>Vault</span></div>
+        </div>
+      </div>
+      <p class="caption">Marketplace · product screen</p>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:40px">
+    <div class="object">
+      <div class="ig">
+        <div class="ig-head">
+          <div class="ig-avatar"><svg role="img" aria-label="Avatar"><use href="#mark"/></svg></div>
+          <div style="display:grid;gap:8px">
+            <span class="ig-handle">rarehaus</span>
+            <div class="ig-stats"><span><b>412</b>posts</span><span><b>84.6k</b>followers</span><span><b>7</b>following</span></div>
+          </div>
+        </div>
+        <p class="ig-bio"><strong style="color:var(--ink)">RAREHAUS — The Home of Rare</strong><br>Authenticated in-house. Archive Release 04 opens Thursday 18:00 CET.</p>
+        <div class="ig-grid">
+          <div class="ig-cell"><svg><use href="#sneaker"/></svg></div>
+          <div class="ig-cell type">FEWER<br>PIECES</div>
+          <div class="ig-cell"><svg><use href="#watch"/></svg></div>
+          <div class="ig-cell foilcell">RELEASE<br>04</div>
+          <div class="ig-cell"><svg><use href="#bagicon"/></svg></div>
+          <div class="ig-cell"><svg><use href="#sneaker"/></svg></div>
+        </div>
+      </div>
+      <p class="caption">Profile · @rarehaus</p>
+    </div>
+    <div class="object">
+      <div class="stage dark" style="min-height:100%">
+        <div style="width:min(100%,300px);aspect-ratio:4/5;background:var(--obsidian);border:1px solid var(--obsidian-3);display:grid;align-content:space-between;padding:24px;text-align:center">
+          <p class="caption" style="color:#8A857C">Launch post · 4:5</p>
+          <div style="display:grid;gap:18px;justify-items:center">
+            <svg style="width:52px;height:52px;color:var(--champagne)" role="img" aria-label="Seal"><use href="#seal"/></svg>
+            <p style="font-family:var(--display);font-size:clamp(22px,4vw,32px);line-height:1.1;color:var(--ivory)">The archive<br>opens Thursday.</p>
+            <p style="font-size:9px;letter-spacing:.34em;text-transform:uppercase;color:var(--champagne)">The Home of Rare</p>
+          </div>
+          <p class="mono" style="font-size:9px;color:#6E695F;letter-spacing:.1em">12 LOTS · 18:00 CET</p>
+        </div>
+      </div>
+      <p class="caption">Launch post</p>
+    </div>
+  </div>
+</section>
+<hr class="rule">
+
+<section id="qc">
+  <div class="sec-head">
+    <p class="sec-num" style="color:var(--champagne)">08</p>
+    <div class="sec-intro">
+      <p class="eyebrow">Authentication &amp; quality control</p>
+      <h2 class="sec" style="color:var(--ivory)">Five checks, in this order, every time.</h2>
+      <p class="note">The sequence is fixed because the identity claims it is. Where authentication imagery appears, shoot the process — gloved hands, callipers, loupe, UV — never a stock &ldquo;certified&rdquo; badge.</p>
+    </div>
+  </div>
+  <div class="grid g3">
+    <div class="qc-step"><span class="n">01</span><span class="t">Intake &amp; serialisation</span><span class="d">Piece is weighed, measured and assigned its permanent RH serial before handling.</span></div>
+    <div class="qc-step"><span class="n">02</span><span class="t">Construction</span><span class="d">Stitch density, glue lines, lasting, hardware weight against reference samples held on site.</span></div>
+    <div class="qc-step"><span class="n">03</span><span class="t">Materials</span><span class="d">Leather grain, suede nap, mesh weave and lining under 10× loupe and UV.</span></div>
+    <div class="qc-step"><span class="n">04</span><span class="t">Marks &amp; labels</span><span class="d">Size tags, date codes, movement references and font weights compared digit by digit.</span></div>
+    <div class="qc-step"><span class="n">05</span><span class="t">Grade &amp; record</span><span class="d">DS, VNDS, EXC or GOOD assigned, photographed, signed by a named authenticator.</span></div>
+    <div class="qc-step"><span class="n">—</span><span class="t">Declined</span><span class="d">Anything unresolved is returned. No conditional passes, no &ldquo;likely authentic&rdquo;.</span></div>
+  </div>
+</section>
+</div>
+</div>
+
+<div class="wrap">
+<section id="photography">
+  <div class="sec-head">
+    <p class="sec-num">09</p>
+    <div class="sec-intro">
+      <p class="eyebrow">Art direction</p>
+      <h2 class="sec">Light it like a vitrine, not a shop floor.</h2>
+      <p class="note">One directional key, hard-edged, raked across the object at roughly 45°; everything else falls away. Shadows stay long and soft-edged. Colour grading holds low saturation with a warm bias so ivory never goes blue.</p>
+    </div>
+  </div>
+  <div class="grid g3">
+    <div><h3>Surfaces</h3><p class="note" style="margin-top:8px">Honed basalt, brushed steel, smoked glass, raw ivory paper. Nothing glossy, nothing marbled.</p></div>
+    <div><h3>Lighting</h3><p class="note" style="margin-top:8px">Single 90&nbsp;cm gridded softbox at 45°, 1/4 CTO, black flag opposite. No fill card on hero shots.</p></div>
+    <div><h3>Composition</h3><p class="note" style="margin-top:8px">One object, one plinth, generous negative space. Overhead flat-lay or three-quarter — never both in one release.</p></div>
+    <div><h3>Detail</h3><p class="note" style="margin-top:8px">Macro on stitch, nap, mesh, bezel knurling. The texture is the proof.</p></div>
+    <div><h3>People</h3><p class="note" style="margin-top:8px">Hands only, gloved, mid-task. The brand is the archive, not a model.</p></div>
+    <div><h3>Never</h3><p class="note" style="margin-top:8px">Confetti, gradients, neon rim light, floating products, crowds, graffiti walls.</p></div>
+  </div>
+</section>
+<hr class="rule">
+
+<section id="voice">
+  <div class="sec-head">
+    <p class="sec-num">10</p>
+    <div class="sec-intro">
+      <p class="eyebrow">Voice</p>
+      <h2 class="sec">State the fact. Let scarcity speak.</h2>
+      <p class="note">Short declaratives. Numbers instead of adjectives. The brand never uses urgency language it cannot substantiate with inventory.</p>
+    </div>
+  </div>
+  <div class="grid g2">
+    <div class="vlist say">
+      <h3>We say</h3>
+      <div class="vrow"><span class="m">—</span><span>12 lots. Opens 18:00 CET.</span></div>
+      <div class="vrow"><span class="m">—</span><span>Examined in-house against reference samples.</span></div>
+      <div class="vrow"><span class="m">—</span><span>Graded DS. Serialised RH-SNK-04127-A.</span></div>
+      <div class="vrow"><span class="m">—</span><span>We declined four pieces this week.</span></div>
+    </div>
+    <div class="vlist dont">
+      <h3>We never say</h3>
+      <div class="vrow"><span class="m">×</span><span>Hurry — almost gone!</span></div>
+      <div class="vrow"><span class="m">×</span><span>100% legit, guaranteed authentic.</span></div>
+      <div class="vrow"><span class="m">×</span><span>The ultimate luxury flex.</span></div>
+      <div class="vrow"><span class="m">×</span><span>Grails you can&rsquo;t miss 🔥</span></div>
+    </div>
+  </div>
+</section>
+<hr class="rule">
+
+<section id="appendix">
+  <div class="sec-head">
+    <p class="sec-num">11</p>
+    <div class="sec-intro">
+      <p class="eyebrow">Appendix</p>
+      <h2 class="sec">Prompt for photographic renders.</h2>
+      <p class="note">Use this to generate the photographic layer only — dark gallery interiors, materials, unboxing scenes. Set the RAREHAUS wordmark, seal and all card copy afterwards from the vector assets in <span class="mono">brand/logo/</span>; image models distort letterforms.</p>
+    </div>
+  </div>
+  <div class="prompt">Cinematic editorial product photography for a luxury resale archive. Matte obsidian rigid box on honed black basalt, warm ivory tissue paper, black satin ribbon, oxblood wax seal, brushed steel and smoked glass surfaces. Single hard directional key light raked at 45 degrees, long soft-edged shadows, dark gallery interior falling to black. Low saturation, warm bias, ivory paper reading warm not blue. One collectible sneaker on a sculptural stone plinth, generous negative space, no clutter, no props. Realistic paper grain, blind emboss, champagne foil catching a single specular highlight. Photorealistic, medium-format detail, 4:5 portrait.
+
+NEGATIVE: text, lettering, logos, wordmarks, brand names, trademarks, watermarks, crowns, dollar signs, shopping carts, diamond icons, neon colours, gradients, confetti, graffiti, cartoon style, plastic materials, busy composition, duplicated objects, distorted products, floating products, models, crowds.</div>
+</section>
+</div>
+
+<footer>
+  <p class="type-wordmark">RAREHAUS</p>
+  <p class="caption" style="margin-top:14px">Identity system · Edition 01 · RH-BRAND-0001</p>
+</footer>

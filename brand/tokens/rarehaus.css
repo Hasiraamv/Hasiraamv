@@ -1,0 +1,52 @@
+/* RAREHAUS — design tokens
+   The Home of Rare
+   Single source of truth for colour, type, spacing and material. */
+
+:root {
+  /* ---- Core palette ---------------------------------------------- */
+  --rh-obsidian:  #111111;  /* primary ground, packaging, type       */
+  --rh-ivory:     #F4F0E8;  /* primary surface, paper stock          */
+  --rh-stone:     #D6D0C5;  /* rules, dividers, secondary surface    */
+  --rh-champagne: #B4935A;  /* foil, accents, verified marks         */
+  --rh-oxblood:   #481B24;  /* reserve tier, seals, rare flags       */
+
+  /* ---- Derived neutrals (warm-biased, never pure grey) ----------- */
+  --rh-ink:        #1C1A17;  /* body type on ivory                   */
+  --rh-ink-muted:  #5B5751;  /* captions, metadata                   */
+  --rh-ivory-dim:  #E7E2D8;  /* pressed / inset ivory                */
+  --rh-obsidian-2: #1A1A1A;  /* raised panel on obsidian             */
+  --rh-obsidian-3: #262523;  /* hairline on obsidian                 */
+
+  /* ---- Foil gradient (champagne stamping) ------------------------ */
+  --rh-foil: linear-gradient(103deg, #8E6E3C 0%, #B4935A 28%, #E4CFA4 50%, #B4935A 72%, #8E6E3C 100%);
+
+  /* ---- Type ------------------------------------------------------ */
+  --rh-display: "Bodoni Moda", "Didot", "Bodoni MT", Georgia, serif;
+  --rh-sans:    "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --rh-mono:    "IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
+
+  --rh-track-wordmark: 0.42em;  /* RAREHAUS wordmark                 */
+  --rh-track-label:    0.24em;  /* uppercase nav + labels            */
+  --rh-track-eyebrow:  0.34em;  /* section eyebrows                  */
+
+  /* ---- Scale (1.333 — perfect fourth) ---------------------------- */
+  --rh-t-xs:  0.6875rem;
+  --rh-t-sm:  0.8125rem;
+  --rh-t-md:  1rem;
+  --rh-t-lg:  1.333rem;
+  --rh-t-xl:  1.777rem;
+  --rh-t-2xl: 2.369rem;
+  --rh-t-3xl: 3.157rem;
+  --rh-t-4xl: 4.209rem;
+
+  /* ---- Space (8pt base) ------------------------------------------ */
+  --rh-s-1: 4px;  --rh-s-2: 8px;   --rh-s-3: 16px; --rh-s-4: 24px;
+  --rh-s-5: 40px; --rh-s-6: 64px;  --rh-s-7: 96px; --rh-s-8: 144px;
+
+  /* ---- Material -------------------------------------------------- */
+  --rh-radius: 0px;          /* the identity is square. no soft corners. */
+  --rh-radius-vessel: 2px;   /* physical goods only: boxes, tags, cards  */
+  --rh-hairline: 1px solid var(--rh-stone);
+  --rh-hairline-dark: 1px solid var(--rh-obsidian-3);
+  --rh-shadow-object: 0 24px 48px -24px rgba(17,17,17,.38);
+}

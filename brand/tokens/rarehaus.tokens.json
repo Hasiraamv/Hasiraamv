@@ -1,0 +1,86 @@
+{
+  "name": "RAREHAUS",
+  "tagline": "The Home of Rare",
+  "color": {
+    "obsidian": {
+      "value": "#111111",
+      "use": "Primary ground, packaging, display type"
+    },
+    "ivory": {
+      "value": "#F4F0E8",
+      "use": "Primary surface, paper stock, reversed type"
+    },
+    "stone": {
+      "value": "#D6D0C5",
+      "use": "Rules, dividers, secondary surface"
+    },
+    "champagne": {
+      "value": "#B4935A",
+      "use": "Foil stamping, verified marks, accents"
+    },
+    "oxblood": {
+      "value": "#481B24",
+      "use": "Reserve tier, wax seals, rare flags"
+    },
+    "ink": {
+      "value": "#1C1A17",
+      "use": "Body copy on ivory"
+    },
+    "inkMuted": {
+      "value": "#5B5751",
+      "use": "Captions, metadata, SKU labels"
+    }
+  },
+  "type": {
+    "display": {
+      "family": "Bodoni Moda",
+      "fallback": "Didot, Bodoni MT, Georgia, serif",
+      "use": "Headlines, wordmark, editorial"
+    },
+    "sans": {
+      "family": "Archivo",
+      "fallback": "Helvetica Neue, Arial, sans-serif",
+      "use": "Navigation, UI, body"
+    },
+    "mono": {
+      "family": "IBM Plex Mono",
+      "fallback": "Menlo, monospace",
+      "use": "SKU, serials, authentication data"
+    },
+    "tracking": {
+      "wordmark": "0.42em",
+      "label": "0.24em",
+      "eyebrow": "0.34em"
+    },
+    "scale": {
+      "ratio": 1.333,
+      "steps": [
+        "0.6875rem",
+        "0.8125rem",
+        "1rem",
+        "1.333rem",
+        "1.777rem",
+        "2.369rem",
+        "3.157rem",
+        "4.209rem"
+      ]
+    }
+  },
+  "space": {
+    "base": 8,
+    "steps": [
+      4,
+      8,
+      16,
+      24,
+      40,
+      64,
+      96,
+      144
+    ]
+  },
+  "radius": {
+    "default": 0,
+    "vessel": 2
+  }
+}

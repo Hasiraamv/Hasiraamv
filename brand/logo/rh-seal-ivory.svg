@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="RAREHAUS vault seal">
+  <title>RAREHAUS — vault seal</title>
+  <path d="M33 178V100a67 67 0 0 1 134 0v78" fill="none" stroke="#F4F0E8" stroke-width="10"/>
+  <g transform="translate(100 112) scale(.6) translate(-100.5 -100)"
+     fill="none" stroke="#F4F0E8" stroke-width="13" stroke-linecap="butt" stroke-linejoin="miter">
+    <path d="M37 60V140"/>
+    <path d="M37 60h31a16 16 0 0 1 0 32H37"/>
+    <path d="M56 92l32 48"/>
+    <path d="M116 60v80"/>
+    <path d="M164 60v80"/>
+    <path d="M116 100h48"/>
+  </g>
+</svg>
