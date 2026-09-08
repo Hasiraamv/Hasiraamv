@@ -17,15 +17,16 @@ DROP TABLE IF EXISTS sourcing_requests;
 DROP TABLE IF EXISTS users;
 
 -- Buyer accounts. Optional: checkout never requires one, this is only for people who want
--- order history and a faster repeat checkout. password_hash is null for a Google-only
--- account; google_id is null for a password-only account. A user can have both.
+-- order history and a faster repeat checkout. Sign-in itself is handled entirely by Clerk
+-- (hosted UI, password/social login, sessions) -- this table just mirrors the minimum we
+-- need locally (email, name) keyed to Clerk's own user id, populated by the user.created
+-- webhook and lazily on first sign-in if the webhook hasn't landed yet.
 CREATE TABLE users (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  email         TEXT NOT NULL UNIQUE,
-  name          TEXT NOT NULL,
-  password_hash TEXT,
-  google_id     TEXT UNIQUE,
-  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  clerk_user_id  TEXT NOT NULL UNIQUE,
+  email          TEXT NOT NULL,
+  name           TEXT NOT NULL,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE categories (

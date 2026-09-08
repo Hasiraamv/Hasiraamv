@@ -14,5 +14,8 @@
   },
   "devDependencies": {
     "wrangler": "^3.90.0"
+  },
+  "dependencies": {
+    "@clerk/backend": "^3.17.1"
   }
 }

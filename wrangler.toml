@@ -60,16 +60,20 @@ GRIEVANCE_EMAIL = "customer@rarehaus.in"
 GRIEVANCE_PHONE = "+91 93959 62006"
 JURISDICTION_CITY = "Guwahati"
 
-# Google sign-in and welcome email. The client ID is not secret (it is sent to the browser
-# as part of the OAuth redirect), so it lives here; the client secret and API key below do
-# not and must be set with `wrangler secret put`. Buyer accounts and sign-in still work
-# without these being set -- "Continue with Google" just returns a 501 until GOOGLE_CLIENT_ID
-# is filled in, and the welcome email is silently skipped until RESEND_API_KEY is set.
-GOOGLE_CLIENT_ID = ""
+# Buyer sign-in (Clerk) and welcome email (Resend). The publishable key is not secret --
+# it is sent to the browser so clerk-js can load -- so it lives here; the secret key,
+# webhook signing secret and Resend API key below do not and must be set with
+# `wrangler secret put`. Checkout still works as a guest without any of this configured:
+# /account/sign-in shows a plain "not set up yet" page until CLERK_PUBLISHABLE_KEY and
+# CLERK_SECRET_KEY are both set, and the welcome email is silently skipped until
+# RESEND_API_KEY is set.
+CLERK_PUBLISHABLE_KEY = ""
 RESEND_FROM = "Rarehaus <welcome@rarehaus.in>"
 
 # Secrets (set with `wrangler secret put <NAME>`, never commit them):
 #   ADMIN_PASSWORD        password for /admin
-#   SESSION_SECRET        random string used to sign admin, cart and buyer-account cookies
-#   GOOGLE_CLIENT_SECRET  from the Google Cloud OAuth client, pairs with GOOGLE_CLIENT_ID above
+#   SESSION_SECRET        random string used to sign admin and cart cookies
+#   CLERK_SECRET_KEY      from the Clerk dashboard, pairs with CLERK_PUBLISHABLE_KEY above
+#   CLERK_WEBHOOK_SECRET  from the Clerk dashboard's Webhooks page, for the endpoint at
+#                         /webhooks/clerk (subscribe it to the user.created event)
 #   RESEND_API_KEY        from your Resend account, used to send the welcome email

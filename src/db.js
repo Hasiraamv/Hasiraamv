@@ -166,28 +166,25 @@ export async function getStats(db) {
 
 // Buyer accounts --------------------------------------------------------------
 
-export async function getUserByEmail(db, email) {
-  return db.prepare('SELECT * FROM users WHERE email = ?').bind(String(email).toLowerCase()).first();
-}
-
 export async function getUserById(db, id) {
   return db.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
 }
 
-export async function getUserByGoogleId(db, googleId) {
-  return db.prepare('SELECT * FROM users WHERE google_id = ?').bind(googleId).first();
+export async function getUserByClerkId(db, clerkUserId) {
+  return db.prepare('SELECT * FROM users WHERE clerk_user_id = ?').bind(clerkUserId).first();
 }
 
-export async function createUser(db, { email, name, passwordHash = null, googleId = null }) {
+// Upsert on clerk_user_id: called both from the user.created webhook and, defensively, the
+// first time we see a valid Clerk session for a user the webhook hasn't reached us for yet
+// (webhooks can arrive late or, rarely, not at all). Returns the local user row either way.
+export async function upsertUserFromClerk(db, { clerkUserId, email, name }) {
+  const existing = await getUserByClerkId(db, clerkUserId);
+  if (existing) return existing;
   const result = await db
-    .prepare('INSERT INTO users (email, name, password_hash, google_id) VALUES (?, ?, ?, ?)')
-    .bind(String(email).toLowerCase(), name, passwordHash, googleId)
+    .prepare('INSERT INTO users (clerk_user_id, email, name) VALUES (?, ?, ?)')
+    .bind(clerkUserId, email, name)
     .run();
-  return result.meta.last_row_id;
-}
-
-export async function linkGoogleId(db, userId, googleId) {
-  await db.prepare('UPDATE users SET google_id = ? WHERE id = ?').bind(googleId, userId).run();
+  return { id: result.meta.last_row_id, clerk_user_id: clerkUserId, email, name };
 }
 
 export async function listOrdersForUser(db, userId, limit = 50) {

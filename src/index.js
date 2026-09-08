@@ -19,18 +19,10 @@ import {
   cookiesPage,
   sellPage,
 } from './views/pages.js';
-import { readCart, writeCart, sameOrigin, publicRef, parseCookies, cookieHeader, clearCookie } from './session.js';
-import {
-  hashPassword,
-  verifyPassword,
-  createUserToken,
-  verifyUserToken,
-  googleAuthUrl,
-  exchangeGoogleCode,
-  randomState,
-} from './auth.js';
+import { readCart, writeCart, sameOrigin, publicRef } from './session.js';
+import { getClerkAuth, getClerkUserProfile, verifyClerkWebhook, clerkConfigured } from './clerk.js';
 import { sendWelcomeEmail } from './email.js';
-import { signupPage, loginPage, accountPage } from './views/account.js';
+import { signInPage, signUpPage, accountPage, clerkNotConfiguredPage } from './views/account.js';
 
 export default {
   async fetch(request, env, ctx) {
@@ -80,6 +72,8 @@ async function route(request, env, ctx) {
     return new Response('Bad origin', { status: 403 });
   }
 
+  if (path === '/webhooks/clerk' && method === 'POST') return clerkWebhook(request, env, ctx);
+
   if (path.startsWith('/admin')) {
     return adminRouter(request, env, path);
   }
@@ -87,15 +81,17 @@ async function route(request, env, ctx) {
   const cart = readCart(request);
   const user = await getSessionUser(request, env);
 
-  if (path === '/account/signup' && method === 'GET') return html(layout({ title: 'Create an account', env, user, cartCount: cart.length, body: signupPage({}) }));
-  if (path === '/account/signup' && method === 'POST') return accountSignup(request, env, cart, ctx);
-  if (path === '/account/login' && method === 'GET') return html(layout({ title: 'Sign in', env, user, cartCount: cart.length, body: loginPage({}) }));
-  if (path === '/account/login' && method === 'POST') return accountLogin(request, env, cart);
-  if (path === '/account/logout' && method === 'POST') return redirect('/', { 'set-cookie': clearCookie('rh_user') });
+  if (path === '/account/sign-in') {
+    return clerkConfigured(env)
+      ? html(layout({ title: 'Sign in', env, user, cartCount: cart.length, body: signInPage({ publishableKey: env.CLERK_PUBLISHABLE_KEY }) }))
+      : html(layout({ title: 'Sign in', env, user, cartCount: cart.length, body: clerkNotConfiguredPage() }));
+  }
+  if (path === '/account/sign-up') {
+    return clerkConfigured(env)
+      ? html(layout({ title: 'Create an account', env, user, cartCount: cart.length, body: signUpPage({ publishableKey: env.CLERK_PUBLISHABLE_KEY }) }))
+      : html(layout({ title: 'Create an account', env, user, cartCount: cart.length, body: clerkNotConfiguredPage() }));
+  }
   if (path === '/account') return accountRoute(request, env, cart, user);
-
-  if (path === '/auth/google/start') return googleStart(request, env);
-  if (path === '/auth/google/callback') return googleCallback(request, env, ctx);
 
   if (path === '/') return homeRoute(request, env, cart, user);
   if (path === '/search') return searchRoute(request, env, url, cart, user);
@@ -141,144 +137,58 @@ async function route(request, env, ctx) {
 }
 
 // Buyer accounts --------------------------------------------------------------
-// Optional throughout: checkout never requires a signed-in buyer. A session is a signed
-// cookie carrying a user id, verified against SESSION_SECRET the same way admin sessions are.
+// Sign-in itself (password, Google, whatever the Clerk dashboard has enabled) is entirely
+// Clerk's -- this file only asks "is this request's Clerk session valid, and if so whose",
+// then mirrors the minimum locally so orders can be linked without an extra API round trip
+// on every page.
 
 async function getSessionUser(request, env) {
-  if (!env.SESSION_SECRET) return null;
-  const token = parseCookies(request).rh_user;
-  const userId = await verifyUserToken(env.SESSION_SECRET, token);
-  if (!userId) return null;
-  return db.getUserById(env.DB, userId);
-}
-
-async function setUserSessionHeader(env, userId) {
-  const token = await createUserToken(env.SESSION_SECRET, userId);
-  return cookieHeader('rh_user', token);
-}
-
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
-async function accountSignup(request, env, cart, ctx) {
-  const form = await request.formData();
-  const name = String(form.get('name') || '').trim().slice(0, 120);
-  const email = String(form.get('email') || '').trim().toLowerCase().slice(0, 160);
-  const password = String(form.get('password') || '');
-
-  const fail = (msg) =>
-    html(
-      layout({
-        title: 'Create an account',
-        env,
-        cartCount: cart.length,
-        body: signupPage({ error: msg }),
-      }),
-      400
-    );
-
-  if (!name) return fail('Please enter your name.');
-  if (!EMAIL_RE.test(email)) return fail('Please enter a valid email.');
-  if (password.length < 8) return fail('Password must be at least 8 characters.');
-
-  const existing = await db.getUserByEmail(env.DB, email);
-  if (existing) return fail('An account with that email already exists. Try signing in instead.');
-
-  const passwordHash = await hashPassword(password);
-  const userId = await db.createUser(env.DB, { email, name, passwordHash });
-  ctx.waitUntil(sendWelcomeEmail(env, { to: email, name }).catch((err) => console.error('Welcome email failed:', err)));
-
-  return redirect('/account', { 'set-cookie': await setUserSessionHeader(env, userId) });
-}
-
-async function accountLogin(request, env, cart) {
-  const form = await request.formData();
-  const email = String(form.get('email') || '').trim().toLowerCase().slice(0, 160);
-  const password = String(form.get('password') || '');
-
-  const fail = () =>
-    html(
-      layout({
-        title: 'Sign in',
-        env,
-        cartCount: cart.length,
-        body: loginPage({ error: 'Incorrect email or password.' }),
-      }),
-      400
-    );
-
-  const user = await db.getUserByEmail(env.DB, email);
-  if (!user || !(await verifyPassword(password, user.password_hash))) return fail();
-
-  return redirect('/account', { 'set-cookie': await setUserSessionHeader(env, user.id) });
+  const auth = await getClerkAuth(request, env);
+  if (!auth) return null;
+  const local = await db.getUserByClerkId(env.DB, auth.userId);
+  if (local) return local;
+  // The user.created webhook may not have landed yet (or, rarely, may never land) -- fetch
+  // the profile directly rather than leaving a signed-in buyer without a local row.
+  const profile = await getClerkUserProfile(env, auth.userId);
+  return db.upsertUserFromClerk(env.DB, { clerkUserId: auth.userId, ...profile });
 }
 
 async function accountRoute(request, env, cart, user) {
-  if (!user) return redirect('/account/login');
+  if (!user) return redirect('/account/sign-in');
   const orders = await db.listOrdersForUser(env.DB, user.id);
   return html(
-    layout({ title: 'Your account', env, user, cartCount: cart.length, body: accountPage({ user, orders }) })
+    layout({
+      title: 'Your account',
+      env,
+      user,
+      cartCount: cart.length,
+      body: accountPage({ user, orders, publishableKey: env.CLERK_PUBLISHABLE_KEY }),
+    })
   );
 }
 
-function googleRedirectUri(request) {
-  const url = new URL(request.url);
-  return `${url.protocol}//${url.host}/auth/google/callback`;
-}
+// Clerk's user.created webhook: the reliable path for the welcome email and for having the
+// local row ready before the buyer's first page load after signing up. Signature verified
+// via Svix HMAC (see clerk.js) before the payload is trusted.
+async function clerkWebhook(request, env, ctx) {
+  const event = await verifyClerkWebhook(request, env.CLERK_WEBHOOK_SECRET);
+  if (!event) return new Response('Invalid signature', { status: 400 });
 
-async function googleStart(request, env) {
-  if (!env.GOOGLE_CLIENT_ID) {
-    return html('Google sign-in is not configured yet.', 501);
-  }
-  const state = randomState();
-  const redirectUri = googleRedirectUri(request);
-  const authUrl = googleAuthUrl(env, redirectUri, state);
-  return redirect(authUrl, { 'set-cookie': cookieHeader('rh_oauth_state', state, { maxAge: 600 }) });
-}
-
-async function googleCallback(request, env, ctx) {
-  const url = new URL(request.url);
-  const code = url.searchParams.get('code');
-  const state = url.searchParams.get('state');
-  const expectedState = parseCookies(request).rh_oauth_state;
-
-  if (!code || !state || !expectedState || state !== expectedState) {
-    return redirect('/account/login');
-  }
-
-  const redirectUri = googleRedirectUri(request);
-  const profile = await exchangeGoogleCode(env, code, redirectUri);
-  if (!profile) return redirect('/account/login');
-
-  let user = await db.getUserByGoogleId(env.DB, profile.googleId);
-  let isNew = false;
-  if (!user) {
-    user = await db.getUserByEmail(env.DB, profile.email);
-    if (user) {
-      await db.linkGoogleId(env.DB, user.id, profile.googleId);
-    } else {
-      const userId = await db.createUser(env.DB, {
-        email: profile.email,
-        name: profile.name,
-        googleId: profile.googleId,
-      });
-      user = { id: userId };
-      isNew = true;
+  if (event.type === 'user.created') {
+    const d = event.data;
+    const email =
+      d.email_addresses?.find((e) => e.id === d.primary_email_address_id)?.email_address ||
+      d.email_addresses?.[0]?.email_address ||
+      '';
+    const name = [d.first_name, d.last_name].filter(Boolean).join(' ') || email;
+    if (email) {
+      await db.upsertUserFromClerk(env.DB, { clerkUserId: d.id, email, name });
+      ctx.waitUntil(sendWelcomeEmail(env, { to: email, name }).catch((err) => console.error('Welcome email failed:', err)));
     }
   }
 
-  if (isNew) {
-    ctx.waitUntil(
-      sendWelcomeEmail(env, { to: profile.email, name: profile.name }).catch((err) =>
-        console.error('Welcome email failed:', err)
-      )
-    );
-  }
-
-  return redirect('/account', {
-    'set-cookie': await setUserSessionHeader(env, user.id),
-  });
+  return new Response('ok');
 }
-
 
 // Routes ---------------------------------------------------------------------
 
