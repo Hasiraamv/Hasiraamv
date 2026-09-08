@@ -14,6 +14,19 @@ DROP TABLE IF EXISTS products;
 DROP TABLE IF EXISTS sellers;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS sourcing_requests;
+DROP TABLE IF EXISTS users;
+
+-- Buyer accounts. Optional: checkout never requires one, this is only for people who want
+-- order history and a faster repeat checkout. password_hash is null for a Google-only
+-- account; google_id is null for a password-only account. A user can have both.
+CREATE TABLE users (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  email         TEXT NOT NULL UNIQUE,
+  name          TEXT NOT NULL,
+  password_hash TEXT,
+  google_id     TEXT UNIQUE,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 CREATE TABLE categories (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,6 +100,7 @@ CREATE TABLE orders (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   public_ref      TEXT NOT NULL UNIQUE,   -- shown to the buyer, e.g. RH-4F2A19
   certificate_no  TEXT UNIQUE,            -- issued at authentication, e.g. RH-00248
+  user_id         INTEGER REFERENCES users(id), -- null for a guest checkout
   offer_id        INTEGER NOT NULL REFERENCES offers(id),
   product_id      INTEGER NOT NULL REFERENCES products(id),
   size_label      TEXT NOT NULL,
@@ -111,6 +125,7 @@ CREATE TABLE orders (
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_orders_created ON orders(created_at DESC);
+CREATE INDEX idx_orders_user ON orders(user_id, created_at DESC);
 
 -- Drives the buyer-facing tracking timeline. One row per stage the order reaches.
 CREATE TABLE order_events (

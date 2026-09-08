@@ -431,7 +431,7 @@ export function productCard(p) {
 </a>`;
 }
 
-export function layout({ title, description, body, env, cartCount = 0, activeNav = '', canonicalPath = '' }) {
+export function layout({ title, description, body, env, cartCount = 0, activeNav = '', canonicalPath = '', user = null }) {
   const site = env?.SITE_NAME || 'Rarehaus';
   const pageTitle = title ? `${title} · ${site}` : site;
   return `<!doctype html>
@@ -486,6 +486,11 @@ ${
         <input id="site-search" type="search" name="q" placeholder="Search listings">
       </form>
       <a href="/track">Track order</a>
+      ${
+        user
+          ? `<a href="/account">${escapeHtml(user.name.split(' ')[0])}</a>`
+          : `<a href="/account/login">Sign in</a>`
+      }
       <a href="/cart" aria-label="Your bag, ${cartCount} item${cartCount === 1 ? '' : 's'}">${icon(
     'bag',
     '#3a362c',
