@@ -643,8 +643,33 @@ ${
 }`);
 }
 
+// A free-text "ships from" box lets an operator type a city we have never seen and quietly
+// get zero shipping cost and the wrong duty treatment -- see computeOfferPricing's domestic
+// check. A dropdown of cities already registered under Rates (each with a real country)
+// forces that decision to happen once, in one place, instead of being guessed per offer.
+function shipsFromField(cities, { id = 'ships_from', name = 'ships_from', required = false, selected = '' } = {}) {
+  const req = required ? ' required' : '';
+  if (!cities.length) {
+    return `<div class="field"><label for="${id}">Ships from</label><input id="${id}" name="${name}"${req} maxlength="60" placeholder="Tokyo" value="${escapeHtml(selected)}">
+      <span class="hint">No source cities set up yet &mdash; <a href="/admin/rates">add one under Rates</a> first, with its country, so duty and shipping come out right (India-sourced pieces pay no import duty).</span>
+    </div>`;
+  }
+  return `<div class="field"><label for="${id}">Ships from</label>
+    <select id="${id}" name="${name}"${req}>
+      ${!selected ? '<option value="" disabled selected>Choose a city&hellip;</option>' : ''}
+      ${cities
+        .map(
+          (c) =>
+            `<option value="${escapeHtml(c.city)}"${c.city === selected ? ' selected' : ''}>${escapeHtml(c.city)} &mdash; ${escapeHtml(c.country || 'country not set')}</option>`
+        )
+        .join('')}
+    </select>
+    <span class="hint">Decides shipping cost, lead time, and whether import duty applies &mdash; India-sourced pieces pay none, everything else uses the category's duty rate. Sourcing somewhere new? <a href="/admin/rates">add the city and its country under Rates</a> first.</span>
+  </div>`;
+}
+
 async function productsPage(env, errorMessage, preselectProductId = null) {
-  const [categories, sellers, offersResult] = await Promise.all([
+  const [categories, sellers, offersResult, cities] = await Promise.all([
     db.getCategories(env.DB),
     env.DB.prepare('SELECT * FROM sellers ORDER BY name').all().then((r) => r.results || []),
     env.DB.prepare(
@@ -655,6 +680,7 @@ async function productsPage(env, errorMessage, preselectProductId = null) {
          JOIN sellers s ON s.id = o.seller_id
         ORDER BY o.created_at DESC LIMIT 200`
     ).all(),
+    listSourceCities(env.DB),
   ]);
   const offerRows = offersResult.results || [];
   const { results: products } = await env.DB.prepare(
@@ -753,9 +779,9 @@ ${
         </p>
         <div class="form-row">
           <div class="field"><label for="price">Your cost (₹)</label><input id="price" name="price" inputmode="numeric" maxlength="12">
-            <span class="hint">What you pay. Duty, authentication and shipping are added on top from your <a href="/admin/rates">rates</a>.</span>
+            <span class="hint">What you pay. Duty, authentication and shipping are added on top, based on the category's rate and the ships-from city's country below &mdash; India-sourced pieces pay no import duty.</span>
           </div>
-          <div class="field"><label for="ships_from">Ships from</label><input id="ships_from" name="ships_from" maxlength="60" placeholder="Tokyo"></div>
+          ${shipsFromField(cities, { id: 'p_ships_from', name: 'ships_from' })}
         </div>
         <div class="form-row">
           <div class="field"><label for="offer_size">Size</label><input id="offer_size" name="offer_size" value="One size" maxlength="40"></div>
@@ -771,6 +797,22 @@ ${
           </select>
           <span class="hint">Ignored while "Inhaus" is ticked.</span>
         </div>
+
+        <details style="margin-top:10px;">
+          <summary style="cursor:pointer; font-size:12.5px; color:var(--muted); padding:6px 0;">Set duty, authentication or shipping myself</summary>
+          <div style="padding-top:12px;">
+            <div class="form-row">
+              <div class="field"><label for="p_duty">Duty (₹)</label><input id="p_duty" name="duty" inputmode="numeric" maxlength="12" placeholder="auto"></div>
+              <div class="field"><label for="p_auth_fee">Authentication (₹)</label><input id="p_auth_fee" name="auth_fee" inputmode="numeric" maxlength="12" placeholder="auto"></div>
+            </div>
+            <div class="form-row">
+              <div class="field"><label for="p_shipping">Shipping (₹)</label><input id="p_shipping" name="shipping" inputmode="numeric" maxlength="12" placeholder="auto"></div>
+              <div class="field"><label for="p_lead_min">Lead days min</label><input id="p_lead_min" name="lead_min" inputmode="numeric" maxlength="3" placeholder="auto"></div>
+            </div>
+            <div class="field" style="max-width:180px;"><label for="p_lead_max">Lead days max</label><input id="p_lead_max" name="lead_max" inputmode="numeric" maxlength="3" placeholder="auto"></div>
+            <span class="hint">Leave these blank to use the city and category rates. Fill one in and it wins over the automatic number.</span>
+          </div>
+        </details>
       </div>
 
       <button class="btn btn-block" type="submit">Add product</button>
@@ -805,12 +847,12 @@ ${
         <div class="field"><label for="size_label">Size</label><input id="size_label" name="size_label" value="One size" maxlength="40"></div>
       </div>
       <div class="form-row">
-        <div class="field"><label for="ships_from">Ships from</label><input id="ships_from" name="ships_from" required maxlength="60" placeholder="Tokyo"></div>
+        ${shipsFromField(cities, { required: true })}
         <div class="field"><label for="condition_o">Condition</label><input id="condition_o" name="condition" value="Deadstock" maxlength="60"></div>
       </div>
       <div class="field"><label for="seller_price">Seller price (₹)</label><input id="seller_price" name="seller_price" required inputmode="numeric" maxlength="12">
         <span class="hint">Duty, authentication, shipping and lead time are worked out from your
-        <a href="/admin/rates">rates</a>. Leave the overrides below blank unless this one is unusual.</span>
+        <a href="/admin/rates">rates</a> and the ships-from city's country &mdash; India-sourced pieces pay no import duty. Leave the overrides below blank unless this one is unusual.</span>
       </div>
 
       <details style="margin-bottom:14px;">
@@ -1025,6 +1067,7 @@ async function createProduct(request, env) {
     const sellerId = inhouse ? await ensureHouseSeller(env) : Number(form.get('seller_id'));
     if (Number.isInteger(sellerId)) {
       const city = String(form.get('ships_from') || '').trim();
+      const rawNum = (k) => String(form.get(k) || '').replace(/[^\d]/g, '');
       const priced = await insertOffer(env, {
         productId,
         inhouse,
@@ -1033,6 +1076,13 @@ async function createProduct(request, env) {
         condition: String(form.get('offer_condition') || 'Deadstock').trim(),
         city,
         sellerPrice,
+        overrides: {
+          duty: rawNum('duty'),
+          auth_fee: rawNum('auth_fee'),
+          shipping: rawNum('shipping'),
+          lead_days_min: rawNum('lead_min'),
+          lead_days_max: rawNum('lead_max'),
+        },
       });
       const warn = pricingWarning(priced, city);
       if (uploadError) {
@@ -1341,8 +1391,11 @@ async function editOfferPage(env, offerId) {
     .first();
   if (!offer) return adminHtml('<div class="notice">No such offer.</div>', 404);
 
-  const sellers = await env.DB.prepare('SELECT * FROM sellers ORDER BY name').all().then((r) => r.results || []);
-  const orderCount = await env.DB.prepare('SELECT COUNT(*) AS n FROM orders WHERE offer_id = ?').bind(offerId).first();
+  const [sellers, cities, orderCount] = await Promise.all([
+    env.DB.prepare('SELECT * FROM sellers ORDER BY name').all().then((r) => r.results || []),
+    listSourceCities(env.DB),
+    env.DB.prepare('SELECT COUNT(*) AS n FROM orders WHERE offer_id = ?').bind(offerId).first(),
+  ]);
   const canDelete = (orderCount?.n || 0) === 0;
 
   return adminHtml(`
@@ -1368,7 +1421,7 @@ async function editOfferPage(env, offerId) {
       <label for="inhouse" style="margin:0;">Inhaus — sourced by us (ignores the seller above)</label>
     </div>
     <div class="form-row">
-      <div class="field"><label for="ships_from">Ships from</label><input id="ships_from" name="ships_from" required maxlength="60" value="${escapeHtml(offer.ships_from)}"></div>
+      ${shipsFromField(cities, { required: true, selected: offer.ships_from })}
       <div class="field"><label for="condition_o">Condition</label><input id="condition_o" name="condition" value="${escapeHtml(offer.condition)}" maxlength="60"></div>
     </div>
     <div class="form-row">
@@ -1475,6 +1528,14 @@ async function ratesPage(env, message) {
   not researched Indian customs rates. Get the real rate for each category from a customs broker
   and put it in here before you list anything. If duty is set too low, every order loses money
   quietly — the sale still completes, the shortfall just comes out of your margin.
+</div>
+
+<div class="notice" style="margin-bottom:24px; max-width:760px;">
+  <strong>Duty only applies to what's actually imported.</strong> A source city whose country
+  below is exactly "India" is treated as domestic &mdash; offers shipping from it are charged
+  no import duty at all, regardless of the category rate. Everything sourced abroad (Japan,
+  Korea, or anywhere else) uses the category's duty % as normal. Spell the country "India" for
+  domestic cities so this kicks in correctly.
 </div>
 
 ${message ? `<div class="notice notice-good" style="margin-bottom:20px;">${escapeHtml(message)}</div>` : ''}
