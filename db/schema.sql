@@ -82,6 +82,9 @@ CREATE TABLE offers (
   stock_code     TEXT UNIQUE,            -- internal shelf number, generated: RH-SNK-00042
   product_id     INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   seller_id      INTEGER NOT NULL REFERENCES sellers(id),
+  sourced_by     TEXT NOT NULL DEFAULT 'seller', -- seller | inhouse: imported by us directly,
+                                                  -- no seller commission -- shown to buyers as
+                                                  -- "Sourced directly by us" instead of a seller name
   size_label     TEXT NOT NULL DEFAULT 'One size',
   condition      TEXT NOT NULL DEFAULT 'Deadstock',
   ships_from     TEXT NOT NULL,

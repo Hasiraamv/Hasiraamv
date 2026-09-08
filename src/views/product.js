@@ -207,15 +207,19 @@ ${
           const e = etaDates(o.lead_days_min, o.lead_days_max);
           // Sellers are shown anonymously. Their names identify the dealers we buy from —
           // publishing them hands our sourcing network to anyone who reads the page, and
-          // several of them are named after the city they trade in.
-          const label = `Verified seller ${String.fromCharCode(65 + i)}`;
+          // several of them are named after the city they trade in. A piece we imported
+          // ourselves has no dealer to anonymise, so it says so plainly instead.
+          const inhouse = o.sourced_by === 'inhouse';
+          const label = inhouse ? 'Sourced directly by us' : `Verified seller ${String.fromCharCode(65 + i)}`;
           return `
         <tr${i === 0 ? ' class="best"' : ''}>
           <td data-label="Seller">
             <div style="display:flex; align-items:center; gap:8px;">
               <strong style="font-size:14px;">${label}</strong>
               ${
-                o.kyc_verified
+                inhouse
+                  ? `<span style="display:inline-flex; align-items:center; gap:4px; background:var(--ink); border:1px solid var(--ink); padding:2px 6px; font-size:9.5px; color:var(--gold-light); font-weight:700;">NO MIDDLEMAN</span>`
+                  : o.kyc_verified
                   ? `<span style="display:inline-flex; align-items:center; gap:4px; background:var(--paper-alt); border:1px solid #d6d0c5; padding:2px 6px; font-size:9.5px; color:var(--gold); font-weight:700;">${icon(
                       'check',
                       '#6a5735',

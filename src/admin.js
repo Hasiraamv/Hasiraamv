@@ -1,7 +1,7 @@
 import { escapeHtml, formatINR, html, redirect, sealMark } from './render.js';
 import * as db from './db.js';
 import { issueCertificate } from './certificates.js';
-import { storeImage, deleteImage } from './images.js';
+import { storeImage, deleteImage, storeVideo } from './images.js';
 import {
   computeOfferPricing,
   listCategoryRates,
@@ -74,12 +74,18 @@ export async function adminRouter(request, env, path) {
   if (path === '/admin/certificates') return certificatesPage(env);
   if (path === '/admin/certificates/issue' && method === 'POST') return issueCert(request, env);
   if (path === '/admin/certificates/revoke' && method === 'POST') return revokeCert(request, env);
-  if (path === '/admin/products')
-    return productsPage(env, new URL(request.url).searchParams.get('error'));
+  if (path === '/admin/products') {
+    const qs = new URL(request.url).searchParams;
+    const forOffer = Number(qs.get('offer_for'));
+    return productsPage(env, qs.get('error'), Number.isInteger(forOffer) ? forOffer : null);
+  }
   if (path === '/admin/products/create' && method === 'POST') return createProduct(request, env);
   if (path === '/admin/offers/create' && method === 'POST') return createOffer(request, env);
   if (path === '/admin/images/upload' && method === 'POST') return uploadImage(request, env);
   if (path === '/admin/images/delete' && method === 'POST') return removeImage(request, env);
+  if (path === '/admin/images/reorder' && method === 'POST') return reorderImage(request, env);
+  if (path === '/admin/products/video-upload' && method === 'POST') return uploadVideo(request, env);
+  if (path === '/admin/products/video-remove' && method === 'POST') return removeVideo(request, env);
   if (path === '/admin/rates')
     return ratesPage(env, new URL(request.url).searchParams.get('saved'));
   if (path === '/admin/rates/categories' && method === 'POST') return saveCategoryRates(request, env);
@@ -503,7 +509,7 @@ async function revokeCert(request, env) {
   return redirect('/admin/certificates');
 }
 
-async function productsPage(env, errorMessage) {
+async function productsPage(env, errorMessage, preselectProductId = null) {
   const [categories, sellers] = await Promise.all([
     db.getCategories(env.DB),
     env.DB.prepare('SELECT * FROM sellers ORDER BY name').all().then((r) => r.results || []),
@@ -579,20 +585,30 @@ ${
     </form>
   </div>
 
-  <div class="panel" style="padding:22px;">
+  <div class="panel" style="padding:22px;" id="offer-form">
     <h3 class="serif" style="font-size:20px; margin:0 0 14px;">Add a seller offer</h3>
     <p class="muted" style="font-size:12.5px; margin:0 0 14px;">The landed price is the sum of the four parts — that is what the buyer pays and what the breakdown shows.</p>
     <form method="post" action="/admin/offers/create">
       <div class="field"><label for="product_id">Product</label>
         <select id="product_id" name="product_id" required>
-          ${(products || []).map((p) => `<option value="${p.id}">${escapeHtml(p.title)}</option>`).join('')}
+          ${(products || [])
+            .map(
+              (p) =>
+                `<option value="${p.id}"${p.id === preselectProductId ? ' selected' : ''}>${escapeHtml(p.title)}</option>`
+            )
+            .join('')}
         </select>
+      </div>
+      <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
+        <input type="checkbox" id="inhouse" name="inhouse" value="1" style="width:auto;">
+        <label for="inhouse" style="margin:0;">Sourced and imported by us directly (in-house — no seller commission)</label>
       </div>
       <div class="form-row">
         <div class="field"><label for="seller_id">Seller</label>
           <select id="seller_id" name="seller_id" required>
             ${sellers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)} — ${escapeHtml(s.city)}</option>`).join('')}
           </select>
+          <span class="hint">Ignored if "sourced in-house" above is checked.</span>
         </div>
         <div class="field"><label for="size_label">Size</label><input id="size_label" name="size_label" value="One size" maxlength="40"></div>
       </div>
@@ -627,7 +643,7 @@ ${
 
 <h3 class="serif" style="font-size:24px; margin:0 0 14px;">Catalogue</h3>
 <table class="table">
-  <thead><tr><th>Product</th><th>Photos</th><th class="num">Offers</th><th class="num">Lowest</th><th></th></tr></thead>
+  <thead><tr><th>Product</th><th>Photos</th><th>Video</th><th class="num">Offers</th><th class="num">Lowest</th><th></th></tr></thead>
   <tbody>
     ${(products || [])
       .map((p) => {
@@ -641,12 +657,25 @@ ${
           <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
             ${imgs
               .map(
-                (im) => `<span style="position:relative; display:inline-block;">
+                (im, i) => `<span style="position:relative; display:inline-block;">
                   <img src="${escapeHtml(im.url)}" alt="" style="width:44px; height:44px; object-fit:cover; border:1px solid var(--line);">
+                  ${i === 0 ? `<span style="position:absolute; bottom:-2px; left:-2px; background:var(--ink-soft); color:var(--paper); font-size:9px; padding:1px 4px;">1st</span>` : ''}
                   <form method="post" action="/admin/images/delete" style="display:inline;">
                     <input type="hidden" name="image_id" value="${im.id}">
                     <button type="submit" title="Delete photo" aria-label="Delete this photo" style="position:absolute; top:-6px; right:-6px; width:18px; height:18px; line-height:1; border:1px solid var(--line); background:var(--card); cursor:pointer; font-size:11px; padding:0;">×</button>
                   </form>
+                  <span style="position:absolute; top:-6px; left:-6px; display:flex; flex-direction:column;">
+                    <form method="post" action="/admin/images/reorder" style="display:inline;">
+                      <input type="hidden" name="image_id" value="${im.id}">
+                      <input type="hidden" name="direction" value="up">
+                      <button type="submit" title="Move earlier" aria-label="Move this photo earlier" ${i === 0 ? 'disabled' : ''} style="width:16px; height:14px; line-height:1; border:1px solid var(--line); background:var(--card); cursor:pointer; font-size:9px; padding:0;">&uarr;</button>
+                    </form>
+                    <form method="post" action="/admin/images/reorder" style="display:inline;">
+                      <input type="hidden" name="image_id" value="${im.id}">
+                      <input type="hidden" name="direction" value="down">
+                      <button type="submit" title="Move later" aria-label="Move this photo later" ${i === imgs.length - 1 ? 'disabled' : ''} style="width:16px; height:14px; line-height:1; border:1px solid var(--line); background:var(--card); cursor:pointer; font-size:9px; padding:0;">&darr;</button>
+                    </form>
+                  </span>
                 </span>`
               )
               .join('')}
@@ -661,7 +690,29 @@ ${
             }
           </div>
         </td>
-        <td data-label="Offers" class="num">${p.offer_count}</td>
+        <td data-label="Video" style="font-size:11.5px;">
+          ${
+            p.video_url
+              ? `<div style="display:flex; align-items:center; gap:6px;">
+                   <span class="faint">Set</span>
+                   <form method="post" action="/admin/products/video-remove" style="display:inline;">
+                     <input type="hidden" name="product_id" value="${p.id}">
+                     <button type="submit" title="Remove video" class="chip" style="cursor:pointer; padding:2px 8px;">×</button>
+                   </form>
+                 </div>`
+              : env.IMAGES
+              ? `<form method="post" action="/admin/products/video-upload" enctype="multipart/form-data" style="display:flex; gap:6px; align-items:center;">
+                   <input type="hidden" name="product_id" value="${p.id}">
+                   <input type="file" name="file" accept="video/mp4,video/webm" required style="font-size:11px; max-width:140px;">
+                   <button class="chip" type="submit" style="cursor:pointer;">Upload</button>
+                 </form>`
+              : `<span class="faint">None</span>`
+          }
+        </td>
+        <td data-label="Offers" class="num">
+          ${p.offer_count}
+          ${!p.offer_count ? `<div><a href="/admin/products?offer_for=${p.id}#offer-form" style="font-size:11px; color:var(--oxblood);">Add an offer &rarr;</a></div>` : ''}
+        </td>
         <td data-label="Lowest" class="num">${p.lowest ? formatINR(p.lowest) : '—'}</td>
         <td><a href="/p/${escapeHtml(p.slug)}" target="_blank">View</a></td>
       </tr>`;
@@ -723,12 +774,25 @@ async function createProduct(request, env) {
   return redirect('/admin/products');
 }
 
+// The "sourced in-house" system seller. Created on first use rather than in seed data, so
+// it exists whether or not seed.sql ever ran against this database.
+async function ensureHouseSeller(env) {
+  const existing = await env.DB.prepare("SELECT id FROM sellers WHERE name = 'Rarehaus (in-house)'").first();
+  if (existing) return existing.id;
+  const result = await env.DB.prepare(
+    `INSERT INTO sellers (name, city, country, kyc_verified, legit_check)
+     VALUES ('Rarehaus (in-house)', 'Guwahati', 'India', 1, 1)`
+  ).run();
+  return result.meta.last_row_id;
+}
+
 async function createOffer(request, env) {
   const form = await request.formData();
   const raw = (k) => String(form.get(k) || '').replace(/[^\d]/g, '');
 
   const productId = Number(form.get('product_id'));
-  const sellerId = Number(form.get('seller_id'));
+  const inhouse = form.get('inhouse') === '1';
+  const sellerId = inhouse ? await ensureHouseSeller(env) : Number(form.get('seller_id'));
   if (!Number.isInteger(productId) || !Number.isInteger(sellerId)) return redirect('/admin/products');
 
   const sellerPrice = Number(raw('seller_price')) || 0;
@@ -763,14 +827,15 @@ async function createOffer(request, env) {
   const stockCode = await nextStockCode(env.DB, product.category_slug);
 
   await env.DB.prepare(
-    `INSERT INTO offers (stock_code, product_id, seller_id, size_label, condition, ships_from,
+    `INSERT INTO offers (stock_code, product_id, seller_id, sourced_by, size_label, condition, ships_from,
                          seller_price, duty, auth_fee, shipping, landed_price, lead_days_min, lead_days_max)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       stockCode,
       productId,
       sellerId,
+      inhouse ? 'inhouse' : 'seller',
       String(form.get('size_label') || 'One size').trim() || 'One size',
       String(form.get('condition') || 'Deadstock').trim(),
       city,
@@ -972,6 +1037,67 @@ async function removeImage(request, env) {
   if (row) {
     await env.DB.prepare('DELETE FROM product_images WHERE id = ?').bind(imageId).run();
     await deleteImage(env, row.url);
+  }
+  return redirect('/admin/products');
+}
+
+// Swaps this image's sort_order with its neighbour in the same direction -- the whole
+// reorder operation, one step at a time, matching the up/down buttons in the admin table.
+async function reorderImage(request, env) {
+  const form = await request.formData();
+  const imageId = Number(form.get('image_id'));
+  const direction = form.get('direction') === 'up' ? 'up' : 'down';
+  if (!Number.isInteger(imageId)) return redirect('/admin/products');
+
+  const current = await env.DB.prepare('SELECT id, product_id, sort_order FROM product_images WHERE id = ?')
+    .bind(imageId)
+    .first();
+  if (!current) return redirect('/admin/products');
+
+  const neighbor = await env.DB.prepare(
+    `SELECT id, sort_order FROM product_images WHERE product_id = ? AND sort_order ${direction === 'up' ? '<' : '>'} ?
+     ORDER BY sort_order ${direction === 'up' ? 'DESC' : 'ASC'} LIMIT 1`
+  )
+    .bind(current.product_id, current.sort_order)
+    .first();
+
+  if (neighbor) {
+    await env.DB.batch([
+      env.DB.prepare('UPDATE product_images SET sort_order = ? WHERE id = ?').bind(neighbor.sort_order, current.id),
+      env.DB.prepare('UPDATE product_images SET sort_order = ? WHERE id = ?').bind(current.sort_order, neighbor.id),
+    ]);
+  }
+  return redirect('/admin/products');
+}
+
+async function uploadVideo(request, env) {
+  const form = await request.formData();
+  const productId = Number(form.get('product_id'));
+  if (!Number.isInteger(productId)) return redirect('/admin/products');
+
+  const result = await storeVideo(env, form.get('file'));
+  if (!result.ok) {
+    return redirect(`/admin/products?error=${encodeURIComponent(result.error)}`);
+  }
+
+  await env.DB.prepare('UPDATE products SET video_url = ? WHERE id = ?')
+    .bind(`/img/${result.key}`, productId)
+    .run();
+
+  return redirect('/admin/products');
+}
+
+async function removeVideo(request, env) {
+  const form = await request.formData();
+  const productId = Number(form.get('product_id'));
+  if (!Number.isInteger(productId)) return redirect('/admin/products');
+
+  const product = await env.DB.prepare('SELECT video_url FROM products WHERE id = ?').bind(productId).first();
+  if (product?.video_url) {
+    await env.DB.prepare('UPDATE products SET video_url = NULL WHERE id = ?').bind(productId).run();
+    // Only delete the R2 object if we hosted it ourselves (a YouTube/Vimeo/external URL is
+    // never stored in R2, so deleteImage's key pattern check already no-ops on those safely).
+    await deleteImage(env, product.video_url);
   }
   return redirect('/admin/products');
 }
