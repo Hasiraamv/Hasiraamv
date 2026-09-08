@@ -145,3 +145,22 @@ export async function deleteImage(env, url) {
     await env.IMAGES.delete(key);
   }
 }
+
+// A Google Drive "share" link points at a viewer page, not the file, so dropping one into
+// an <img> renders a broken image. Rewrite it to Drive's direct-image endpoint instead.
+//
+// This is a stopgap for before R2 is connected, not a real hosting answer: Google rate-limits
+// and sometimes blocks hotlinked Drive images, so a picture that works today can quietly stop
+// loading later. Uploading to R2 is the fix.
+export function normalizeImageUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return null;
+
+  const drive =
+    raw.match(/drive\.google\.com\/file\/d\/([\w-]+)/) ||
+    raw.match(/drive\.google\.com\/open\?id=([\w-]+)/) ||
+    raw.match(/drive\.google\.com\/uc\?(?:export=\w+&)?id=([\w-]+)/);
+  if (drive) return `https://drive.google.com/thumbnail?id=${drive[1]}&sz=w1600`;
+
+  return /^https:\/\//i.test(raw) ? raw : null;
+}

@@ -1,7 +1,7 @@
 import { escapeHtml, formatINR, html, redirect, sealMark } from './render.js';
 import * as db from './db.js';
 import { issueCertificate } from './certificates.js';
-import { storeImage, deleteImage, storeVideo } from './images.js';
+import { storeImage, deleteImage, storeVideo, normalizeImageUrl } from './images.js';
 import {
   computeOfferPricing,
   listCategoryRates,
@@ -79,6 +79,8 @@ export async function adminRouter(request, env, path) {
     const forOffer = Number(qs.get('offer_for'));
     return productsPage(env, qs.get('error'), Number.isInteger(forOffer) ? forOffer : null);
   }
+  if (path === '/admin/listings')
+    return listingsPage(env, new URL(request.url).searchParams.get('error'));
   if (path === '/admin/products/create' && method === 'POST') return createProduct(request, env);
   if (path === '/admin/offers/create' && method === 'POST') return createOffer(request, env);
   if (path === '/admin/offers/status' && method === 'POST') return setOfferStatus(request, env);
@@ -139,7 +141,8 @@ function adminHtml(body, status = 200, extraHeaders = {}) {
   <nav class="nav-links">
     <a href="/admin/orders">Orders</a>
     <a href="/admin/certificates">Certificates</a>
-    <a href="/admin/products">Products &amp; offers</a>
+    <a href="/admin/listings">Listings</a>
+    <a href="/admin/products">Add &amp; edit</a>
     <a href="/admin/rates">Rates</a>
     <a href="/admin/sellers">Seller applications</a>
     <a href="/admin/sourcing">Sourcing requests</a>
@@ -535,6 +538,111 @@ async function revokeCert(request, env) {
   return redirect('/admin/certificates');
 }
 
+// The day-to-day page: everything that is (or should be) for sale, with the controls that
+// get used most -- mark sold, relist, edit. Adding new pieces lives on /admin/products.
+async function listingsPage(env, errorMessage) {
+  const { results: rows } = await env.DB.prepare(
+    `SELECT p.id AS product_id, p.title, p.slug, c.name AS category_name,
+            (SELECT url FROM product_images pi WHERE pi.product_id = p.id ORDER BY sort_order LIMIT 1) AS image_url,
+            o.id AS offer_id, o.size_label, o.status, o.landed_price, o.stock_code, o.sourced_by,
+            s.name AS seller_name
+       FROM products p
+       JOIN categories c ON c.id = p.category_id
+       LEFT JOIN offers o ON o.product_id = p.id
+       LEFT JOIN sellers s ON s.id = o.seller_id
+      ORDER BY (o.status = 'active') DESC, p.created_at DESC, o.id`
+  ).all();
+
+  const live = (rows || []).filter((r) => r.status === 'active');
+  const other = (rows || []).filter((r) => r.offer_id && r.status !== 'active');
+  const unpriced = (rows || []).filter((r) => !r.offer_id);
+
+  const row = (r) => {
+    const canToggle = r.status === 'active' || r.status === 'withdrawn';
+    const nextStatus = r.status === 'active' ? 'withdrawn' : 'active';
+    const label = r.status === 'active' ? 'Mark sold out' : 'Relist';
+    return `<tr>
+      <td data-label="Piece">
+        <div style="display:flex; align-items:center; gap:12px;">
+          ${
+            r.image_url
+              ? `<img src="${escapeHtml(r.image_url)}" alt="" style="width:46px; height:46px; object-fit:cover; border:1px solid var(--line); flex:none;">`
+              : `<span style="width:46px; height:46px; background:var(--tile); border:1px solid var(--line); flex:none; display:inline-block;"></span>`
+          }
+          <div>
+            <strong>${escapeHtml(r.title)}</strong>
+            <div style="font-size:11.5px; color:var(--faint);">
+              ${escapeHtml(r.category_name)}${r.size_label && r.size_label !== 'One size' ? ` · ${escapeHtml(r.size_label)}` : ''}${r.stock_code ? ` · ${escapeHtml(r.stock_code)}` : ''}
+            </div>
+          </div>
+        </div>
+      </td>
+      <td data-label="Source">${r.sourced_by === 'inhouse' ? 'In-house' : escapeHtml(r.seller_name || '—')}</td>
+      <td data-label="Price" class="num">${r.landed_price ? formatINR(r.landed_price) : '—'}</td>
+      <td data-label="Status">
+        ${
+          r.offer_id
+            ? `<span class="tag" style="color:${
+                r.status === 'active' ? 'var(--green)' : r.status === 'withdrawn' ? 'var(--oxblood)' : 'var(--muted)'
+              };">${escapeHtml(r.status)}</span>`
+            : `<span class="tag" style="color:var(--oxblood);">not priced</span>`
+        }
+      </td>
+      <td style="white-space:nowrap;">
+        ${
+          r.offer_id
+            ? `<a href="/admin/offers/${r.offer_id}/edit" style="font-size:12.5px;">Edit</a>`
+            : `<a href="/admin/products?offer_for=${r.product_id}#offer-form" style="font-size:12.5px; color:var(--oxblood);">Add a price</a>`
+        }
+        &middot; <a href="/p/${escapeHtml(r.slug)}" target="_blank" style="font-size:12.5px;">View</a>
+        ${
+          r.offer_id && canToggle
+            ? ` <form method="post" action="/admin/offers/status" style="display:inline;">
+                  <input type="hidden" name="offer_id" value="${r.offer_id}">
+                  <input type="hidden" name="status" value="${nextStatus}">
+                  <button class="chip" type="submit" style="cursor:pointer;">${label}</button>
+                </form>`
+            : ''
+        }
+      </td>
+    </tr>`;
+  };
+
+  const table = (items, empty) =>
+    items.length
+      ? `<table class="table">
+           <thead><tr><th>Piece</th><th>Source</th><th class="num">Price</th><th>Status</th><th></th></tr></thead>
+           <tbody>${items.map(row).join('')}</tbody>
+         </table>`
+      : `<div class="notice">${empty}</div>`;
+
+  return adminHtml(`
+<div style="display:flex; justify-content:space-between; align-items:baseline; gap:20px; flex-wrap:wrap;">
+  <h2 class="serif" style="font-size:32px; margin:0 0 8px;">Listings</h2>
+  <a class="btn" href="/admin/products">Add a piece</a>
+</div>
+<p class="muted" style="margin:0 0 22px; font-size:13.5px;">Everything for sale, and everything waiting to be.</p>
+${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${escapeHtml(errorMessage)}</div>` : ''}
+
+<h3 class="serif" style="font-size:22px; margin:0 0 12px;">Live <span class="muted" style="font-size:14px;">(${live.length})</span></h3>
+${table(live, 'Nothing is live yet. Add a piece with a price and it appears here.')}
+
+${
+  unpriced.length
+    ? `<h3 class="serif" style="font-size:22px; margin:32px 0 12px;">Not priced yet <span class="muted" style="font-size:14px;">(${unpriced.length})</span></h3>
+       <p class="muted" style="font-size:12.5px; margin:0 0 12px;">Saved as drafts. They stay off the site until a price is set — nobody can buy a piece without one.</p>
+       ${table(unpriced, '')}`
+    : ''
+}
+
+${
+  other.length
+    ? `<h3 class="serif" style="font-size:22px; margin:32px 0 12px;">Sold out and reserved <span class="muted" style="font-size:14px;">(${other.length})</span></h3>
+       ${table(other, '')}`
+    : ''
+}`);
+}
+
 async function productsPage(env, errorMessage, preselectProductId = null) {
   const [categories, sellers, offersResult] = await Promise.all([
     db.getCategories(env.DB),
@@ -608,14 +716,45 @@ ${
       <div class="field"><label for="condition">Condition notes</label><input id="condition" name="condition" maxlength="200"></div>
       <div class="field"><label for="image">Image URL (optional)</label><input id="image" name="image" maxlength="400" placeholder="https://...">
         <span class="hint">
-          Only use photographs you took or have written permission to use. Brand press images,
-          another reseller's photos and images lifted from search results are someone else's
-          copyright, and using them is how a shop like this gets a takedown notice.
+          A Google Drive share link is converted automatically, but Google throttles hotlinked
+          Drive images and they can stop loading without warning — fine to get going, not for
+          real stock. Enable R2 and upload the file directly instead.
+          Only use photographs you took or have written permission to use: brand press images and
+          another reseller's photos are someone else's copyright.
         </span>
       </div>
       <div class="field"><label for="video">Video URL (optional)</label><input id="video" name="video" maxlength="400" placeholder="YouTube, Vimeo, or a direct .mp4 link">
         <span class="hint">A short unboxing or 360° clip. YouTube/Vimeo links embed automatically; a direct video file plays inline. Same copyright rule as photos.</span>
       </div>
+
+      <div style="border-top:1px solid var(--line); margin:20px 0 16px; padding-top:16px;">
+        <div style="font-size:13px; font-weight:600; margin-bottom:4px;">Price and stock</div>
+        <p class="muted" style="font-size:12px; margin:0 0 14px;">
+          Fill in a price and this goes live straight away. Leave it blank to save the piece as a
+          draft — it stays off the site until you price it.
+        </p>
+        <div class="form-row">
+          <div class="field"><label for="price">Your cost (₹)</label><input id="price" name="price" inputmode="numeric" maxlength="12">
+            <span class="hint">What you pay. Duty, authentication and shipping are added on top from your <a href="/admin/rates">rates</a>.</span>
+          </div>
+          <div class="field"><label for="ships_from">Ships from</label><input id="ships_from" name="ships_from" maxlength="60" placeholder="Tokyo"></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label for="offer_size">Size</label><input id="offer_size" name="offer_size" value="One size" maxlength="40"></div>
+          <div class="field"><label for="offer_condition">Condition</label><input id="offer_condition" name="offer_condition" value="Deadstock" maxlength="60"></div>
+        </div>
+        <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
+          <input type="checkbox" id="p_inhouse" name="inhouse" value="1" style="width:auto;" checked>
+          <label for="p_inhouse" style="margin:0;">Sourced and imported by us (in-house — no seller commission)</label>
+        </div>
+        <div class="field"><label for="p_seller">Or a marketplace seller</label>
+          <select id="p_seller" name="seller_id">
+            ${sellers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)} — ${escapeHtml(s.city)}</option>`).join('')}
+          </select>
+          <span class="hint">Ignored while "sourced in-house" is ticked.</span>
+        </div>
+      </div>
+
       <button class="btn btn-block" type="submit">Add product</button>
     </form>
   </div>
@@ -842,14 +981,39 @@ async function createProduct(request, env) {
     )
     .run();
 
-  const image = String(form.get('image') || '').trim();
-  if (image && /^https:\/\//i.test(image)) {
+  const productId = result.meta.last_row_id;
+
+  const image = normalizeImageUrl(form.get('image'));
+  if (image) {
     await env.DB.prepare('INSERT INTO product_images (product_id, url, alt) VALUES (?, ?, ?)')
-      .bind(result.meta.last_row_id, image, title)
+      .bind(productId, image, title)
       .run();
   }
 
-  return redirect('/admin/products');
+  // A product with no offer has no price and cannot be bought, so the price fields live on
+  // this same form: fill one in and the listing goes live in a single step.
+  const sellerPrice = Number(String(form.get('price') || '').replace(/[^\d]/g, '')) || 0;
+  if (sellerPrice > 0) {
+    const inhouse = form.get('inhouse') === '1';
+    const sellerId = inhouse ? await ensureHouseSeller(env) : Number(form.get('seller_id'));
+    if (Number.isInteger(sellerId)) {
+      const city = String(form.get('ships_from') || '').trim();
+      const priced = await insertOffer(env, {
+        productId,
+        inhouse,
+        sellerId,
+        sizeLabel: String(form.get('offer_size') || 'One size').trim(),
+        condition: String(form.get('offer_condition') || 'Deadstock').trim(),
+        city,
+        sellerPrice,
+      });
+      return redirect('/admin/listings' + pricingWarning(priced, city));
+    }
+  }
+
+  return redirect('/admin/products?error=' + encodeURIComponent(
+    'Product saved, but with no price it is not for sale yet. Add a price from the Listings page to make it buyable.'
+  ));
 }
 
 // The "sourced in-house" system seller. Created on first use rather than in seed data, so
@@ -862,6 +1026,66 @@ async function ensureHouseSeller(env) {
      VALUES ('Rarehaus (in-house)', 'Guwahati', 'India', 1, 1)`
   ).run();
   return result.meta.last_row_id;
+}
+
+// Shared by the one-step "Add a product" form and the standalone offer form, so a listing
+// priced either way goes through exactly the same duty/fee/shipping rules.
+async function insertOffer(env, { productId, inhouse, sellerId, sizeLabel, condition, city, sellerPrice, overrides = {} }) {
+  const product = await env.DB.prepare(
+    'SELECT p.id, p.category_id, c.slug AS category_slug FROM products p JOIN categories c ON c.id = p.category_id WHERE p.id = ?'
+  )
+    .bind(productId)
+    .first();
+  if (!product) return null;
+
+  // Duty, fees, shipping and lead time all come from the rate rules. Only values the
+  // operator actually typed are treated as overrides.
+  const priced = await computeOfferPricing(env.DB, {
+    categoryId: product.category_id,
+    city,
+    sellerPrice,
+    overrides,
+  });
+
+  const stockCode = await nextStockCode(env.DB, product.category_slug);
+
+  await env.DB.prepare(
+    `INSERT INTO offers (stock_code, product_id, seller_id, sourced_by, size_label, condition, ships_from,
+                         seller_price, duty, auth_fee, shipping, landed_price, lead_days_min, lead_days_max)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(
+      stockCode,
+      productId,
+      sellerId,
+      inhouse ? 'inhouse' : 'seller',
+      sizeLabel || 'One size',
+      condition || 'Deadstock',
+      city,
+      priced.seller_price,
+      priced.duty,
+      priced.auth_fee,
+      priced.shipping,
+      priced.landed_price,
+      priced.lead_days_min,
+      priced.lead_days_max
+    )
+    .run();
+
+  return priced;
+}
+
+// Turns a priced offer's rate-lookup result into the warning query string, so a missing duty
+// rate or unknown city is surfaced rather than silently charging zero.
+function pricingWarning(priced, city) {
+  if (!priced) return '';
+  if (!priced.rate_found) {
+    return '?error=' + encodeURIComponent('Listed, but no duty rate is set for that category — duty was charged at 0. Set it under Rates.');
+  }
+  if (!priced.city_found) {
+    return '?error=' + encodeURIComponent(`Listed, but "${city}" is not in your source cities — shipping was charged at 0. Add it under Rates.`);
+  }
+  return '';
 }
 
 async function createOffer(request, env) {
@@ -878,19 +1102,14 @@ async function createOffer(request, env) {
     return redirect('/admin/products?error=' + encodeURIComponent('Enter a seller price.'));
   }
 
-  const product = await env.DB.prepare(
-    'SELECT p.id, p.category_id, c.slug AS category_slug FROM products p JOIN categories c ON c.id = p.category_id WHERE p.id = ?'
-  )
-    .bind(productId)
-    .first();
-  if (!product) return redirect('/admin/products');
-
   const city = String(form.get('ships_from') || '').trim();
 
-  // Duty, fees, shipping and lead time all come from the rate rules. Only values the
-  // operator actually typed are treated as overrides.
-  const priced = await computeOfferPricing(env.DB, {
-    categoryId: product.category_id,
+  const priced = await insertOffer(env, {
+    productId,
+    inhouse,
+    sellerId,
+    sizeLabel: String(form.get('size_label') || 'One size').trim(),
+    condition: String(form.get('condition') || 'Deadstock').trim(),
     city,
     sellerPrice,
     overrides: {
@@ -901,31 +1120,7 @@ async function createOffer(request, env) {
       lead_days_max: raw('lead_max'),
     },
   });
-
-  const stockCode = await nextStockCode(env.DB, product.category_slug);
-
-  await env.DB.prepare(
-    `INSERT INTO offers (stock_code, product_id, seller_id, sourced_by, size_label, condition, ships_from,
-                         seller_price, duty, auth_fee, shipping, landed_price, lead_days_min, lead_days_max)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  )
-    .bind(
-      stockCode,
-      productId,
-      sellerId,
-      inhouse ? 'inhouse' : 'seller',
-      String(form.get('size_label') || 'One size').trim() || 'One size',
-      String(form.get('condition') || 'Deadstock').trim(),
-      city,
-      priced.seller_price,
-      priced.duty,
-      priced.auth_fee,
-      priced.shipping,
-      priced.landed_price,
-      priced.lead_days_min,
-      priced.lead_days_max
-    )
-    .run();
+  if (!priced) return redirect('/admin/products');
 
   const warn = !priced.rate_found
     ? '?error=' + encodeURIComponent('Offer added, but no duty rate is set for that category — duty was charged at 0. Set it under Rates.')
