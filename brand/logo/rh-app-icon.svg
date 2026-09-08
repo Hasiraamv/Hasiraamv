@@ -2,8 +2,8 @@
   <title>RAREHAUS — app icon</title>
   <rect width="512" height="512" fill="#111111"/>
   <g transform="translate(106 106) scale(1.37)">
-    <path d="M33 178V100a67 67 0 0 1 134 0v78" fill="none" stroke="#B4935A" stroke-width="10"/>
-    <g transform="translate(100 112) scale(.6) translate(-100.5 -100)"
+    <path d="M33 155V100a67 67 0 0 1 134 0v55" fill="none" stroke="#B4935A" stroke-width="10"/>
+    <g transform="translate(100 102) scale(.72) translate(-100.5 -100)"
        fill="none" stroke="#B4935A" stroke-width="13">
       <path d="M37 60V140"/>
       <path d="M37 60h31a16 16 0 0 1 0 32H37"/>

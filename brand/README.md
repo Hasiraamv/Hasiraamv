@@ -23,8 +23,9 @@ brand/
 │   ├── rh-wordmark-ivory.svg
 │   ├── rh-wordmark-champagne.svg
 │   └── rh-lockup-stacked.svg      # seal + wordmark + tagline
-└── patterns/
-    └── monogram-tile.svg          # half-drop tissue pattern, 200pt repeat
+├── patterns/
+│   └── monogram-tile.svg          # half-drop tissue pattern, 200pt repeat
+└── social/                        # Instagram kit — see social/README.md
 ```
 
 ## The mark

@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420" role="img" aria-label="RAREHAUS — The Home of Rare">
   <title>RAREHAUS — stacked lockup</title>
   <g transform="translate(350 40) scale(1)">
-    <path d="M33 178V100a67 67 0 0 1 134 0v78" fill="none" stroke="#111111" stroke-width="10"/>
-    <g transform="translate(100 112) scale(.6) translate(-100.5 -100)"
+    <path d="M33 155V100a67 67 0 0 1 134 0v55" fill="none" stroke="#111111" stroke-width="10"/>
+    <g transform="translate(100 102) scale(.72) translate(-100.5 -100)"
        fill="none" stroke="#111111" stroke-width="13">
       <path d="M37 60V140"/>
       <path d="M37 60h31a16 16 0 0 1 0 32H37"/>
