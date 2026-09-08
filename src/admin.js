@@ -533,7 +533,7 @@ ${
     ? ''
     : `<div class="notice" style="margin-bottom:20px;">
          <strong>Image storage is not connected.</strong> Enable R2 in the Cloudflare dashboard,
-         create a bucket called <code>mintmark-images</code>, then uncomment the
+         create a bucket called <code>rarehaus-images</code>, then uncomment the
          <code>[[r2_buckets]]</code> block in <code>wrangler.toml</code> and redeploy. Until then you
          can still paste an image URL when creating a product.
        </div>`
