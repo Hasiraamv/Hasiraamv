@@ -572,6 +572,9 @@ ${
           copyright, and using them is how a shop like this gets a takedown notice.
         </span>
       </div>
+      <div class="field"><label for="video">Video URL (optional)</label><input id="video" name="video" maxlength="400" placeholder="YouTube, Vimeo, or a direct .mp4 link">
+        <span class="hint">A short unboxing or 360° clip. YouTube/Vimeo links embed automatically; a direct video file plays inline. Same copyright rule as photos.</span>
+      </div>
       <button class="btn btn-block" type="submit">Add product</button>
     </form>
   </div>
@@ -691,9 +694,11 @@ async function createProduct(request, env) {
   const existing = await env.DB.prepare('SELECT id FROM products WHERE slug = ?').bind(slug).first();
   if (existing) slug = `${slug}-${Date.now().toString(36).slice(-4)}`;
 
+  const video = String(form.get('video') || '').trim();
+
   const result = await env.DB.prepare(
-    `INSERT INTO products (slug, title, category_id, sku, description, condition_notes, retail_price, size_type)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO products (slug, title, category_id, sku, description, condition_notes, retail_price, size_type, video_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       slug,
@@ -703,7 +708,8 @@ async function createProduct(request, env) {
       String(form.get('description') || '').trim() || null,
       String(form.get('condition') || '').trim() || null,
       num('retail'),
-      String(form.get('size_type') || 'none')
+      String(form.get('size_type') || 'none'),
+      video && /^https:\/\//i.test(video) ? video : null
     )
     .run();
 

@@ -60,6 +60,7 @@ CREATE TABLE products (
   condition_notes  TEXT,
   retail_price     INTEGER,                   -- used to compute "under retail"
   size_type        TEXT NOT NULL DEFAULT 'none', -- none | uk | eu | apparel
+  video_url        TEXT,                      -- optional: YouTube/Vimeo link or a direct video file
   is_published     INTEGER NOT NULL DEFAULT 1,
   created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
