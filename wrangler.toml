@@ -67,7 +67,7 @@ JURISDICTION_CITY = "Guwahati"
 # /account/sign-in shows a plain "not set up yet" page until CLERK_PUBLISHABLE_KEY and
 # CLERK_SECRET_KEY are both set, and the welcome email is silently skipped until
 # RESEND_API_KEY is set.
-CLERK_PUBLISHABLE_KEY = "pk_test_ZW1lcmdpbmctcGlnbGV0LTQ1ODIuY2xlcmsuYWNjb3VudHMuZGV2JA"
+CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsucmFyZWhhdXMuaW4k"
 RESEND_FROM = "Rarehaus <welcome@rarehaus.in>"
 
 # Help chat, via Groq (a fast, free-tier OpenAI-compatible inference API -- console.groq.com).
