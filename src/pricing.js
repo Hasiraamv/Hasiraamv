@@ -45,15 +45,27 @@ export async function listCategoryRates(db) {
 
 // Works out the four components for an offer. Anything passed in `overrides` wins, so a
 // one-off shipment with unusual freight can still be entered by hand.
+// Nothing crosses customs for stock bought inside India, so import duty does not apply to
+// it -- charging the category's duty percentage on a domestically sourced piece overcharges
+// the buyer for a cost that was never incurred. The source city's country (set once, under
+// Rates) is what decides this: pick "Mumbai / India" and duty is zero automatically; pick a
+// city abroad and the category's duty rate applies as usual. A manual duty override, if
+// given, always wins over either default.
+function isDomestic(source) {
+  const country = String(source?.country || '').trim().toLowerCase();
+  return country === 'india' || country === 'domestic';
+}
+
 export async function computeOfferPricing(db, { categoryId, city, sellerPrice, overrides = {} }) {
   const rate = await getCategoryRate(db, categoryId);
   const source = await getSourceCity(db, city);
+  const domestic = isDomestic(source);
 
   const price = Math.max(0, Math.round(Number(sellerPrice) || 0));
   const dutyPct = Number(rate?.duty_pct ?? 0);
 
   const computed = {
-    duty: Math.round((price * dutyPct) / 100),
+    duty: domestic ? 0 : Math.round((price * dutyPct) / 100),
     auth_fee: Math.round(Number(rate?.auth_fee ?? 0)),
     shipping: Math.round(Number(source?.shipping_cost ?? 0)),
     lead_days_min: Number(source?.lead_days_min ?? 14),
@@ -70,9 +82,10 @@ export async function computeOfferPricing(db, { categoryId, city, sellerPrice, o
 
   computed.seller_price = price;
   computed.landed_price = price + computed.duty + computed.auth_fee + computed.shipping;
-  computed.duty_pct_used = dutyPct;
+  computed.duty_pct_used = domestic ? 0 : dutyPct;
   computed.rate_found = !!rate;
   computed.city_found = !!source;
+  computed.domestic = domestic;
   return computed;
 }
 

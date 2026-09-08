@@ -1,4 +1,4 @@
-import { escapeHtml, formatINR, icon, productCard, etaDates } from '../render.js';
+import { escapeHtml, formatINR, icon, productCard, etaDates, STOCK_LABELS } from '../render.js';
 
 // Group live offers by size and keep the cheapest per size — this is what the size grid
 // prices off, and it is why the same product shows a different price per size.
@@ -85,6 +85,14 @@ export function productPage({ product, offers, images, related, selectedSize, en
     <div class="panel" style="margin-top:22px; padding:22px 24px;">
       <h3 class="serif" style="font-size:20px; margin:0 0 10px;">About this piece</h3>
       <p style="margin:0 0 14px; font-size:14px; line-height:1.7; color:#4a463c;">${escapeHtml(product.description || '')}</p>
+      ${
+        product.details
+          ? `<div style="margin:0 0 14px; padding-top:14px; border-top:1px solid var(--line);">
+               <h4 style="font-size:12.5px; font-weight:600; margin:0 0 8px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);">Details</h4>
+               <p style="margin:0; font-size:13.5px; line-height:1.75; color:#4a463c; white-space:pre-line;">${escapeHtml(product.details)}</p>
+             </div>`
+          : ''
+      }
       <div style="display:flex; gap:28px; flex-wrap:wrap; font-size:12.5px; color:var(--muted);">
         ${product.sku ? `<span><strong style="color:var(--text)">Style</strong> ${escapeHtml(product.sku)}</span>` : ''}
         ${product.release_year ? `<span><strong style="color:var(--text)">Released</strong> ${product.release_year}</span>` : ''}
@@ -95,6 +103,11 @@ export function productPage({ product, offers, images, related, selectedSize, en
 
   <div>
     <span class="tag gold">Imported &amp; authenticated</span>
+    ${
+      product.gender && product.gender !== 'unisex'
+        ? `<span class="tag muted" style="margin-left:8px;">${product.gender === 'men' ? "Men's" : "Women's"}</span>`
+        : ''
+    }
     <h1 class="serif" style="font-size:38px; margin:8px 0; line-height:1.2;">${escapeHtml(product.title)}</h1>
 
     ${
@@ -106,6 +119,7 @@ export function productPage({ product, offers, images, related, selectedSize, en
           activeSize !== 'One size' ? ` · size ${escapeHtml(activeSize)}` : ''
         }</div>
         <div class="serif" style="font-size:40px; line-height:1;">${formatINR(best.landed_price)}</div>
+        ${best.stock_label && STOCK_LABELS[best.stock_label] ? `<div style="font-size:11px; color:var(--oxblood); font-weight:700; margin-top:4px;">${STOCK_LABELS[best.stock_label]}</div>` : ''}
       </div>
       ${
         underRetail
@@ -239,6 +253,7 @@ ${
           <td data-label="Landed price" class="num">
             <div class="serif" style="font-size:20px;">${formatINR(o.landed_price)}</div>
             ${i === 0 ? '<div style="font-size:11px; color:var(--green); font-weight:600;">Lowest</div>' : ''}
+            ${o.stock_label && STOCK_LABELS[o.stock_label] ? `<div style="font-size:10.5px; color:var(--oxblood); font-weight:700; margin-top:2px;">${STOCK_LABELS[o.stock_label]}</div>` : ''}
           </td>
           <td class="num">
             <form method="post" action="/cart/add">

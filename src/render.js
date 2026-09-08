@@ -446,8 +446,15 @@ export function verifiedBadge() {
   return `<span class="badge">${icon('check', '#80632e', 11)} VERIFIED</span>`;
 }
 
+export const STOCK_LABELS = {
+  limited: 'LIMITED STOCK',
+  last_one: 'ONLY ONE LEFT',
+  made_to_order: 'MADE TO ORDER',
+};
+
 export function productCard(p) {
   const under = p.retail_price && p.lowest_price && p.lowest_price < p.retail_price;
+  const stockTag = STOCK_LABELS[p.stock_label];
   const shot = p.image_url
     ? `<img src="${escapeHtml(p.image_url)}" alt="${escapeHtml(p.title)}">`
     : '';
@@ -463,7 +470,13 @@ export function productCard(p) {
   <span class="shot">
     ${shot}
     ${verifiedBadge()}
-    ${under ? '<span class="badge badge-right badge-under">UNDER RETAIL</span>' : ''}
+    ${
+      under
+        ? '<span class="badge badge-right badge-under">UNDER RETAIL</span>'
+        : stockTag
+        ? `<span class="badge badge-right badge-under">${stockTag}</span>`
+        : ''
+    }
   </span>
   <span>
     <span class="title">${escapeHtml(p.title)}</span>

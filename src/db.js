@@ -3,13 +3,14 @@
 // One row per product, carrying the best live offer — this is the marketplace view the
 // listing pages are built on.
 const PRODUCT_LIST_SELECT = `
-  SELECT p.id, p.slug, p.title, p.retail_price, p.size_type, p.created_at,
+  SELECT p.id, p.slug, p.title, p.retail_price, p.size_type, p.gender, p.created_at,
          c.slug AS category_slug, c.name AS category_name,
          (SELECT url FROM product_images pi WHERE pi.product_id = p.id ORDER BY sort_order LIMIT 1) AS image_url,
          o.landed_price   AS lowest_price,
          o.ships_from     AS ships_from,
          o.lead_days_min  AS lead_days_min,
          o.lead_days_max  AS lead_days_max,
+         o.stock_label    AS stock_label,
          (SELECT COUNT(*) FROM offers o2 WHERE o2.product_id = p.id AND o2.status = 'active') AS offer_count
     FROM products p
     JOIN categories c ON c.id = p.category_id
@@ -38,6 +39,10 @@ export async function listProducts(db, opts = {}) {
   if (opts.categorySlug && opts.categorySlug !== 'all') {
     clauses.push('c.slug = ?');
     binds.push(opts.categorySlug);
+  }
+  if (opts.gender && opts.gender !== 'all') {
+    clauses.push('p.gender = ?');
+    binds.push(opts.gender);
   }
   if (opts.search) {
     clauses.push('(p.title LIKE ? OR p.description LIKE ?)');
