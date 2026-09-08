@@ -238,6 +238,8 @@ function parseFilters(url) {
   if (Number.isFinite(min) && min > 0) f.min = min;
   if (Number.isFinite(lead) && lead > 0) f.lead = lead;
   if (url.searchParams.get('under_retail') === '1') f.under_retail = 1;
+  const gender = url.searchParams.get('gender');
+  if (['men', 'women', 'unisex'].includes(gender)) f.gender = gender;
   const sort = url.searchParams.get('sort');
   if (['price_asc', 'price_desc', 'new', 'fastest'].includes(sort)) f.sort = sort;
   return f;
@@ -266,6 +268,7 @@ async function categoryRoute(request, env, url, slug, cart, user) {
     minPrice: f.min,
     underRetail: !!f.under_retail,
     maxLead: f.lead,
+    gender: f.gender,
     sort: f.sort,
     limit: 48,
   });

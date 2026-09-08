@@ -22,7 +22,8 @@ INSERT INTO categories (slug, name, blurb, sort_order) VALUES
   ('watches',     'Watches',         'Vintage and modern references, inspected by a watchmaker.', 3),
   ('bags',        'Bags & Leather',  'Leather goods, condition graded in hand.', 4),
   ('jewelry',     'Jewelry',         'Gold, stones and signed pieces, assayed before dispatch.', 5),
-  ('collectibles','Collectibles',    'Objects, print and rare ephemera.', 6);
+  ('eyewear',     'Eyewear',         'Sunglasses and optical frames, checked for authenticity before dispatch.', 6),
+  ('collectibles','Collectibles',    'Objects, print and rare ephemera.', 7);
 
 -- Replace with your real authenticators. Initials appear on every certificate they sign.
 INSERT INTO authenticators (initials, full_name) VALUES

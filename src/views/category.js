@@ -13,6 +13,11 @@ export function categoryPage({ category, products, filters, total }) {
   const base = {};
   if (filters.sort) base.sort = filters.sort;
 
+  const genderBase = { ...base };
+  if (filters.max) genderBase.max = filters.max;
+  if (filters.under_retail) genderBase.under_retail = filters.under_retail;
+  if (filters.lead) genderBase.lead = filters.lead;
+
   return `
 <section class="section">
   <div class="section-head">
@@ -34,6 +39,12 @@ export function categoryPage({ category, products, filters, total }) {
     <span class="tag muted" style="margin-right:4px;">Arrives</span>
     ${chip('Within 2 weeks', { ...base, lead: 14 }, filters)}
     ${chip('Within 3 weeks', { ...base, lead: 21 }, filters)}
+    <span style="width:1px; height:22px; background:var(--line); margin:0 6px;"></span>
+    <span class="tag muted" style="margin-right:4px;">Section</span>
+    ${chip('All', { ...genderBase }, filters)}
+    ${chip("Men's", { ...genderBase, gender: 'men' }, filters)}
+    ${chip("Women's", { ...genderBase, gender: 'women' }, filters)}
+    ${chip('Unisex', { ...genderBase, gender: 'unisex' }, filters)}
   </div>
 
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:22px; flex-wrap:wrap; gap:12px;">

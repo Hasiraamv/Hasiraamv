@@ -668,6 +668,29 @@ function shipsFromField(cities, { id = 'ships_from', name = 'ships_from', requir
   </div>`;
 }
 
+const STOCK_LABEL_OPTIONS = [
+  ['', 'Normal'],
+  ['limited', 'Limited stock'],
+  ['last_one', 'Only one left'],
+  ['made_to_order', 'Made to order'],
+];
+
+function normalizeStockLabel(value) {
+  const v = String(value || '');
+  return STOCK_LABEL_OPTIONS.some(([opt]) => opt === v) && v ? v : null;
+}
+
+function stockLabelField(id, name, selected = '') {
+  return `<div class="field"><label for="${id}">Stock</label>
+    <select id="${id}" name="${name}">
+      ${STOCK_LABEL_OPTIONS.map(
+        ([v, label]) => `<option value="${v}"${v === (selected || '') ? ' selected' : ''}>${label}</option>`
+      ).join('')}
+    </select>
+    <span class="hint">Shows as a small tag on the listing. "Normal" shows nothing.</span>
+  </div>`;
+}
+
 async function productsPage(env, errorMessage, preselectProductId = null) {
   const [categories, sellers, offersResult, cities] = await Promise.all([
     db.getCategories(env.DB),
@@ -740,20 +763,30 @@ ${
         </div>
       </div>
       <div class="form-row">
+        <div class="field"><label for="gender">Section</label>
+          <select id="gender" name="gender">
+            <option value="unisex" selected>Unisex</option>
+            <option value="men">Men's</option>
+            <option value="women">Women's</option>
+          </select>
+        </div>
         <div class="field"><label for="sku">Style / SKU</label><input id="sku" name="sku" maxlength="60"></div>
         <div class="field"><label for="retail">Retail price (₹)</label><input id="retail" name="retail" inputmode="numeric" maxlength="12">
           <span class="hint">Set this to unlock the "under retail" badge.</span>
         </div>
       </div>
       <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="3" maxlength="1200"></textarea></div>
+      <div class="field"><label for="details">Details</label><textarea id="details" name="details" rows="3" maxlength="2000" placeholder="Material, dimensions, what's in the box..."></textarea>
+        <span class="hint">Shown in its own "Details" section on the product page, separate from the description above.</span>
+      </div>
       <div class="field"><label for="condition">Condition notes</label><input id="condition" name="condition" maxlength="200"></div>
       ${
         imageStore(env)
-          ? `<div class="field"><label for="photo">Photo</label><input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif">
+          ? `<div class="field"><label for="photo">Photos</label><input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple>
                <span class="hint">
-                 Pick a file straight off your computer &mdash; JPEG, PNG, WEBP or GIF, up to 5&nbsp;MB.
-                 It is stored on rarehaus.in itself, so it always loads. Add more photos, and set
-                 their order, from the table below once the product is saved.
+                 Pick one or several files straight off your computer &mdash; JPEG, PNG, WEBP or GIF, up to
+                 5&nbsp;MB each. The first one becomes the cover photo; reorder them, or add more, from the
+                 table below once the product is saved. Stored on rarehaus.in itself, so it always loads.
                  Only use photographs you took or have written permission to use: brand press
                  images and another reseller's photos are someone else's copyright.
                </span>
@@ -786,6 +819,9 @@ ${
         <div class="form-row">
           <div class="field"><label for="offer_size">Size</label><input id="offer_size" name="offer_size" value="One size" maxlength="40"></div>
           <div class="field"><label for="offer_condition">Condition</label><input id="offer_condition" name="offer_condition" value="Deadstock" maxlength="60"></div>
+        </div>
+        <div class="form-row">
+          ${stockLabelField('p_stock_label', 'stock_label')}
         </div>
         <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
           <input type="checkbox" id="p_inhouse" name="inhouse" value="1" style="width:auto;" checked>
@@ -854,6 +890,7 @@ ${
         <span class="hint">Duty, authentication, shipping and lead time are worked out from your
         <a href="/admin/rates">rates</a> and the ships-from city's country &mdash; India-sourced pieces pay no import duty. Leave the overrides below blank unless this one is unusual.</span>
       </div>
+      ${stockLabelField('stock_label_o', 'stock_label')}
 
       <details style="margin-bottom:14px;">
         <summary style="cursor:pointer; font-size:12.5px; color:var(--muted); padding:6px 0;">Override the calculated values</summary>
@@ -917,7 +954,7 @@ ${
               imageStore(env)
                 ? `<form method="post" action="/admin/images/upload" enctype="multipart/form-data" style="display:flex; gap:6px; align-items:center;">
                      <input type="hidden" name="product_id" value="${p.id}">
-                     <input type="file" name="file" accept="image/jpeg,image/png,image/webp,image/gif" required style="font-size:11px; max-width:170px;">
+                     <input type="file" name="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple required style="font-size:11px; max-width:170px;">
                      <button class="chip" type="submit" style="cursor:pointer;">Upload</button>
                    </form>`
                 : `<span class="faint" style="font-size:11.5px;">${imgs.length ? '' : 'No photos'}</span>`
@@ -1024,9 +1061,11 @@ async function createProduct(request, env) {
 
   const video = String(form.get('video') || '').trim();
 
+  const gender = ['men', 'women', 'unisex'].includes(form.get('gender')) ? form.get('gender') : 'unisex';
+
   const result = await env.DB.prepare(
-    `INSERT INTO products (slug, title, category_id, sku, description, condition_notes, retail_price, size_type, video_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO products (slug, title, category_id, sku, description, details, condition_notes, retail_price, size_type, gender, video_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       slug,
@@ -1034,30 +1073,45 @@ async function createProduct(request, env) {
       categoryId,
       String(form.get('sku') || '').trim() || null,
       String(form.get('description') || '').trim() || null,
+      String(form.get('details') || '').trim() || null,
       String(form.get('condition') || '').trim() || null,
       num('retail'),
       String(form.get('size_type') || 'none'),
+      gender,
       video && /^https:\/\//i.test(video) ? video : null
     )
     .run();
 
   const productId = result.meta.last_row_id;
 
-  // An uploaded file wins over a pasted URL: it is hosted by us, so it cannot break later.
-  let image = null;
-  const upload = form.get('photo');
+  // Uploaded files win over a pasted URL: they are hosted by us, so they cannot break later.
+  // Several photos can be picked at once; they are stored in the order the browser sent them,
+  // so the first one is the cover photo the same way a single upload would be.
+  const uploads = form.getAll('photo').filter((f) => f && typeof f.arrayBuffer === 'function' && f.size > 0);
   let uploadError = '';
-  if (upload && typeof upload.arrayBuffer === 'function' && upload.size > 0) {
-    const stored = await storeImage(env, upload);
-    if (stored.ok) image = `/img/${stored.key}`;
-    else uploadError = ` The photo was not saved: ${stored.error}`;
-  }
-  if (!image) image = normalizeImageUrl(form.get('image'));
-  if (image) {
-    await env.DB.prepare('INSERT INTO product_images (product_id, url, alt) VALUES (?, ?, ?)')
-      .bind(productId, image, title)
+  let sortOrder = 0;
+  let storedAny = false;
+  for (const file of uploads) {
+    const stored = await storeImage(env, file);
+    if (!stored.ok) {
+      uploadError += ` ${stored.error}`;
+      continue;
+    }
+    await env.DB.prepare('INSERT INTO product_images (product_id, url, alt, sort_order) VALUES (?, ?, ?, ?)')
+      .bind(productId, `/img/${stored.key}`, title, sortOrder)
       .run();
+    sortOrder += 1;
+    storedAny = true;
   }
+  if (!storedAny) {
+    const image = normalizeImageUrl(form.get('image'));
+    if (image) {
+      await env.DB.prepare('INSERT INTO product_images (product_id, url, alt) VALUES (?, ?, ?)')
+        .bind(productId, image, title)
+        .run();
+    }
+  }
+  uploadError = uploadError.trim();
 
   // A product with no offer has no price and cannot be bought, so the price fields live on
   // this same form: fill one in and the listing goes live in a single step.
@@ -1076,6 +1130,7 @@ async function createProduct(request, env) {
         condition: String(form.get('offer_condition') || 'Deadstock').trim(),
         city,
         sellerPrice,
+        stockLabel: form.get('stock_label'),
         overrides: {
           duty: rawNum('duty'),
           auth_fee: rawNum('auth_fee'),
@@ -1127,7 +1182,7 @@ async function ensureHouseSeller(env) {
 
 // Shared by the one-step "Add a product" form and the standalone offer form, so a listing
 // priced either way goes through exactly the same duty/fee/shipping rules.
-async function insertOffer(env, { productId, inhouse, sellerId, sizeLabel, condition, city, sellerPrice, overrides = {} }) {
+async function insertOffer(env, { productId, inhouse, sellerId, sizeLabel, condition, city, sellerPrice, stockLabel, overrides = {} }) {
   const product = await env.DB.prepare(
     'SELECT p.id, p.category_id, c.slug AS category_slug FROM products p JOIN categories c ON c.id = p.category_id WHERE p.id = ?'
   )
@@ -1148,8 +1203,8 @@ async function insertOffer(env, { productId, inhouse, sellerId, sizeLabel, condi
 
   await env.DB.prepare(
     `INSERT INTO offers (stock_code, product_id, seller_id, sourced_by, size_label, condition, ships_from,
-                         seller_price, duty, auth_fee, shipping, landed_price, lead_days_min, lead_days_max)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                         seller_price, duty, auth_fee, shipping, landed_price, lead_days_min, lead_days_max, stock_label)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       stockCode,
@@ -1165,7 +1220,8 @@ async function insertOffer(env, { productId, inhouse, sellerId, sizeLabel, condi
       priced.shipping,
       priced.landed_price,
       priced.lead_days_min,
-      priced.lead_days_max
+      priced.lead_days_max,
+      normalizeStockLabel(stockLabel)
     )
     .run();
 
@@ -1209,6 +1265,7 @@ async function createOffer(request, env) {
     condition: String(form.get('condition') || 'Deadstock').trim(),
     city,
     sellerPrice,
+    stockLabel: form.get('stock_label'),
     overrides: {
       duty: raw('duty'),
       auth_fee: raw('auth_fee'),
@@ -1294,10 +1351,22 @@ async function editProductPage(env, productId) {
       </div>
     </div>
     <div class="form-row">
+      <div class="field"><label for="gender">Section</label>
+        <select id="gender" name="gender">
+          ${[['unisex', 'Unisex'], ['men', "Men's"], ['women', "Women's"]]
+            .map(
+              ([v, label]) => `<option value="${v}"${v === product.gender ? ' selected' : ''}>${label}</option>`
+            )
+            .join('')}
+        </select>
+      </div>
       <div class="field"><label for="sku">Style / SKU</label><input id="sku" name="sku" maxlength="60" value="${escapeHtml(product.sku || '')}"></div>
-      <div class="field"><label for="retail">Retail price (₹)</label><input id="retail" name="retail" inputmode="numeric" maxlength="12" value="${product.retail_price || ''}"></div>
     </div>
+    <div class="field"><label for="retail">Retail price (₹)</label><input id="retail" name="retail" inputmode="numeric" maxlength="12" value="${product.retail_price || ''}"></div>
     <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="3" maxlength="1200">${escapeHtml(product.description || '')}</textarea></div>
+    <div class="field"><label for="details">Details</label><textarea id="details" name="details" rows="3" maxlength="2000" placeholder="Material, dimensions, what's in the box...">${escapeHtml(product.details || '')}</textarea>
+      <span class="hint">Shown in its own "Details" section on the product page, separate from the description above.</span>
+    </div>
     <div class="field"><label for="condition">Condition notes</label><input id="condition" name="condition" maxlength="200" value="${escapeHtml(product.condition_notes || '')}"></div>
     <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
       <input type="checkbox" id="is_published" name="is_published" value="1" style="width:auto;" ${product.is_published ? 'checked' : ''}>
@@ -1342,18 +1411,22 @@ async function updateProduct(request, env, productId) {
     return v ? Number(v) : null;
   };
 
+  const gender = ['men', 'women', 'unisex'].includes(form.get('gender')) ? form.get('gender') : 'unisex';
+
   await env.DB.prepare(
-    `UPDATE products SET title = ?, category_id = ?, sku = ?, description = ?, condition_notes = ?,
-       retail_price = ?, size_type = ?, is_published = ? WHERE id = ?`
+    `UPDATE products SET title = ?, category_id = ?, sku = ?, description = ?, details = ?, condition_notes = ?,
+       retail_price = ?, size_type = ?, gender = ?, is_published = ? WHERE id = ?`
   )
     .bind(
       title,
       categoryId,
       String(form.get('sku') || '').trim() || null,
       String(form.get('description') || '').trim() || null,
+      String(form.get('details') || '').trim() || null,
       String(form.get('condition') || '').trim() || null,
       num('retail'),
       String(form.get('size_type') || 'none'),
+      gender,
       form.get('is_published') === '1' ? 1 : 0,
       productId
     )
@@ -1434,6 +1507,7 @@ async function editOfferPage(env, offerId) {
         </select>
       </div>
     </div>
+    ${stockLabelField('stock_label_e', 'stock_label', offer.stock_label)}
     <p class="hint" style="margin:-6px 0 14px;">Landed price is always seller price + duty + authentication + shipping, recalculated from these four fields on save.</p>
     <div class="form-row">
       <div class="field"><label for="duty">Duty (₹)</label><input id="duty" name="duty" inputmode="numeric" maxlength="12" value="${offer.duty}"></div>
@@ -1479,7 +1553,7 @@ async function updateOffer(request, env, offerId) {
 
   await env.DB.prepare(
     `UPDATE offers SET seller_id = ?, sourced_by = ?, size_label = ?, condition = ?, ships_from = ?,
-       seller_price = ?, duty = ?, auth_fee = ?, shipping = ?, landed_price = ?, lead_days_min = ?, lead_days_max = ?, status = ?
+       seller_price = ?, duty = ?, auth_fee = ?, shipping = ?, landed_price = ?, lead_days_min = ?, lead_days_max = ?, status = ?, stock_label = ?
      WHERE id = ?`
   )
     .bind(
@@ -1496,6 +1570,7 @@ async function updateOffer(request, env, offerId) {
       leadMin,
       leadMax,
       status,
+      normalizeStockLabel(form.get('stock_label')),
       offerId
     )
     .run();
@@ -1665,26 +1740,39 @@ async function uploadImage(request, env) {
   const productId = Number(form.get('product_id'));
   if (!Number.isInteger(productId)) return redirect('/admin/products');
 
-  const result = await storeImage(env, form.get('file'));
-  if (!result.ok) {
-    return redirect(`/admin/products?error=${encodeURIComponent(result.error)}`);
-  }
+  // The file input allows selecting several photos at once (multiple attribute), so every
+  // one under the "file" field name is stored and added in the order the browser sent them.
+  const files = form.getAll('file').filter((f) => f && typeof f.arrayBuffer === 'function' && f.size > 0);
+  if (!files.length) return redirect('/admin/products?error=' + encodeURIComponent('No file was uploaded.'));
 
   const product = await env.DB.prepare('SELECT title FROM products WHERE id = ?')
     .bind(productId)
     .first();
-  const next = await env.DB.prepare(
+  let next = await env.DB.prepare(
     'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM product_images WHERE product_id = ?'
   )
     .bind(productId)
     .first();
+  let sortOrder = next?.n || 0;
 
-  await env.DB.prepare(
-    'INSERT INTO product_images (product_id, url, alt, sort_order) VALUES (?, ?, ?, ?)'
-  )
-    .bind(productId, `/img/${result.key}`, product?.title || null, next?.n || 0)
-    .run();
+  const errors = [];
+  for (const file of files) {
+    const result = await storeImage(env, file);
+    if (!result.ok) {
+      errors.push(result.error);
+      continue;
+    }
+    await env.DB.prepare(
+      'INSERT INTO product_images (product_id, url, alt, sort_order) VALUES (?, ?, ?, ?)'
+    )
+      .bind(productId, `/img/${result.key}`, product?.title || null, sortOrder)
+      .run();
+    sortOrder += 1;
+  }
 
+  if (errors.length) {
+    return redirect('/admin/products?error=' + encodeURIComponent(errors.join(' ')));
+  }
   return redirect('/admin/products');
 }
 

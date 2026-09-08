@@ -57,9 +57,11 @@ CREATE TABLE products (
   sku              TEXT,
   release_year     INTEGER,
   description      TEXT,
+  details          TEXT,                      -- longer specs/what's-included, shown in its own section
   condition_notes  TEXT,
   retail_price     INTEGER,                   -- used to compute "under retail"
   size_type        TEXT NOT NULL DEFAULT 'none', -- none | uk | eu | apparel
+  gender           TEXT NOT NULL DEFAULT 'unisex', -- men | women | unisex
   video_url        TEXT,                      -- optional: YouTube/Vimeo link or a direct video file
   is_published     INTEGER NOT NULL DEFAULT 1,
   created_at       TEXT NOT NULL DEFAULT (datetime('now'))
@@ -96,6 +98,7 @@ CREATE TABLE offers (
   lead_days_min  INTEGER NOT NULL DEFAULT 14,
   lead_days_max  INTEGER NOT NULL DEFAULT 28,
   status         TEXT NOT NULL DEFAULT 'active', -- active | reserved | sold | withdrawn
+  stock_label    TEXT,                   -- optional merchandising tag: limited | last_one | made_to_order
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_offers_product ON offers(product_id, status);
