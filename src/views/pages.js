@@ -349,9 +349,8 @@ export function aboutPage(env) {
   return page({
     eyebrow: 'About',
     title: escapeHtml(site),
-    intro: `A mint mark is the small stamp struck into a coin identifying which mint produced it — the
-      mark that proves where something genuinely came from. That is the whole business: rare pieces,
-      sourced abroad, proven before they ship.`,
+    intro: `A haus for the rare. We source pieces that never reach India, prove they are real before
+      they ship, and put the whole cost in one honest number.`,
     body: `
 <h3 class="serif" style="${H3}">The problem we exist for</h3>
 <p style="${P}">
@@ -360,18 +359,39 @@ export function aboutPage(env) {
   door. Fakes are good enough now that photographs prove nothing.
 </p>
 
+<h3 class="serif" style="${H3}">Inhaus &mdash; sourced by us</h3>
+<p style="${P}">
+  Some pieces on ${escapeHtml(site)} are marked <strong>Inhaus</strong>. That means we imported them
+  ourselves: our own buying, our own money, our own shipment. There is no third-party seller in the
+  chain, so there is no seller commission in the price &mdash; that saving goes to you rather than to a
+  middleman. An Inhaus piece carries a <strong>NO MIDDLEMAN</strong> mark on its listing.
+</p>
+<ul style="${P} padding-left:20px;">
+  <li><strong>Bought direct.</strong> We buy the piece abroad ourselves instead of taking a cut of somebody else's stock.</li>
+  <li><strong>Priced without commission.</strong> You pay our landed cost plus duty, authentication and shipping. No dealer margin sits on top.</li>
+  <li><strong>Same proof, same certificate.</strong> Inhaus stock goes through the identical authentication and gets the same verifiable certificate as anything else on the site.</li>
+  <li><strong>In our hands the whole way.</strong> Because we own it from purchase to delivery, we can tell you exactly where it is.</li>
+</ul>
+<p style="${P}">
+  Everything not marked Inhaus comes from a verified marketplace seller. We show those anonymously and
+  authenticate them on arrival before anything ships.
+</p>
+
 <h3 class="serif" style="${H3}">What we do differently</h3>
 <ul style="${P} padding-left:20px;">
   <li><strong>Every seller competes.</strong> One listing per piece, with every verified seller's offer for your size underneath it, cheapest first. You see the market rather than one dealer's price.</li>
   <li><strong>Two authentications, not one.</strong> The seller's report is required before a listing goes live; ours happens on arrival, independently.</li>
   <li><strong>A certificate that can be checked.</strong> Numbered, verifiable online by anyone, revocable by us if it is ever compromised.</li>
   <li><strong>Honest dates and honest prices.</strong> Import takes weeks and we say so upfront. Duty is in the price, not a surprise at your door.</li>
-  <li><strong>Sourcing stays ours.</strong> We name what a piece is and prove it is real. We do not publish which dealer or country it came from — that network is the business.</li>
+  <li><strong>Sourcing stays ours.</strong> We name what a piece is and prove it is real. We do not publish which dealer or country it came from &mdash; that network is the business.</li>
 </ul>
 
-<div class="notice" style="margin-top:24px;">
-  Replace this with your real story, team and registered business details before launch.
-</div>`,
+<h3 class="serif" style="${H3}">Who we are</h3>
+<p style="${P}">
+  ${escapeHtml(site)} is run from Guwahati, Assam. Reach us on WhatsApp or email from the
+  <a href="/contact">contact page</a>, or on Instagram
+  <a href="https://instagram.com/rarehaus.in" rel="me noopener" target="_blank">@rarehaus.in</a>.
+</p>`,
   });
 }
 

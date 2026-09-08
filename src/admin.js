@@ -1,7 +1,7 @@
 import { escapeHtml, formatINR, html, redirect, sealMark } from './render.js';
 import * as db from './db.js';
 import { issueCertificate } from './certificates.js';
-import { storeImage, deleteImage, storeVideo, normalizeImageUrl } from './images.js';
+import { storeImage, deleteImage, storeVideo, normalizeImageUrl, imageStore } from './images.js';
 import {
   computeOfferPricing,
   listCategoryRates,
@@ -577,7 +577,7 @@ async function listingsPage(env, errorMessage) {
           </div>
         </div>
       </td>
-      <td data-label="Source">${r.sourced_by === 'inhouse' ? 'In-house' : escapeHtml(r.seller_name || '—')}</td>
+      <td data-label="Source">${r.sourced_by === 'inhouse' ? 'Inhaus' : escapeHtml(r.seller_name || '—')}</td>
       <td data-label="Price" class="num">${r.landed_price ? formatINR(r.landed_price) : '—'}</td>
       <td data-label="Status">
         ${
@@ -678,20 +678,27 @@ async function productsPage(env, errorMessage, preselectProductId = null) {
 <h2 class="serif" style="font-size:32px; margin:0 0 22px;">Products &amp; offers</h2>
 ${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${escapeHtml(errorMessage)}</div>` : ''}
 ${
-  env.IMAGES
+  imageStore(env)
     ? ''
     : `<div class="notice" style="margin-bottom:20px;">
-         <strong>Image storage is not connected.</strong> Enable R2 in the Cloudflare dashboard,
-         create a bucket called <code>rarehaus-images</code>, then uncomment the
-         <code>[[r2_buckets]]</code> block in <code>wrangler.toml</code> and redeploy. Until then you
-         can still paste an image URL when creating a product.
+         <strong>Photo upload is not connected.</strong> Add the <code>IMAGES_KV</code> binding in
+         <code>wrangler.toml</code> and redeploy. Until then you can paste an image URL instead.
        </div>`
+}
+${
+  imageStore(env) === 'kv'
+    ? `<div class="notice" style="margin-bottom:20px;">
+         Photos upload straight from your computer and are served from rarehaus.in. Video needs R2
+         enabled in the Cloudflare dashboard — a stored photo is fine on the free plan, a video file
+         is too large for it.
+       </div>`
+    : ''
 }
 
 <div class="grid grid-2" style="gap:24px; align-items:start; margin-bottom:32px;">
   <div class="panel" style="padding:22px;">
     <h3 class="serif" style="font-size:20px; margin:0 0 14px;">Add a product</h3>
-    <form method="post" action="/admin/products/create">
+    <form method="post" action="/admin/products/create" enctype="multipart/form-data">
       <div class="field"><label for="title">Title</label><input id="title" name="title" required maxlength="160"></div>
       <div class="form-row">
         <div class="field"><label for="category_id">Category</label>
@@ -714,13 +721,24 @@ ${
       </div>
       <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="3" maxlength="1200"></textarea></div>
       <div class="field"><label for="condition">Condition notes</label><input id="condition" name="condition" maxlength="200"></div>
-      <div class="field"><label for="image">Image URL (optional)</label><input id="image" name="image" maxlength="400" placeholder="https://...">
+      ${
+        imageStore(env)
+          ? `<div class="field"><label for="photo">Photo</label><input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif">
+               <span class="hint">
+                 Pick a file straight off your computer &mdash; JPEG, PNG, WEBP or GIF, up to 5&nbsp;MB.
+                 It is stored on rarehaus.in itself, so it always loads. Add more photos, and set
+                 their order, from the table below once the product is saved.
+                 Only use photographs you took or have written permission to use: brand press
+                 images and another reseller's photos are someone else's copyright.
+               </span>
+             </div>`
+          : ''
+      }
+      <div class="field"><label for="image">Or an image URL</label><input id="image" name="image" maxlength="400" placeholder="https://...">
         <span class="hint">
-          A Google Drive share link is converted automatically, but Google throttles hotlinked
-          Drive images and they can stop loading without warning — fine to get going, not for
-          real stock. Enable R2 and upload the file directly instead.
-          Only use photographs you took or have written permission to use: brand press images and
-          another reseller's photos are someone else's copyright.
+          Only needed if the photo lives somewhere else already. A Google Drive share link is
+          converted automatically, but Google throttles hotlinked Drive images and they can stop
+          loading without warning &mdash; uploading the file above is the reliable option.
         </span>
       </div>
       <div class="field"><label for="video">Video URL (optional)</label><input id="video" name="video" maxlength="400" placeholder="YouTube, Vimeo, or a direct .mp4 link">
@@ -745,13 +763,13 @@ ${
         </div>
         <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
           <input type="checkbox" id="p_inhouse" name="inhouse" value="1" style="width:auto;" checked>
-          <label for="p_inhouse" style="margin:0;">Sourced and imported by us (in-house — no seller commission)</label>
+          <label for="p_inhouse" style="margin:0;">Inhaus — sourced and imported by us (no seller commission)</label>
         </div>
         <div class="field"><label for="p_seller">Or a marketplace seller</label>
           <select id="p_seller" name="seller_id">
             ${sellers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)} — ${escapeHtml(s.city)}</option>`).join('')}
           </select>
-          <span class="hint">Ignored while "sourced in-house" is ticked.</span>
+          <span class="hint">Ignored while "Inhaus" is ticked.</span>
         </div>
       </div>
 
@@ -775,14 +793,14 @@ ${
       </div>
       <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
         <input type="checkbox" id="inhouse" name="inhouse" value="1" style="width:auto;">
-        <label for="inhouse" style="margin:0;">Sourced and imported by us directly (in-house — no seller commission)</label>
+        <label for="inhouse" style="margin:0;">Inhaus — sourced and imported by us directly (no seller commission)</label>
       </div>
       <div class="form-row">
         <div class="field"><label for="seller_id">Seller</label>
           <select id="seller_id" name="seller_id" required>
             ${sellers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)} — ${escapeHtml(s.city)}</option>`).join('')}
           </select>
-          <span class="hint">Ignored if "sourced in-house" above is checked.</span>
+          <span class="hint">Ignored if "Inhaus" above is checked.</span>
         </div>
         <div class="field"><label for="size_label">Size</label><input id="size_label" name="size_label" value="One size" maxlength="40"></div>
       </div>
@@ -854,7 +872,7 @@ ${
               )
               .join('')}
             ${
-              env.IMAGES
+              imageStore(env)
                 ? `<form method="post" action="/admin/images/upload" enctype="multipart/form-data" style="display:flex; gap:6px; align-items:center;">
                      <input type="hidden" name="product_id" value="${p.id}">
                      <input type="file" name="file" accept="image/jpeg,image/png,image/webp,image/gif" required style="font-size:11px; max-width:170px;">
@@ -913,7 +931,7 @@ ${
           <div style="font-size:11px; color:var(--faint);">${escapeHtml(o.stock_code || '')}</div>
         </td>
         <td data-label="Size">${escapeHtml(o.size_label)}</td>
-        <td data-label="Seller">${o.sourced_by === 'inhouse' ? 'In-house' : escapeHtml(o.seller_name)}</td>
+        <td data-label="Seller">${o.sourced_by === 'inhouse' ? 'Inhaus' : escapeHtml(o.seller_name)}</td>
         <td data-label="Price" class="num">${formatINR(o.landed_price)}</td>
         <td data-label="Status">
           <span class="tag" style="color:${
@@ -983,7 +1001,16 @@ async function createProduct(request, env) {
 
   const productId = result.meta.last_row_id;
 
-  const image = normalizeImageUrl(form.get('image'));
+  // An uploaded file wins over a pasted URL: it is hosted by us, so it cannot break later.
+  let image = null;
+  const upload = form.get('photo');
+  let uploadError = '';
+  if (upload && typeof upload.arrayBuffer === 'function' && upload.size > 0) {
+    const stored = await storeImage(env, upload);
+    if (stored.ok) image = `/img/${stored.key}`;
+    else uploadError = ` The photo was not saved: ${stored.error}`;
+  }
+  if (!image) image = normalizeImageUrl(form.get('image'));
   if (image) {
     await env.DB.prepare('INSERT INTO product_images (product_id, url, alt) VALUES (?, ?, ?)')
       .bind(productId, image, title)
@@ -1007,24 +1034,44 @@ async function createProduct(request, env) {
         city,
         sellerPrice,
       });
-      return redirect('/admin/listings' + pricingWarning(priced, city));
+      const warn = pricingWarning(priced, city);
+      if (uploadError) {
+        return redirect('/admin/listings?error=' + encodeURIComponent(uploadError.trim()));
+      }
+      return redirect('/admin/listings' + warn);
     }
   }
 
   return redirect('/admin/products?error=' + encodeURIComponent(
-    'Product saved, but with no price it is not for sale yet. Add a price from the Listings page to make it buyable.'
+    'Product saved, but with no price it is not for sale yet. Add a price from the Listings page to make it buyable.' +
+      uploadError
   ));
 }
 
 // The "sourced in-house" system seller. Created on first use rather than in seed data, so
 // it exists whether or not seed.sql ever ran against this database.
+const HOUSE_SELLER_NAME = 'Inhaus (by Rarehaus)';
+
 async function ensureHouseSeller(env) {
-  const existing = await env.DB.prepare("SELECT id FROM sellers WHERE name = 'Rarehaus (in-house)'").first();
+  const existing = await env.DB.prepare('SELECT id FROM sellers WHERE name = ?')
+    .bind(HOUSE_SELLER_NAME)
+    .first();
   if (existing) return existing.id;
+
+  // Databases created before the name settled on "Inhaus" carry the old row. Rename it rather
+  // than adding a second house seller, so existing offers stay attached to it.
+  const legacy = await env.DB.prepare("SELECT id FROM sellers WHERE name = 'Rarehaus (in-house)'").first();
+  if (legacy) {
+    await env.DB.prepare('UPDATE sellers SET name = ? WHERE id = ?').bind(HOUSE_SELLER_NAME, legacy.id).run();
+    return legacy.id;
+  }
+
   const result = await env.DB.prepare(
     `INSERT INTO sellers (name, city, country, kyc_verified, legit_check)
-     VALUES ('Rarehaus (in-house)', 'Guwahati', 'India', 1, 1)`
-  ).run();
+     VALUES (?, 'Guwahati', 'India', 1, 1)`
+  )
+    .bind(HOUSE_SELLER_NAME)
+    .run();
   return result.meta.last_row_id;
 }
 
@@ -1318,7 +1365,7 @@ async function editOfferPage(env, offerId) {
     </div>
     <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
       <input type="checkbox" id="inhouse" name="inhouse" value="1" style="width:auto;" ${offer.sourced_by === 'inhouse' ? 'checked' : ''}>
-      <label for="inhouse" style="margin:0;">Sourced in-house (ignores the seller above)</label>
+      <label for="inhouse" style="margin:0;">Inhaus — sourced by us (ignores the seller above)</label>
     </div>
     <div class="form-row">
       <div class="field"><label for="ships_from">Ships from</label><input id="ships_from" name="ships_from" required maxlength="60" value="${escapeHtml(offer.ships_from)}"></div>
