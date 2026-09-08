@@ -37,7 +37,7 @@ DEMO_MODE = "false"
 # Business details. These appear in your policies, footer and contact page. Every page that
 # needs them reads from here, so fill them in once. Leaving a value blank shows a visible
 # placeholder rather than silently omitting a legally required detail.
-LEGAL_NAME = "Rehan Hussain"
+LEGAL_NAME = "Rarehaus"
 REGISTERED_ADDRESS = "Bishnu Rabha Path, Guwahati, Assam 781026, India"
 SUPPORT_EMAIL = "customer@rarehaus.in"
 SUPPORT_WHATSAPP = "+91 93959 62006"
