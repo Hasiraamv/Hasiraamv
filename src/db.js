@@ -164,19 +164,59 @@ export async function getStats(db) {
   return { sellers: sellers?.n || 0, listings: listings?.n || 0 };
 }
 
+// Buyer accounts --------------------------------------------------------------
+
+export async function getUserByEmail(db, email) {
+  return db.prepare('SELECT * FROM users WHERE email = ?').bind(String(email).toLowerCase()).first();
+}
+
+export async function getUserById(db, id) {
+  return db.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
+}
+
+export async function getUserByGoogleId(db, googleId) {
+  return db.prepare('SELECT * FROM users WHERE google_id = ?').bind(googleId).first();
+}
+
+export async function createUser(db, { email, name, passwordHash = null, googleId = null }) {
+  const result = await db
+    .prepare('INSERT INTO users (email, name, password_hash, google_id) VALUES (?, ?, ?, ?)')
+    .bind(String(email).toLowerCase(), name, passwordHash, googleId)
+    .run();
+  return result.meta.last_row_id;
+}
+
+export async function linkGoogleId(db, userId, googleId) {
+  await db.prepare('UPDATE users SET google_id = ? WHERE id = ?').bind(googleId, userId).run();
+}
+
+export async function listOrdersForUser(db, userId, limit = 50) {
+  const { results } = await db
+    .prepare(
+      `SELECT o.*, p.title AS product_title, p.slug AS product_slug
+         FROM orders o JOIN products p ON p.id = o.product_id
+        WHERE o.user_id = ?
+        ORDER BY o.created_at DESC LIMIT ?`
+    )
+    .bind(userId, limit)
+    .all();
+  return results || [];
+}
+
 // Orders --------------------------------------------------------------------
 
 export async function createOrder(db, data) {
   const result = await db
     .prepare(
       `INSERT INTO orders
-        (public_ref, offer_id, product_id, size_label, amount, seller_price, duty, auth_fee, shipping,
+        (public_ref, user_id, offer_id, product_id, size_label, amount, seller_price, duty, auth_fee, shipping,
          buyer_name, buyer_email, buyer_phone, address_line1, address_line2, city, state, pincode,
          status, payment_status, eta_min, eta_max)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'placed', 'pending', ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'placed', 'pending', ?, ?)`
     )
     .bind(
       data.publicRef,
+      data.userId || null,
       data.offerId,
       data.productId,
       data.sizeLabel,

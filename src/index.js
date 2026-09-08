@@ -19,7 +19,18 @@ import {
   cookiesPage,
   sellPage,
 } from './views/pages.js';
-import { readCart, writeCart, sameOrigin, publicRef } from './session.js';
+import { readCart, writeCart, sameOrigin, publicRef, parseCookies, cookieHeader, clearCookie } from './session.js';
+import {
+  hashPassword,
+  verifyPassword,
+  createUserToken,
+  verifyUserToken,
+  googleAuthUrl,
+  exchangeGoogleCode,
+  randomState,
+} from './auth.js';
+import { sendWelcomeEmail } from './email.js';
+import { signupPage, loginPage, accountPage } from './views/account.js';
 
 export default {
   async fetch(request, env, ctx) {
@@ -74,34 +85,45 @@ async function route(request, env, ctx) {
   }
 
   const cart = readCart(request);
+  const user = await getSessionUser(request, env);
 
-  if (path === '/') return homeRoute(request, env, cart);
-  if (path === '/search') return searchRoute(request, env, url, cart);
-  if (path.startsWith('/c/')) return categoryRoute(request, env, url, path.slice(3), cart);
-  if (path.startsWith('/p/')) return productRoute(request, env, url, path.slice(3), cart);
+  if (path === '/account/signup' && method === 'GET') return html(layout({ title: 'Create an account', env, user, cartCount: cart.length, body: signupPage({}) }));
+  if (path === '/account/signup' && method === 'POST') return accountSignup(request, env, cart, ctx);
+  if (path === '/account/login' && method === 'GET') return html(layout({ title: 'Sign in', env, user, cartCount: cart.length, body: loginPage({}) }));
+  if (path === '/account/login' && method === 'POST') return accountLogin(request, env, cart);
+  if (path === '/account/logout' && method === 'POST') return redirect('/', { 'set-cookie': clearCookie('rh_user') });
+  if (path === '/account') return accountRoute(request, env, cart, user);
 
-  if (path === '/cart') return cartRoute(request, env, cart);
-  if (path === '/cart/add' && method === 'POST') return cartAdd(request, env, cart);
-  if (path === '/cart/remove' && method === 'POST') return cartRemove(request, env, cart);
+  if (path === '/auth/google/start') return googleStart(request, env);
+  if (path === '/auth/google/callback') return googleCallback(request, env, ctx);
 
-  if (path === '/checkout' && method === 'GET') return checkoutRoute(request, env, cart);
-  if (path === '/checkout' && method === 'POST') return checkoutSubmit(request, env, cart);
+  if (path === '/') return homeRoute(request, env, cart, user);
+  if (path === '/search') return searchRoute(request, env, url, cart, user);
+  if (path.startsWith('/c/')) return categoryRoute(request, env, url, path.slice(3), cart, user);
+  if (path.startsWith('/p/')) return productRoute(request, env, url, path.slice(3), cart, user);
 
-  if (path === '/track') return trackRoute(request, env, url, cart);
-  if (path.startsWith('/order/')) return orderRoute(request, env, decodeURIComponent(path.slice(7)), cart);
+  if (path === '/cart') return cartRoute(request, env, cart, user);
+  if (path === '/cart/add' && method === 'POST') return cartAdd(request, env, cart, user);
+  if (path === '/cart/remove' && method === 'POST') return cartRemove(request, env, cart, user);
 
-  if (path === '/verify') return verifyRoute(request, env, url, cart);
+  if (path === '/checkout' && method === 'GET') return checkoutRoute(request, env, cart, user);
+  if (path === '/checkout' && method === 'POST') return checkoutSubmit(request, env, cart, user);
+
+  if (path === '/track') return trackRoute(request, env, url, cart, user);
+  if (path.startsWith('/order/')) return orderRoute(request, env, decodeURIComponent(path.slice(7)), cart, user);
+
+  if (path === '/verify') return verifyRoute(request, env, url, cart, user);
   if (path.startsWith('/certificate/'))
-    return certificateRoute(request, env, decodeURIComponent(path.slice(13)), cart);
+    return certificateRoute(request, env, decodeURIComponent(path.slice(13)), cart, user);
 
   if (path === '/sourcing-requests' && method === 'POST') return sourcingSubmit(request, env);
 
-  if (path === '/sell' && method === 'POST') return sellerApply(request, env, cart);
+  if (path === '/sell' && method === 'POST') return sellerApply(request, env, cart, user);
 
   const staticPage = STATIC_PAGES[path];
   if (staticPage) {
     return html(
-      layout({ title: staticPage.title, env, cartCount: cart.length, body: staticPage.body(env, url) })
+      layout({ title: staticPage.title, env, user, cartCount: cart.length, body: staticPage.body(env, url) })
     );
   }
 
@@ -109,6 +131,7 @@ async function route(request, env, ctx) {
     layout({
       title: 'Not found',
       env,
+      user,
       cartCount: cart.length,
       body: `<section class="section"><h2 class="serif" style="font-size:34px;">Page not found</h2>
              <p class="muted">That page does not exist. <a href="/c/all">Browse listings</a>.</p></section>`,
@@ -117,9 +140,149 @@ async function route(request, env, ctx) {
   );
 }
 
+// Buyer accounts --------------------------------------------------------------
+// Optional throughout: checkout never requires a signed-in buyer. A session is a signed
+// cookie carrying a user id, verified against SESSION_SECRET the same way admin sessions are.
+
+async function getSessionUser(request, env) {
+  if (!env.SESSION_SECRET) return null;
+  const token = parseCookies(request).rh_user;
+  const userId = await verifyUserToken(env.SESSION_SECRET, token);
+  if (!userId) return null;
+  return db.getUserById(env.DB, userId);
+}
+
+async function setUserSessionHeader(env, userId) {
+  const token = await createUserToken(env.SESSION_SECRET, userId);
+  return cookieHeader('rh_user', token);
+}
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+async function accountSignup(request, env, cart, ctx) {
+  const form = await request.formData();
+  const name = String(form.get('name') || '').trim().slice(0, 120);
+  const email = String(form.get('email') || '').trim().toLowerCase().slice(0, 160);
+  const password = String(form.get('password') || '');
+
+  const fail = (msg) =>
+    html(
+      layout({
+        title: 'Create an account',
+        env,
+        cartCount: cart.length,
+        body: signupPage({ error: msg }),
+      }),
+      400
+    );
+
+  if (!name) return fail('Please enter your name.');
+  if (!EMAIL_RE.test(email)) return fail('Please enter a valid email.');
+  if (password.length < 8) return fail('Password must be at least 8 characters.');
+
+  const existing = await db.getUserByEmail(env.DB, email);
+  if (existing) return fail('An account with that email already exists. Try signing in instead.');
+
+  const passwordHash = await hashPassword(password);
+  const userId = await db.createUser(env.DB, { email, name, passwordHash });
+  ctx.waitUntil(sendWelcomeEmail(env, { to: email, name }).catch((err) => console.error('Welcome email failed:', err)));
+
+  return redirect('/account', { 'set-cookie': await setUserSessionHeader(env, userId) });
+}
+
+async function accountLogin(request, env, cart) {
+  const form = await request.formData();
+  const email = String(form.get('email') || '').trim().toLowerCase().slice(0, 160);
+  const password = String(form.get('password') || '');
+
+  const fail = () =>
+    html(
+      layout({
+        title: 'Sign in',
+        env,
+        cartCount: cart.length,
+        body: loginPage({ error: 'Incorrect email or password.' }),
+      }),
+      400
+    );
+
+  const user = await db.getUserByEmail(env.DB, email);
+  if (!user || !(await verifyPassword(password, user.password_hash))) return fail();
+
+  return redirect('/account', { 'set-cookie': await setUserSessionHeader(env, user.id) });
+}
+
+async function accountRoute(request, env, cart, user) {
+  if (!user) return redirect('/account/login');
+  const orders = await db.listOrdersForUser(env.DB, user.id);
+  return html(
+    layout({ title: 'Your account', env, user, cartCount: cart.length, body: accountPage({ user, orders }) })
+  );
+}
+
+function googleRedirectUri(request) {
+  const url = new URL(request.url);
+  return `${url.protocol}//${url.host}/auth/google/callback`;
+}
+
+async function googleStart(request, env) {
+  if (!env.GOOGLE_CLIENT_ID) {
+    return html('Google sign-in is not configured yet.', 501);
+  }
+  const state = randomState();
+  const redirectUri = googleRedirectUri(request);
+  const authUrl = googleAuthUrl(env, redirectUri, state);
+  return redirect(authUrl, { 'set-cookie': cookieHeader('rh_oauth_state', state, { maxAge: 600 }) });
+}
+
+async function googleCallback(request, env, ctx) {
+  const url = new URL(request.url);
+  const code = url.searchParams.get('code');
+  const state = url.searchParams.get('state');
+  const expectedState = parseCookies(request).rh_oauth_state;
+
+  if (!code || !state || !expectedState || state !== expectedState) {
+    return redirect('/account/login');
+  }
+
+  const redirectUri = googleRedirectUri(request);
+  const profile = await exchangeGoogleCode(env, code, redirectUri);
+  if (!profile) return redirect('/account/login');
+
+  let user = await db.getUserByGoogleId(env.DB, profile.googleId);
+  let isNew = false;
+  if (!user) {
+    user = await db.getUserByEmail(env.DB, profile.email);
+    if (user) {
+      await db.linkGoogleId(env.DB, user.id, profile.googleId);
+    } else {
+      const userId = await db.createUser(env.DB, {
+        email: profile.email,
+        name: profile.name,
+        googleId: profile.googleId,
+      });
+      user = { id: userId };
+      isNew = true;
+    }
+  }
+
+  if (isNew) {
+    ctx.waitUntil(
+      sendWelcomeEmail(env, { to: profile.email, name: profile.name }).catch((err) =>
+        console.error('Welcome email failed:', err)
+      )
+    );
+  }
+
+  return redirect('/account', {
+    'set-cookie': await setUserSessionHeader(env, user.id),
+  });
+}
+
+
 // Routes ---------------------------------------------------------------------
 
-async function homeRoute(request, env, cart) {
+async function homeRoute(request, env, cart, user) {
   const [categories, newArrivals, regions, stats] = await Promise.all([
     db.getCategories(env.DB),
     db.listProducts(env.DB, { sort: 'new', limit: 8 }),
@@ -145,6 +308,7 @@ async function homeRoute(request, env, cart) {
   return html(
     layout({
       env,
+      user,
       cartCount: cart.length,
       description:
         'Authenticated imports. Every verified seller compared, every piece checked twice, delivery windows shown upfront.',
@@ -167,13 +331,14 @@ function parseFilters(url) {
   return f;
 }
 
-async function categoryRoute(request, env, url, slug, cart) {
+async function categoryRoute(request, env, url, slug, cart, user) {
   const category = slug === 'all' ? null : await db.getCategoryBySlug(env.DB, slug);
   if (slug !== 'all' && !category) {
     return html(
       layout({
         title: 'Not found',
         env,
+        user,
         cartCount: cart.length,
         body: `<section class="section"><h2 class="serif" style="font-size:34px;">No such category</h2>
                <p class="muted"><a href="/c/all">See everything</a>.</p></section>`,
@@ -197,19 +362,21 @@ async function categoryRoute(request, env, url, slug, cart) {
     layout({
       title: category ? category.name : 'All listings',
       env,
+      user,
       cartCount: cart.length,
       body: categoryPage({ category, products, filters: f, total: products.length }),
     })
   );
 }
 
-async function searchRoute(request, env, url, cart) {
+async function searchRoute(request, env, url, cart, user) {
   const q = (url.searchParams.get('q') || '').trim().slice(0, 80);
   const products = q ? await db.listProducts(env.DB, { search: q, limit: 48 }) : [];
   return html(
     layout({
       title: q ? `Search: ${q}` : 'Search',
       env,
+      user,
       cartCount: cart.length,
       body: categoryPage({
         category: { name: q ? `Results for “${q}”` : 'Search', blurb: null },
@@ -221,13 +388,14 @@ async function searchRoute(request, env, url, cart) {
   );
 }
 
-async function productRoute(request, env, url, slug, cart) {
+async function productRoute(request, env, url, slug, cart, user) {
   const product = await db.getProductBySlug(env.DB, slug);
   if (!product) {
     return html(
       layout({
         title: 'Not found',
         env,
+        user,
         cartCount: cart.length,
         body: `<section class="section"><h2 class="serif" style="font-size:34px;">Listing not found</h2>
                <p class="muted">It may have sold. <a href="/c/all">Browse what is live</a>.</p></section>`,
@@ -247,6 +415,7 @@ async function productRoute(request, env, url, slug, cart) {
       title: product.title,
       description: product.description,
       env,
+      user,
       cartCount: cart.length,
       body: productPage({
         product,
@@ -270,15 +439,15 @@ async function loadCartItems(env, cart) {
   return items;
 }
 
-async function cartRoute(request, env, cart) {
+async function cartRoute(request, env, cart, user) {
   const items = await loadCartItems(env, cart);
   const total = items.reduce((s, i) => s + i.landed_price, 0);
   return html(
-    layout({ title: 'Your bag', env, cartCount: items.length, body: cartPage({ items, total }) })
+    layout({ title: 'Your bag', env, user, cartCount: items.length, body: cartPage({ items, total }) })
   );
 }
 
-async function cartAdd(request, env, cart) {
+async function cartAdd(request, env, cart, user) {
   const form = await request.formData();
   const offerId = Number(form.get('offer_id'));
   const offer = Number.isInteger(offerId) ? await db.getOfferById(env.DB, offerId) : null;
@@ -287,23 +456,23 @@ async function cartAdd(request, env, cart) {
   return redirect('/cart', { 'set-cookie': writeCart(next) });
 }
 
-async function cartRemove(request, env, cart) {
+async function cartRemove(request, env, cart, user) {
   const form = await request.formData();
   const offerId = Number(form.get('offer_id'));
   const next = cart.filter((id) => id !== offerId);
   return redirect('/cart', { 'set-cookie': writeCart(next) });
 }
 
-async function checkoutRoute(request, env, cart) {
+async function checkoutRoute(request, env, cart, user) {
   const items = await loadCartItems(env, cart);
   if (!items.length) return redirect('/cart');
   const total = items.reduce((s, i) => s + i.landed_price, 0);
   return html(
-    layout({ title: 'Checkout', env, cartCount: items.length, body: checkoutPage({ items, total }) })
+    layout({ title: 'Checkout', env, user, cartCount: items.length, body: checkoutPage({ items, total }) })
   );
 }
 
-async function checkoutSubmit(request, env, cart) {
+async function checkoutSubmit(request, env, cart, user) {
   const items = await loadCartItems(env, cart);
   if (!items.length) return redirect('/cart');
 
@@ -336,6 +505,7 @@ async function checkoutSubmit(request, env, cart) {
       layout({
         title: 'Checkout',
         env,
+        user,
         cartCount: items.length,
         body: checkoutPage({ items, total, error: `Please enter ${errors.join(', ')}.` }),
       }),
@@ -351,6 +521,7 @@ async function checkoutSubmit(request, env, cart) {
     if (!firstRef) firstRef = ref;
     await db.createOrder(env.DB, {
       publicRef: ref,
+      userId: user?.id,
       offerId: offer.id,
       productId: offer.product_id,
       sizeLabel: offer.size_label,
@@ -370,6 +541,7 @@ async function checkoutSubmit(request, env, cart) {
     layout({
       title: 'Order placed',
       env,
+      user,
       cartCount: 0,
       body: orderPlacedPage({ order }),
     }),
@@ -378,10 +550,10 @@ async function checkoutSubmit(request, env, cart) {
   );
 }
 
-async function trackRoute(request, env, url, cart) {
+async function trackRoute(request, env, url, cart, user) {
   const ref = (url.searchParams.get('ref') || '').trim();
   if (!ref) {
-    return html(layout({ title: 'Track order', env, cartCount: cart.length, body: trackPage({}) }));
+    return html(layout({ title: 'Track order', env, user, cartCount: cart.length, body: trackPage({}) }));
   }
   const order = await db.getOrderByRef(env.DB, ref);
   if (!order) {
@@ -389,6 +561,7 @@ async function trackRoute(request, env, url, cart) {
       layout({
         title: 'Track order',
         env,
+        user,
         cartCount: cart.length,
         body: trackPage({ error: `No order found with reference ${escapeHtml(ref)}.` }),
       }),
@@ -398,13 +571,14 @@ async function trackRoute(request, env, url, cart) {
   return redirect(`/order/${encodeURIComponent(order.public_ref)}`);
 }
 
-async function orderRoute(request, env, ref, cart) {
+async function orderRoute(request, env, ref, cart, user) {
   const order = await db.getOrderByRef(env.DB, ref);
   if (!order) {
     return html(
       layout({
         title: 'Track order',
         env,
+        user,
         cartCount: cart.length,
         body: trackPage({ error: 'No order with that reference.' }),
       }),
@@ -426,13 +600,14 @@ async function orderRoute(request, env, ref, cart) {
     layout({
       title: `Order ${order.public_ref}`,
       env,
+      user,
       cartCount: cart.length,
       body: orderPage({ order, events, certificate }),
     })
   );
 }
 
-async function verifyRoute(request, env, url, cart) {
+async function verifyRoute(request, env, url, cart, user) {
   const no = (url.searchParams.get('no') || '').trim();
   const code = (url.searchParams.get('code') || '').trim();
   const result = no ? await verifyCertificate(env.DB, no, code) : null;
@@ -440,13 +615,14 @@ async function verifyRoute(request, env, url, cart) {
     layout({
       title: 'Verify a certificate',
       env,
+      user,
       cartCount: cart.length,
       body: verifyPage({ query: no, code, result }),
     })
   );
 }
 
-async function certificateRoute(request, env, certNo, cart) {
+async function certificateRoute(request, env, certNo, cart, user) {
   const cert = await env.DB.prepare(
     `SELECT c.*, a.initials AS authenticator_initials
        FROM certificates c LEFT JOIN authenticators a ON a.id = c.authenticator_id
@@ -460,6 +636,7 @@ async function certificateRoute(request, env, certNo, cart) {
       layout({
         title: 'Certificate',
         env,
+        user,
         cartCount: cart.length,
         body: `<section class="section"><h2 class="serif" style="font-size:34px;">No such certificate</h2>
                <p class="muted"><a href="/verify">Try the verifier</a>.</p></section>`,
@@ -472,6 +649,7 @@ async function certificateRoute(request, env, certNo, cart) {
     layout({
       title: `Certificate ${cert.certificate_no}`,
       env,
+      user,
       cartCount: cart.length,
       body: certificatePage({ cert, siteName: env.SITE_NAME || 'Rarehaus' }),
     })
@@ -513,7 +691,7 @@ const STATIC_PAGES = {
   },
 };
 
-async function sellerApply(request, env, cart) {
+async function sellerApply(request, env, cart, user) {
   const form = await request.formData();
   const get = (k, max) => String(form.get(k) || '').trim().slice(0, max);
 
@@ -543,6 +721,7 @@ async function sellerApply(request, env, cart) {
       layout({
         title: 'Sell with us',
         env,
+        user,
         cartCount: cart.length,
         body: sellPage({
           error: 'Please fill in the business name, your name, a valid email, city and country.',
