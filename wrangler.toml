@@ -15,8 +15,17 @@ binding = "DB"
 database_name = "mintmark"
 database_id = "8932b638-5ed4-4173-9fe3-c27c5203954c"
 
-# Product photo storage. Uncomment once R2 is enabled in the dashboard and the bucket exists,
-# otherwise `wrangler deploy` fails because the bucket cannot be found.
+# Product photo storage, free tier, no payment method required: KV is on the Workers free
+# plan (1 GB, 100k reads/day), which is far more than a shop this size needs for photos.
+# Uploading from the admin panel works off this binding alone.
+[[kv_namespaces]]
+binding = "IMAGES_KV"
+id = "61f557640dc14e97a45909d00fc8258c"
+
+# R2 is the better home for photos at volume, and the only option for video (a KV value
+# tops out at 25 MB). It needs R2 enabled in the dashboard, which asks for a card even
+# though the free tier covers this shop. Uncomment once that is done and the bucket exists;
+# images already uploaded to KV keep serving either way.
 # [[r2_buckets]]
 # binding = "IMAGES"
 # bucket_name = "rarehaus-images"

@@ -210,7 +210,7 @@ ${
           // several of them are named after the city they trade in. A piece we imported
           // ourselves has no dealer to anonymise, so it says so plainly instead.
           const inhouse = o.sourced_by === 'inhouse';
-          const label = inhouse ? 'Sourced directly by us' : `Verified seller ${String.fromCharCode(65 + i)}`;
+          const label = inhouse ? 'Inhaus — sourced by us' : `Verified seller ${String.fromCharCode(65 + i)}`;
           return `
         <tr${i === 0 ? ' class="best"' : ''}>
           <td data-label="Seller">

@@ -17,6 +17,9 @@ FACTS ABOUT ${site.toUpperCase()}:
   seller price + import duty + authentication fee + shipping, all included, nothing added at checkout.
 - Every piece is authenticated twice: once by the seller before listing, once independently in-house
   before it ships. Only after passing does it get sealed and a numbered certificate issued.
+- Some listings are marked "Inhaus". That means Rarehaus imported the piece itself rather than
+  buying it through a seller, so there is no seller commission in the price. Inhaus pieces show a
+  NO MIDDLEMAN mark and go through exactly the same authentication and certificate as everything else.
 - Certificate numbers look like RH-26-SNK-00248-M and can be checked at /verify. The check character
   makes a typo or invented number fail instantly.
 - Order tracking has four buyer-facing stages: Order placed, Shipped, Out for delivery, Delivered.

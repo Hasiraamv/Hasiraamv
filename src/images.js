@@ -61,10 +61,21 @@ function randomKey(ext) {
   return `${hex}.${ext}`;
 }
 
+// Two storage backends, because R2 needs a card on file and KV does not. R2 is preferred
+// when it is bound (no per-object size ceiling worth worrying about, cheaper at volume);
+// KV is the free fallback that covers product photos at a small shop's scale. Video only
+// ever goes to R2 -- a KV value tops out at 25 MB.
+export function imageStore(env) {
+  if (env.IMAGES) return 'r2';
+  if (env.IMAGES_KV) return 'kv';
+  return null;
+}
+
 // Returns { ok, key, error }.
 export async function storeImage(env, file) {
-  if (!env.IMAGES) {
-    return { ok: false, error: 'Image storage is not connected. Enable R2 and add the IMAGES binding.' };
+  const store = imageStore(env);
+  if (!store) {
+    return { ok: false, error: 'Image storage is not connected. Add the IMAGES_KV or IMAGES binding.' };
   }
   if (!file || typeof file.arrayBuffer !== 'function' || file.size === 0) {
     return { ok: false, error: 'No file was uploaded.' };
@@ -77,6 +88,12 @@ export async function storeImage(env, file) {
   const sig = sniffImageType(buffer);
   if (!sig) {
     return { ok: false, error: 'That is not a JPEG, PNG, WEBP or GIF image.' };
+  }
+
+  if (store === 'kv') {
+    const key = randomKey(sig.ext);
+    await env.IMAGES_KV.put(key, buffer, { metadata: { contentType: sig.type } });
+    return { ok: true, key, contentType: sig.type };
   }
 
   const key = randomKey(sig.ext);
@@ -124,26 +141,39 @@ export async function storeVideo(env, file) {
 const KEY_PATTERN = /^[0-9a-f]{32}\.(jpg|png|webp|gif|mp4|webm)$/;
 
 export async function serveImage(env, key) {
-  if (!env.IMAGES || !KEY_PATTERN.test(key)) {
-    return new Response('Not found', { status: 404 });
-  }
-
-  const object = await env.IMAGES.get(key);
-  if (!object) return new Response('Not found', { status: 404 });
+  if (!KEY_PATTERN.test(key)) return new Response('Not found', { status: 404 });
 
   const headers = new Headers();
-  object.writeHttpMetadata(headers);
-  headers.set('etag', object.httpEtag);
   headers.set('cache-control', 'public, max-age=31536000, immutable');
   headers.set('x-content-type-options', 'nosniff');
-  return new Response(object.body, { headers });
+
+  if (env.IMAGES) {
+    const object = await env.IMAGES.get(key);
+    if (object) {
+      object.writeHttpMetadata(headers);
+      headers.set('etag', object.httpEtag);
+      return new Response(object.body, { headers });
+    }
+  }
+
+  // Fall through to KV even when R2 is bound, so anything uploaded before R2 was turned on
+  // keeps loading instead of 404ing the moment the better backend appears.
+  if (env.IMAGES_KV) {
+    const { value, metadata } = await env.IMAGES_KV.getWithMetadata(key, { type: 'arrayBuffer' });
+    if (value) {
+      headers.set('content-type', metadata?.contentType || 'application/octet-stream');
+      return new Response(value, { headers });
+    }
+  }
+
+  return new Response('Not found', { status: 404 });
 }
 
 export async function deleteImage(env, url) {
   const key = String(url || '').replace(/^\/img\//, '');
-  if (env.IMAGES && KEY_PATTERN.test(key)) {
-    await env.IMAGES.delete(key);
-  }
+  if (!KEY_PATTERN.test(key)) return;
+  if (env.IMAGES) await env.IMAGES.delete(key);
+  if (env.IMAGES_KV) await env.IMAGES_KV.delete(key);
 }
 
 // A Google Drive "share" link points at a viewer page, not the file, so dropping one into
