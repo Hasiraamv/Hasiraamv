@@ -82,6 +82,31 @@ export async function adminRouter(request, env, path) {
   if (path === '/admin/products/create' && method === 'POST') return createProduct(request, env);
   if (path === '/admin/offers/create' && method === 'POST') return createOffer(request, env);
   if (path === '/admin/offers/status' && method === 'POST') return setOfferStatus(request, env);
+
+  {
+    const m = path.match(/^\/admin\/products\/(\d+)\/edit$/);
+    if (m) return editProductPage(env, Number(m[1]));
+  }
+  {
+    const m = path.match(/^\/admin\/products\/(\d+)\/update$/);
+    if (m && method === 'POST') return updateProduct(request, env, Number(m[1]));
+  }
+  {
+    const m = path.match(/^\/admin\/products\/(\d+)\/delete$/);
+    if (m && method === 'POST') return deleteProduct(request, env, Number(m[1]));
+  }
+  {
+    const m = path.match(/^\/admin\/offers\/(\d+)\/edit$/);
+    if (m) return editOfferPage(env, Number(m[1]));
+  }
+  {
+    const m = path.match(/^\/admin\/offers\/(\d+)\/update$/);
+    if (m && method === 'POST') return updateOffer(request, env, Number(m[1]));
+  }
+  {
+    const m = path.match(/^\/admin\/offers\/(\d+)\/delete$/);
+    if (m && method === 'POST') return deleteOffer(request, env, Number(m[1]));
+  }
   if (path === '/admin/images/upload' && method === 'POST') return uploadImage(request, env);
   if (path === '/admin/images/delete' && method === 'POST') return removeImage(request, env);
   if (path === '/admin/images/reorder' && method === 'POST') return reorderImage(request, env);
@@ -724,7 +749,7 @@ ${
           ${!p.offer_count ? `<div><a href="/admin/products?offer_for=${p.id}#offer-form" style="font-size:11px; color:var(--oxblood);">Add an offer &rarr;</a></div>` : ''}
         </td>
         <td data-label="Lowest" class="num">${p.lowest ? formatINR(p.lowest) : '—'}</td>
-        <td><a href="/p/${escapeHtml(p.slug)}" target="_blank">View</a></td>
+        <td><a href="/p/${escapeHtml(p.slug)}" target="_blank">View</a> &middot; <a href="/admin/products/${p.id}/edit">Edit</a></td>
       </tr>`;
       })
       .join('')}
@@ -756,10 +781,11 @@ ${
             o.status === 'active' ? 'var(--green)' : o.status === 'withdrawn' ? 'var(--oxblood)' : 'var(--muted)'
           };">${escapeHtml(o.status)}</span>
         </td>
-        <td>
+        <td style="white-space:nowrap;">
+          <a href="/admin/offers/${o.id}/edit" style="font-size:12.5px;">Edit</a>
           ${
             canToggle
-              ? `<form method="post" action="/admin/offers/status">
+              ? ` &middot; <form method="post" action="/admin/offers/status" style="display:inline;">
                    <input type="hidden" name="offer_id" value="${o.id}">
                    <input type="hidden" name="status" value="${nextStatus}">
                    <button class="chip" type="submit" style="cursor:pointer;">${label}</button>
@@ -922,6 +948,270 @@ async function setOfferStatus(request, env) {
     .bind(status, offerId)
     .run();
 
+  return redirect('/admin/products');
+}
+
+// Edit / delete -----------------------------------------------------------------
+// Deletion is only ever offered when nothing real depends on the row -- a product or
+// offer that already has an order against it can be withdrawn but never deleted, so order
+// history and certificates never end up pointing at something that no longer exists.
+
+async function editProductPage(env, productId) {
+  const [product, categories, images] = await Promise.all([
+    env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first(),
+    db.getCategories(env.DB),
+    env.DB.prepare('SELECT id, url FROM product_images WHERE product_id = ? ORDER BY sort_order')
+      .bind(productId)
+      .all()
+      .then((r) => r.results || []),
+  ]);
+  if (!product) return adminHtml('<div class="notice">No such product.</div>', 404);
+
+  const orderCount = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM orders o JOIN offers ofr ON ofr.id = o.offer_id WHERE ofr.product_id = ?`
+  )
+    .bind(productId)
+    .first();
+  const canDelete = (orderCount?.n || 0) === 0;
+
+  return adminHtml(`
+<h2 class="serif" style="font-size:32px; margin:0 0 22px;">Edit product</h2>
+<div class="panel" style="padding:22px; max-width:640px;">
+  <form method="post" action="/admin/products/${product.id}/update">
+    <div class="field"><label for="title">Title</label><input id="title" name="title" required maxlength="160" value="${escapeHtml(product.title)}"></div>
+    <div class="form-row">
+      <div class="field"><label for="category_id">Category</label>
+        <select id="category_id" name="category_id" required>
+          ${categories
+            .map(
+              (c) =>
+                `<option value="${c.id}"${c.id === product.category_id ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
+            )
+            .join('')}
+        </select>
+      </div>
+      <div class="field"><label for="size_type">Sizing</label>
+        <select id="size_type" name="size_type">
+          ${['none', 'uk', 'eu', 'apparel']
+            .map(
+              (v) =>
+                `<option value="${v}"${v === product.size_type ? ' selected' : ''}>${v === 'none' ? 'None' : v.toUpperCase()}</option>`
+            )
+            .join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label for="sku">Style / SKU</label><input id="sku" name="sku" maxlength="60" value="${escapeHtml(product.sku || '')}"></div>
+      <div class="field"><label for="retail">Retail price (₹)</label><input id="retail" name="retail" inputmode="numeric" maxlength="12" value="${product.retail_price || ''}"></div>
+    </div>
+    <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="3" maxlength="1200">${escapeHtml(product.description || '')}</textarea></div>
+    <div class="field"><label for="condition">Condition notes</label><input id="condition" name="condition" maxlength="200" value="${escapeHtml(product.condition_notes || '')}"></div>
+    <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
+      <input type="checkbox" id="is_published" name="is_published" value="1" style="width:auto;" ${product.is_published ? 'checked' : ''}>
+      <label for="is_published" style="margin:0;">Published (visible on the site)</label>
+    </div>
+    <button class="btn btn-block" type="submit">Save changes</button>
+  </form>
+</div>
+
+<h3 class="serif" style="font-size:20px; margin:28px 0 12px;">Photos</h3>
+<div style="display:flex; gap:10px; flex-wrap:wrap;">
+  ${
+    images.length
+      ? images
+          .map((im) => `<img src="${escapeHtml(im.url)}" alt="" style="width:70px; height:70px; object-fit:cover; border:1px solid var(--line);">`)
+          .join('')
+      : '<span class="faint">None yet — manage photos from the catalogue table.</span>'
+  }
+</div>
+
+<div style="margin-top:32px; padding-top:20px; border-top:1px solid var(--line);">
+  ${
+    canDelete
+      ? `<form method="post" action="/admin/products/${product.id}/delete" onsubmit="return confirm('Delete this product and all its offers permanently? This cannot be undone.');">
+           <button class="btn" type="submit" style="background:var(--oxblood);">Delete this product</button>
+         </form>`
+      : `<p class="muted" style="font-size:12.5px;">This product has real orders against it, so it can't be deleted — withdraw its offers instead.</p>`
+  }
+</div>
+
+<p style="margin-top:20px;"><a href="/admin/products">&larr; Back to products</a></p>`);
+}
+
+async function updateProduct(request, env, productId) {
+  const form = await request.formData();
+  const title = String(form.get('title') || '').trim();
+  const categoryId = Number(form.get('category_id'));
+  if (!title || !Number.isInteger(categoryId)) return redirect(`/admin/products/${productId}/edit`);
+
+  const num = (k) => {
+    const v = String(form.get(k) || '').replace(/[^\d]/g, '');
+    return v ? Number(v) : null;
+  };
+
+  await env.DB.prepare(
+    `UPDATE products SET title = ?, category_id = ?, sku = ?, description = ?, condition_notes = ?,
+       retail_price = ?, size_type = ?, is_published = ? WHERE id = ?`
+  )
+    .bind(
+      title,
+      categoryId,
+      String(form.get('sku') || '').trim() || null,
+      String(form.get('description') || '').trim() || null,
+      String(form.get('condition') || '').trim() || null,
+      num('retail'),
+      String(form.get('size_type') || 'none'),
+      form.get('is_published') === '1' ? 1 : 0,
+      productId
+    )
+    .run();
+
+  return redirect('/admin/products');
+}
+
+async function deleteProduct(request, env, productId) {
+  const orderCount = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM orders o JOIN offers ofr ON ofr.id = o.offer_id WHERE ofr.product_id = ?`
+  )
+    .bind(productId)
+    .first();
+  if ((orderCount?.n || 0) > 0) return redirect('/admin/products');
+
+  const images = await env.DB.prepare('SELECT url FROM product_images WHERE product_id = ?').bind(productId).all();
+  for (const im of images.results || []) {
+    await deleteImage(env, im.url);
+  }
+  const product = await env.DB.prepare('SELECT video_url FROM products WHERE id = ?').bind(productId).first();
+  if (product?.video_url) await deleteImage(env, product.video_url);
+
+  // product_images and offers both reference products with ON DELETE CASCADE, so this
+  // takes the rest of the row's data with it.
+  await env.DB.prepare('DELETE FROM products WHERE id = ?').bind(productId).run();
+  return redirect('/admin/products');
+}
+
+async function editOfferPage(env, offerId) {
+  const offer = await env.DB.prepare(
+    `SELECT o.*, p.title AS product_title FROM offers o JOIN products p ON p.id = o.product_id WHERE o.id = ?`
+  )
+    .bind(offerId)
+    .first();
+  if (!offer) return adminHtml('<div class="notice">No such offer.</div>', 404);
+
+  const sellers = await env.DB.prepare('SELECT * FROM sellers ORDER BY name').all().then((r) => r.results || []);
+  const orderCount = await env.DB.prepare('SELECT COUNT(*) AS n FROM orders WHERE offer_id = ?').bind(offerId).first();
+  const canDelete = (orderCount?.n || 0) === 0;
+
+  return adminHtml(`
+<h2 class="serif" style="font-size:32px; margin:0 0 6px;">Edit offer</h2>
+<p class="muted" style="font-size:13px; margin:0 0 20px;">${escapeHtml(offer.product_title)} &middot; ${escapeHtml(offer.stock_code || '')}</p>
+<div class="panel" style="padding:22px; max-width:640px;">
+  <form method="post" action="/admin/offers/${offer.id}/update">
+    <div class="form-row">
+      <div class="field"><label for="seller_id">Seller</label>
+        <select id="seller_id" name="seller_id" required>
+          ${sellers
+            .map(
+              (s) =>
+                `<option value="${s.id}"${s.id === offer.seller_id ? ' selected' : ''}>${escapeHtml(s.name)} — ${escapeHtml(s.city)}</option>`
+            )
+            .join('')}
+        </select>
+      </div>
+      <div class="field"><label for="size_label">Size</label><input id="size_label" name="size_label" value="${escapeHtml(offer.size_label)}" maxlength="40"></div>
+    </div>
+    <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
+      <input type="checkbox" id="inhouse" name="inhouse" value="1" style="width:auto;" ${offer.sourced_by === 'inhouse' ? 'checked' : ''}>
+      <label for="inhouse" style="margin:0;">Sourced in-house (ignores the seller above)</label>
+    </div>
+    <div class="form-row">
+      <div class="field"><label for="ships_from">Ships from</label><input id="ships_from" name="ships_from" required maxlength="60" value="${escapeHtml(offer.ships_from)}"></div>
+      <div class="field"><label for="condition_o">Condition</label><input id="condition_o" name="condition" value="${escapeHtml(offer.condition)}" maxlength="60"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label for="seller_price">Seller price (₹)</label><input id="seller_price" name="seller_price" required inputmode="numeric" maxlength="12" value="${offer.seller_price}"></div>
+      <div class="field"><label for="status">Status</label>
+        <select id="status" name="status">
+          ${['active', 'withdrawn', 'reserved', 'sold']
+            .map((s) => `<option value="${s}"${s === offer.status ? ' selected' : ''}>${s}</option>`)
+            .join('')}
+        </select>
+      </div>
+    </div>
+    <p class="hint" style="margin:-6px 0 14px;">Landed price is always seller price + duty + authentication + shipping, recalculated from these four fields on save.</p>
+    <div class="form-row">
+      <div class="field"><label for="duty">Duty (₹)</label><input id="duty" name="duty" inputmode="numeric" maxlength="12" value="${offer.duty}"></div>
+      <div class="field"><label for="auth_fee">Authentication (₹)</label><input id="auth_fee" name="auth_fee" inputmode="numeric" maxlength="12" value="${offer.auth_fee}"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label for="shipping">Shipping (₹)</label><input id="shipping" name="shipping" inputmode="numeric" maxlength="12" value="${offer.shipping}"></div>
+      <div class="field"><label for="lead_min">Lead days min</label><input id="lead_min" name="lead_min" inputmode="numeric" maxlength="3" value="${offer.lead_days_min}"></div>
+    </div>
+    <div class="field" style="max-width:180px;"><label for="lead_max">Lead days max</label><input id="lead_max" name="lead_max" inputmode="numeric" maxlength="3" value="${offer.lead_days_max}"></div>
+    <button class="btn btn-block" type="submit">Save changes</button>
+  </form>
+</div>
+
+<div style="margin-top:32px; padding-top:20px; border-top:1px solid var(--line);">
+  ${
+    canDelete
+      ? `<form method="post" action="/admin/offers/${offer.id}/delete" onsubmit="return confirm('Delete this offer permanently? This cannot be undone.');">
+           <button class="btn" type="submit" style="background:var(--oxblood);">Delete this offer</button>
+         </form>`
+      : `<p class="muted" style="font-size:12.5px;">This offer has a real order against it, so it can't be deleted — change its status instead.</p>`
+  }
+</div>
+
+<p style="margin-top:20px;"><a href="/admin/products">&larr; Back to products</a></p>`);
+}
+
+async function updateOffer(request, env, offerId) {
+  const form = await request.formData();
+  const raw = (k) => Number(String(form.get(k) || '').replace(/[^\d]/g, '')) || 0;
+
+  const inhouse = form.get('inhouse') === '1';
+  const sellerId = inhouse ? await ensureHouseSeller(env) : Number(form.get('seller_id'));
+  if (!Number.isInteger(sellerId)) return redirect(`/admin/offers/${offerId}/edit`);
+
+  const sellerPrice = raw('seller_price');
+  const duty = raw('duty');
+  const authFee = raw('auth_fee');
+  const shipping = raw('shipping');
+  const leadMin = raw('lead_min') || 14;
+  const leadMax = raw('lead_max') || 28;
+  const status = ['active', 'withdrawn', 'reserved', 'sold'].includes(form.get('status')) ? form.get('status') : 'active';
+
+  await env.DB.prepare(
+    `UPDATE offers SET seller_id = ?, sourced_by = ?, size_label = ?, condition = ?, ships_from = ?,
+       seller_price = ?, duty = ?, auth_fee = ?, shipping = ?, landed_price = ?, lead_days_min = ?, lead_days_max = ?, status = ?
+     WHERE id = ?`
+  )
+    .bind(
+      sellerId,
+      inhouse ? 'inhouse' : 'seller',
+      String(form.get('size_label') || 'One size').trim() || 'One size',
+      String(form.get('condition') || 'Deadstock').trim(),
+      String(form.get('ships_from') || '').trim(),
+      sellerPrice,
+      duty,
+      authFee,
+      shipping,
+      sellerPrice + duty + authFee + shipping,
+      leadMin,
+      leadMax,
+      status,
+      offerId
+    )
+    .run();
+
+  return redirect('/admin/products');
+}
+
+async function deleteOffer(request, env, offerId) {
+  const orderCount = await env.DB.prepare('SELECT COUNT(*) AS n FROM orders WHERE offer_id = ?').bind(offerId).first();
+  if ((orderCount?.n || 0) > 0) return redirect('/admin/products');
+  await env.DB.prepare('DELETE FROM offers WHERE id = ?').bind(offerId).run();
   return redirect('/admin/products');
 }
 
