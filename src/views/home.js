@@ -1,6 +1,7 @@
-import { escapeHtml, formatINR, icon, productCard } from '../render.js';
+import { escapeHtml, formatINR, icon, productCard, sealMark } from '../render.js';
 
 export function homePage({ categories, newArrivals, regions, stats, env }) {
+  const hasInventory = stats.sellers > 0 || stats.listings > 0;
   return `
 <section class="dark" style="padding:80px 0;">
   <div class="wrap hero-split" style="display:grid; grid-template-columns:1.05fr .95fr; gap:56px; align-items:center;">
@@ -21,13 +22,18 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
         <a class="btn btn-outline" href="/authentication" style="color:#f2ede2; border-color:#4a4336;">How authentication works</a>
       </div>
       <div style="display:flex; gap:32px; margin-top:34px; padding-top:22px; border-top:1px solid var(--line-dark); flex-wrap:wrap;">
-        <div><div class="serif" style="font-size:24px; color:#f2ede2;">${stats.sellers}</div><div style="font-size:12px; color:#8b8474;">KYC-verified sellers</div></div>
-        <div><div class="serif" style="font-size:24px; color:#f2ede2;">${stats.listings}</div><div style="font-size:12px; color:#8b8474;">Live listings</div></div>
-        <div><div class="serif" style="font-size:24px; color:#f2ede2;">14–28 days</div><div style="font-size:12px; color:#8b8474;">Typical import window</div></div>
+        ${
+          hasInventory
+            ? `<div><div class="serif" style="font-size:24px; color:#f2ede2;">${stats.sellers}</div><div style="font-size:12px; color:#8b8474;">KYC-verified sellers</div></div>
+               <div><div class="serif" style="font-size:24px; color:#f2ede2;">${stats.listings}</div><div style="font-size:12px; color:#8b8474;">Live listings</div></div>
+               <div><div class="serif" style="font-size:24px; color:#f2ede2;">14–28 days</div><div style="font-size:12px; color:#8b8474;">Typical import window</div></div>`
+            : `<div><div class="serif" style="font-size:20px; color:#f2ede2;">Opening soon</div><div style="font-size:12px; color:#8b8474;">The first archive is being sourced and authenticated now</div></div>`
+        }
       </div>
     </div>
     <div>
-      <div style="height:430px; background:linear-gradient(155deg,#3a332a,#1d1913); position:relative;">
+      <div style="height:430px; background:radial-gradient(120% 90% at 30% 20%,#3a332a,#16130f); position:relative; display:grid; place-items:center;">
+        ${sealMark('var(--gold-light)', 92)}
         <span style="position:absolute; bottom:20px; left:20px; display:flex; align-items:center; gap:9px; background:rgba(22,19,15,.9); border:1px solid #3f382c; padding:8px 12px; font-size:11px; color:var(--gold-light); font-weight:600; letter-spacing:.08em;">
           ${icon('check', '#b4935a', 12)} DUAL AUTHENTICATED
         </span>
@@ -78,8 +84,10 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
         <span class="serif" style="font-size:25px;">${escapeHtml(c.name)}</span>
         <span style="font-size:12px; color:${
           i === 2 ? '#a49b88' : 'var(--muted)'
-        }; margin-top:3px;">${c.listing_count || 0} listings${
-          c.from_price ? ` · from ${formatINR(c.from_price)}` : ''
+        }; margin-top:3px;">${
+          c.listing_count
+            ? `${c.listing_count} listing${c.listing_count === 1 ? '' : 's'}${c.from_price ? ` · from ${formatINR(c.from_price)}` : ''}`
+            : 'Opening soon'
         }</span>
       </a>`
       )
@@ -97,9 +105,15 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
       <a class="chip" href="/c/all?lead=14">Arrives in 2 weeks</a>
     </div>
   </div>
-  <div class="card-grid">
-    ${newArrivals.map(productCard).join('')}
-  </div>
+  ${
+    newArrivals.length
+      ? `<div class="card-grid">${newArrivals.map(productCard).join('')}</div>`
+      : `<div class="notice" style="padding:36px; text-align:center;">
+          The first pieces are being sourced and authenticated now.
+          <a href="/sell#requirements">Sell with us</a> or
+          <a href="/#sourcing">tell us what to hunt for</a> below.
+        </div>`
+  }
 </section>
 
 <section class="dark" style="margin-top:88px; padding:80px 0;">
@@ -139,7 +153,7 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
   </div>
 </section>
 
-<section class="section">
+<section class="section" id="sourcing">
   <div style="background:var(--paper-alt); border:1px solid var(--line); padding:48px;">
     <div class="grid grid-2" style="gap:56px; align-items:center;">
       <div>
