@@ -489,7 +489,7 @@ ${
       ${
         user
           ? `<a href="/account">${escapeHtml(user.name.split(' ')[0])}</a>`
-          : `<a href="/account/login">Sign in</a>`
+          : `<a href="/account/sign-in">Sign in</a>`
       }
       <a href="/cart" aria-label="Your bag, ${cartCount} item${cartCount === 1 ? '' : 's'}">${icon(
     'bag',
