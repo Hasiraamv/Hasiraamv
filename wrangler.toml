@@ -1,4 +1,4 @@
-name = "mintmark"
+name = "rarehaus"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
 
@@ -8,6 +8,10 @@ compatibility_date = "2026-09-01"
 
 [[d1_databases]]
 binding = "DB"
+# database_name stays "mintmark" deliberately -- it must match the D1 database's actual
+# registered name in the Cloudflare account (its real identity is database_id below, which
+# is unchanged), not the Worker's own name. Renaming the D1 resource itself is a separate,
+# unnecessary step: it is never shown to a customer.
 database_name = "mintmark"
 database_id = "8932b638-5ed4-4173-9fe3-c27c5203954c"
 
@@ -15,12 +19,20 @@ database_id = "8932b638-5ed4-4173-9fe3-c27c5203954c"
 # otherwise `wrangler deploy` fails because the bucket cannot be found.
 # [[r2_buckets]]
 # binding = "IMAGES"
-# bucket_name = "mintmark-images"
+# bucket_name = "rarehaus-images"
 
-# The Worker's technical name (top of this file) and the D1 database_name below stay
-# "mintmark" deliberately — renaming a live Worker changes its workers.dev URL and orphans
-# the old one, and that's a decision for you to make once rarehaus.in is ready to go live,
-# not something to do silently mid-rebrand. Only the customer-facing name changes here.
+# Renaming the Worker's technical name (top of this file) from "mintmark" to "rarehaus" makes
+# `wrangler deploy` create a NEW Worker script called "rarehaus" -- Cloudflare treats a name
+# change as a new Worker, not an in-place rename. Before deploying this:
+#   1. Run `wrangler secret put ADMIN_PASSWORD` and `wrangler secret put SESSION_SECRET` again
+#      -- secrets belong to the old "mintmark" Worker and do NOT carry over automatically.
+#      Skipping this breaks admin login and cart/cookie signing on the new Worker.
+#   2. After deploying, go to Cloudflare dashboard -> Workers & Pages -> rarehaus -> Settings
+#      -> Domains & Routes -> Add Custom Domain -> rarehaus.in. Adding it here automatically
+#      removes it from the old "mintmark" Worker (a domain can only route to one Worker).
+#   3. Once rarehaus.in is confirmed serving from the new Worker, the old "mintmark" Worker can
+#      be deleted from the dashboard -- it will keep serving the fallback
+#      mintmark.rehanhussain859.workers.dev URL until then, which is harmless to leave running.
 [vars]
 SITE_NAME = "Rarehaus"
 SITE_URL = "https://rarehaus.in"
