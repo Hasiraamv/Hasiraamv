@@ -436,6 +436,7 @@ export function icon(name, color = 'currentColor', size = 16) {
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4.3-4.3"/>',
     whatsapp: '<path d="M21 11.5a8.4 8.4 0 01-12.4 7.4L3 21l2.2-5.4A8.4 8.4 0 1121 11.5z"/>',
     instagram: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/>',
+    chevron: '<path d="M9 6l6 6-6 6"/>',
   };
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${
     paths[name] || ''

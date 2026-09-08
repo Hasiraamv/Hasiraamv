@@ -45,7 +45,6 @@ export function productPage({ product, offers, images, related, selectedSize, en
     : 0;
 
   const eta = best ? etaDates(best.lead_days_min, best.lead_days_max) : null;
-  const hero = images[0];
 
   return `
 <div class="wrap" style="padding-top:16px; padding-bottom:16px; font-size:12px; color:var(--faint); border-bottom:1px solid var(--line);">
@@ -56,26 +55,64 @@ export function productPage({ product, offers, images, related, selectedSize, en
 <section class="wrap pdp" style="display:grid; grid-template-columns:1.05fr .95fr; gap:52px; padding-top:40px;">
 
   <div>
-    <div style="aspect-ratio:1/1; background:var(--tile); position:relative;">
-      ${hero ? `<img src="${escapeHtml(hero.url)}" alt="${escapeHtml(product.title)}" style="width:100%;height:100%;object-fit:cover">` : ''}
-      <span class="badge">${icon('check', '#6a5735', 12)} DUAL AUTHENTICATED</span>
-      ${underRetail ? `<span class="badge badge-right badge-under">UNDER RETAIL</span>` : ''}
+    <div class="pdp-gallery" data-gallery>
+      <div class="pdp-gallery-main" style="aspect-ratio:1/1; background:var(--tile); position:relative; overflow:hidden;">
+        ${
+          images.length
+            ? images
+                .map(
+                  (im, i) =>
+                    `<img src="${escapeHtml(im.url)}" alt="${escapeHtml(product.title)}" class="pdp-slide"
+                       data-slide="${i}" style="position:absolute; inset:0; width:100%; height:100%;
+                       object-fit:cover; opacity:${i === 0 ? 1 : 0}; transition:opacity .25s;">`
+                )
+                .join('')
+            : ''
+        }
+        <span class="badge">${icon('check', '#6a5735', 12)} DUAL AUTHENTICATED</span>
+        ${underRetail ? `<span class="badge badge-right badge-under">UNDER RETAIL</span>` : ''}
+        ${
+          images.length > 1
+            ? `
+        <button type="button" class="pdp-nav pdp-nav-prev" data-nav="prev" aria-label="Previous photo"
+          style="position:absolute; left:10px; top:50%; transform:translateY(-50%); width:34px; height:34px;
+          border:none; border-radius:50%; background:rgba(20,18,14,.55); color:#fff; display:flex;
+          align-items:center; justify-content:center; cursor:pointer;">${icon('chevron', 'currentColor', 18)}</button>
+        <button type="button" class="pdp-nav pdp-nav-next" data-nav="next" aria-label="Next photo"
+          style="position:absolute; right:10px; top:50%; transform:translateY(-50%); width:34px; height:34px;
+          border:none; border-radius:50%; background:rgba(20,18,14,.55); color:#fff; display:flex;
+          align-items:center; justify-content:center; cursor:pointer;"><span style="display:block; transform:rotate(180deg);">${icon(
+            'chevron',
+            'currentColor',
+            18
+          )}</span></button>
+        <div class="pdp-counter" data-counter style="position:absolute; right:12px; bottom:12px; font-size:11px;
+          font-weight:600; color:#fff; background:rgba(20,18,14,.55); padding:4px 9px; border-radius:20px;">1 / ${
+            images.length
+          }</div>`
+            : ''
+        }
+      </div>
+      ${
+        images.length > 1
+          ? `<div class="pdp-thumbs" style="display:flex; gap:9px; margin-top:12px; overflow-x:auto; padding-bottom:2px;">
+               ${images
+                 .map(
+                   (im, i) =>
+                     `<button type="button" class="pdp-thumb${i === 0 ? ' active' : ''}" data-thumb="${i}"
+                        aria-label="Photo ${i + 1} of ${images.length}"
+                        style="position:relative; flex:none; width:60px; aspect-ratio:1/1; padding:0; cursor:pointer;
+                        background:var(--tile); border:2px solid ${i === 0 ? 'var(--gold)' : 'var(--line)'};">
+                        <img src="${escapeHtml(im.url)}" alt="" style="width:100%; height:100%; object-fit:cover; display:block;">
+                        <span style="position:absolute; left:3px; bottom:2px; font-size:9px; font-weight:700; color:#fff;
+                          text-shadow:0 1px 2px rgba(0,0,0,.7);">${i + 1}</span>
+                      </button>`
+                 )
+                 .join('')}
+             </div>`
+          : ''
+      }
     </div>
-    ${
-      images.length > 1
-        ? `<div class="grid" style="grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-top:12px;">
-             ${images
-               .slice(0, 5)
-               .map(
-                 (im) =>
-                   `<div style="aspect-ratio:1/1; background:var(--tile);"><img src="${escapeHtml(
-                     im.url
-                   )}" alt="${escapeHtml(product.title)}" style="width:100%;height:100%;object-fit:cover"></div>`
-               )
-               .join('')}
-           </div>`
-        : ''
-    }
     ${
       product.video_url
         ? `<div style="margin-top:12px; border:1px solid var(--line);">${videoEmbed(product.video_url)}</div>`
@@ -100,6 +137,51 @@ export function productPage({ product, offers, images, related, selectedSize, en
       </div>
     </div>
   </div>
+  ${
+    images.length > 1
+      ? `<script>
+  (function () {
+    var galleries = document.querySelectorAll('[data-gallery]');
+    galleries.forEach(function (gallery) {
+      if (gallery.dataset.wired) return;
+      gallery.dataset.wired = '1';
+      var slides = gallery.querySelectorAll('.pdp-slide');
+      var thumbs = gallery.querySelectorAll('.pdp-thumb');
+      var counter = gallery.querySelector('[data-counter]');
+      var i = 0;
+      function show(n) {
+        i = (n + slides.length) % slides.length;
+        slides.forEach(function (s, idx) { s.style.opacity = idx === i ? '1' : '0'; });
+        thumbs.forEach(function (t, idx) {
+          t.style.borderColor = idx === i ? 'var(--gold)' : 'var(--line)';
+          t.classList.toggle('active', idx === i);
+        });
+        if (counter) counter.textContent = (i + 1) + ' / ' + slides.length;
+      }
+      gallery.querySelectorAll('[data-nav]').forEach(function (btn) {
+        btn.addEventListener('click', function () { show(i + (btn.dataset.nav === 'next' ? 1 : -1)); });
+      });
+      thumbs.forEach(function (t) {
+        t.addEventListener('click', function () { show(Number(t.dataset.thumb)); });
+      });
+      gallery.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowRight') show(i + 1);
+        if (e.key === 'ArrowLeft') show(i - 1);
+      });
+      var main = gallery.querySelector('.pdp-gallery-main');
+      var touchX = null;
+      main.addEventListener('touchstart', function (e) { touchX = e.touches[0].clientX; }, { passive: true });
+      main.addEventListener('touchend', function (e) {
+        if (touchX === null) return;
+        var dx = e.changedTouches[0].clientX - touchX;
+        if (Math.abs(dx) > 40) show(i + (dx < 0 ? 1 : -1));
+        touchX = null;
+      });
+    });
+  })();
+</script>`
+      : ''
+  }
 
   <div>
     <span class="tag gold">Imported &amp; authenticated</span>
