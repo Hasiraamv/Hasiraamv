@@ -23,27 +23,30 @@ database_id = "8932b638-5ed4-4173-9fe3-c27c5203954c"
 # not something to do silently mid-rebrand. Only the customer-facing name changes here.
 [vars]
 SITE_NAME = "Rarehaus"
-SITE_URL = "https://mintmark.rehanhussain859.workers.dev"
+SITE_URL = "https://rarehaus.in"
 CURRENCY = "INR"
 
 # DEMO_MODE shows a banner saying the catalogue is sample data and no orders are fulfilled.
-# Leave it "true" until you are selling real stock — the listings, sellers and prices below
-# are invented, and presenting them as a live shop would mislead buyers.
-DEMO_MODE = "true"
+# Turned off at the owner's explicit request. NOTE: the catalogue in db/seed.sql is still
+# placeholder stock and checkout still has no payment gateway wired (see README "Before
+# taking real money") -- turning this off removes the disclaimer, it does not by itself
+# make the shop truthful or able to take money. Replace the catalogue and wire Razorpay
+# before actually announcing the site publicly.
+DEMO_MODE = "false"
 
 # Business details. These appear in your policies, footer and contact page. Every page that
 # needs them reads from here, so fill them in once. Leaving a value blank shows a visible
 # placeholder rather than silently omitting a legally required detail.
-LEGAL_NAME = ""
-REGISTERED_ADDRESS = ""
-SUPPORT_EMAIL = ""
-SUPPORT_WHATSAPP = ""
+LEGAL_NAME = "Rehan Hussain"
+REGISTERED_ADDRESS = "Bishnu Rabha Path, Guwahati, Assam 781026, India"
+SUPPORT_EMAIL = "customer@rarehaus.in"
+SUPPORT_WHATSAPP = "+91 93959 62006"
 GSTIN = ""
 CIN = ""
-GRIEVANCE_OFFICER = ""
-GRIEVANCE_EMAIL = ""
-GRIEVANCE_PHONE = ""
-JURISDICTION_CITY = ""
+GRIEVANCE_OFFICER = "Rehan Hussain"
+GRIEVANCE_EMAIL = "customer@rarehaus.in"
+GRIEVANCE_PHONE = "+91 93959 62006"
+JURISDICTION_CITY = "Guwahati"
 
 # Secrets (set with `wrangler secret put <NAME>`, never commit them):
 #   ADMIN_PASSWORD   password for /admin
