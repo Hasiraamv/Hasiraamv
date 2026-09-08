@@ -176,25 +176,42 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: var(--text); white-space: nowrap;
 }
 .logo svg { flex: none; }
-.nav-links { display: flex; gap: 30px; font-size: 13.5px; font-weight: 500; }
-.nav-links a { color: #3a362c; }
-.nav-right { display: flex; align-items: center; gap: 16px; font-size: 13px; }
-.nav-right a { color: #3a362c; }
-.search {
-  display: flex; align-items: center; gap: 9px;
-  border: 1px solid #ddd5c2; background: var(--card);
-  padding: 8px 13px; min-width: 190px;
+.nav-links {
+  display: flex; gap: 28px;
+  font-size: 11.5px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
 }
-.search input { border: 0; background: none; outline: none; width: 100%; font-size: 12.5px; }
-.subnav {
-  display: flex; gap: 26px; padding: 0 72px 14px;
-  max-width: 1440px; margin: 0 auto;
-  font-size: 12.5px; color: var(--muted);
-  border-bottom: 1px solid var(--line);
-  overflow-x: auto;
+.nav-links a { color: var(--muted); }
+.nav-links a:hover { color: var(--text); }
+.nav-right {
+  display: flex; align-items: center; gap: 22px;
+  font-size: 11.5px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
 }
-.subnav a { color: var(--muted); white-space: nowrap; }
-.subnav a.active { color: var(--gold); font-weight: 600; }
+.nav-right > a { color: var(--muted); }
+.nav-right > a:hover { color: var(--text); }
+
+/* Search and More both use <details> so they work with zero client JS; a small script in
+   the footer closes them on an outside click for polish. */
+.nav-pop { position: relative; }
+.nav-pop summary {
+  display: flex; align-items: center; gap: 7px; cursor: pointer; list-style: none;
+  color: var(--muted); user-select: none;
+}
+.nav-pop summary:hover { color: var(--text); }
+.nav-pop summary::-webkit-details-marker { display: none; }
+.nav-pop[open] summary { color: var(--text); }
+.nav-pop-panel {
+  position: absolute; top: calc(100% + 18px); right: 0; z-index: 30;
+  background: var(--card); border: 1px solid var(--line);
+  box-shadow: 0 22px 44px -18px rgba(17, 17, 17, 0.28);
+}
+.search-panel { padding: 10px 12px; display: flex; align-items: center; gap: 9px; min-width: 240px; }
+.search-panel input { border: 0; background: none; outline: none; width: 100%; font-size: 13px; text-transform: none; letter-spacing: normal; }
+.more-panel { min-width: 200px; padding: 8px 0; }
+.more-panel a {
+  display: block; padding: 10px 20px; color: var(--text);
+  font-size: 12px; letter-spacing: 0.06em; text-transform: none; font-weight: 400;
+}
+.more-panel a:hover { background: var(--paper-alt); }
 
 /* Buttons ----------------------------------------------------------- */
 .btn {
@@ -331,10 +348,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* Mobile ------------------------------------------------------------ */
 @media (max-width: 900px) {
-  .wrap, .nav, .subnav, .section, .footer { padding-left: 20px; padding-right: 20px; }
+  .wrap, .nav, .section, .footer { padding-left: 20px; padding-right: 20px; }
   .nav { flex-wrap: wrap; gap: 12px; }
   .nav-links { order: 3; width: 100%; overflow-x: auto; gap: 20px; padding-bottom: 4px; }
-  .search { display: none; }
   .section { padding-top: 44px; }
   .section-head h2 { font-size: 27px; }
   .grid-2 { grid-template-columns: 1fr; }
@@ -388,6 +404,7 @@ export function icon(name, color = 'currentColor', size = 16) {
     bag: '<path d="M6 8V6a6 6 0 0112 0v2M4 8h16l-1.2 12.2A2 2 0 0116.8 22H7.2a2 2 0 01-2-1.8L4 8z"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4.3-4.3"/>',
     whatsapp: '<path d="M21 11.5a8.4 8.4 0 01-12.4 7.4L3 21l2.2-5.4A8.4 8.4 0 1121 11.5z"/>',
+    instagram: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/>',
   };
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${
     paths[name] || ''
@@ -480,12 +497,23 @@ ${
       <a href="/c/collectibles">Collectibles</a>
     </nav>
     <div class="nav-right">
-      <form class="search" action="/search" method="get" role="search">
-        ${icon('search', '#6e675a', 14)}
-        <label for="site-search" class="visually-hidden">Search listings</label>
-        <input id="site-search" type="search" name="q" placeholder="Search listings">
-      </form>
-      <a href="/track">Track order</a>
+      <details class="nav-pop">
+        <summary aria-label="Search listings">${icon('search', 'currentColor', 15)}</summary>
+        <form class="nav-pop-panel search-panel" action="/search" method="get" role="search">
+          <label for="site-search" class="visually-hidden">Search listings</label>
+          <input id="site-search" type="search" name="q" placeholder="Search listings">
+        </form>
+      </details>
+      <details class="nav-pop">
+        <summary>More</summary>
+        <div class="nav-pop-panel more-panel">
+          <a href="/track">Track order</a>
+          <a href="/verify">Verify a certificate</a>
+          <a href="/sell">Sell with us</a>
+          <a href="/authentication">Authentication</a>
+          <a href="/about">About</a>
+        </div>
+      </details>
       ${
         user
           ? `<a href="/account">${escapeHtml(user.name.split(' ')[0])}</a>`
@@ -493,20 +521,11 @@ ${
       }
       <a href="/cart" aria-label="Your bag, ${cartCount} item${cartCount === 1 ? '' : 's'}">${icon(
     'bag',
-    '#3a362c',
+    'currentColor',
     15
   )} Bag (${cartCount})</a>
     </div>
   </div>
-  <nav class="subnav" aria-label="Price and delivery filters">
-    <a href="/c/all?max=25000"${activeNav === 'u25' ? ' class="active"' : ''}>Under ₹25,000</a>
-    <a href="/c/all?max=50000">Under ₹50,000</a>
-    <a href="/c/all?under_retail=1">Under retail</a>
-    <a href="/c/all?sort=new">New this week</a>
-    <a href="/c/all?lead=14">Arriving in 2 weeks</a>
-    <a href="/verify">Verify a certificate</a>
-    <a href="/sell">Sell with us</a>
-  </nav>
 </header>
 
 <main id="main">
@@ -544,7 +563,14 @@ ${body}
       </div>
     </div>
     <div class="bottom">
-      <span>© ${new Date().getFullYear()} ${escapeHtml(site)}. All rights reserved.</span>
+      <span style="display:flex; align-items:center; gap:14px;">
+        © ${new Date().getFullYear()} ${escapeHtml(site)}. All rights reserved.
+        <a href="https://instagram.com/rarehaus.in" target="_blank" rel="noopener" aria-label="${escapeHtml(site)} on Instagram" style="display:inline-flex;">${icon(
+    'instagram',
+    'currentColor',
+    15
+  )}</a>
+      </span>
       <span style="display:flex; gap:18px; flex-wrap:wrap;">
         <a href="/privacy">Privacy</a><a href="/cookies">Cookies</a><a href="/terms">Terms</a>
         <a href="/returns">Returns</a><a href="/shipping">Import &amp; customs</a>
@@ -552,6 +578,13 @@ ${body}
     </div>
   </div>
 </footer>
+<script>
+  document.addEventListener('click', function (e) {
+    document.querySelectorAll('.nav-pop[open]').forEach(function (d) {
+      if (!d.contains(e.target)) d.removeAttribute('open');
+    });
+  });
+</script>
 </body>
 </html>`;
 }
