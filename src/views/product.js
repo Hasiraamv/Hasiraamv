@@ -16,6 +16,20 @@ function sizeSortKey(label) {
   return m ? Number(m[1]) : Number.MAX_SAFE_INTEGER;
 }
 
+// YouTube/Vimeo links embed as an iframe; anything else is treated as a direct video file
+// (e.g. an R2-hosted .mp4) and played inline.
+function videoEmbed(url) {
+  const yt = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/);
+  if (yt) {
+    return `<iframe src="https://www.youtube.com/embed/${yt[1]}" title="Product video" style="width:100%; aspect-ratio:16/9; border:0; display:block;" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>`;
+  }
+  const vimeo = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vimeo) {
+    return `<iframe src="https://player.vimeo.com/video/${vimeo[1]}" title="Product video" style="width:100%; aspect-ratio:16/9; border:0; display:block;" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen loading="lazy"></iframe>`;
+  }
+  return `<video controls preload="metadata" style="width:100%; aspect-ratio:16/9; background:#000; display:block;"><source src="${escapeHtml(url)}"></video>`;
+}
+
 export function productPage({ product, offers, images, related, selectedSize, env }) {
   const bySize = groupOffersBySize(offers);
   const sizes = [...bySize.keys()].sort((a, b) => sizeSortKey(a) - sizeSortKey(b) || a.localeCompare(b));
@@ -60,6 +74,11 @@ export function productPage({ product, offers, images, related, selectedSize, en
                )
                .join('')}
            </div>`
+        : ''
+    }
+    ${
+      product.video_url
+        ? `<div style="margin-top:12px; border:1px solid var(--line);">${videoEmbed(product.video_url)}</div>`
         : ''
     }
 
