@@ -50,7 +50,7 @@ async function route(request, env, ctx) {
   }
 
   if (path === '/favicon.svg' || path === '/favicon.ico') {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#111111"/><text x="16" y="23" font-family="Georgia,serif" font-size="18" fill="#b4935a" text-anchor="middle">R</text></svg>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="200" height="200" fill="#111111"/><path d="M43 168V95a57 57 0 0 1 114 0v73" fill="none" stroke="#b4935a" stroke-width="13"/><g stroke="#b4935a" stroke-width="16" fill="none" transform="translate(100 105) scale(.58) translate(-100.5 -100)"><path d="M37 60V140"/><path d="M37 60h31a16 16 0 0 1 0 32H37"/><path d="M56 92l32 48"/><path d="M116 60v80"/><path d="M164 60v80"/><path d="M116 100h48"/></g></svg>`;
     return new Response(svg, {
       headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' },
     });

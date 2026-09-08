@@ -30,7 +30,7 @@ export function verifyPage({ query, code, result }) {
 
   <div class="panel" style="padding:24px; margin-top:26px;">
     <h3 class="serif" style="font-size:20px; margin:0 0 12px;">How to read a certificate number</h3>
-    <div class="serif" style="font-size:22px; letter-spacing:0.06em; margin-bottom:14px;">RH-26-SNK-00248-M</div>
+    <div class="mono" style="font-size:19px; letter-spacing:0.04em; margin-bottom:14px;">RH-26-SNK-00248-M</div>
     <table class="table" style="background:none;">
       <tbody>
         ${[
@@ -156,7 +156,7 @@ export function certificatePage({ cert, siteName }) {
     </div>
 
     <div style="text-align:center; padding:28px 0; border-bottom:1px solid var(--line-dark);">
-      <div class="serif" style="font-size:30px; letter-spacing:0.1em;">${escapeHtml(cert.certificate_no)}</div>
+      <div class="mono" style="font-size:24px; letter-spacing:0.06em;">${escapeHtml(cert.certificate_no)}</div>
     </div>
 
     <div style="padding-top:18px;">

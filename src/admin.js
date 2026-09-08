@@ -1,4 +1,4 @@
-import { escapeHtml, formatINR, html, redirect } from './render.js';
+import { escapeHtml, formatINR, html, redirect, sealMark } from './render.js';
 import * as db from './db.js';
 import { issueCertificate } from './certificates.js';
 import { storeImage, deleteImage } from './images.js';
@@ -98,12 +98,12 @@ function adminHtml(body, status = 200, extraHeaders = {}) {
     `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Admin · Rarehaus</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,500;6..96,700&family=Archivo:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/styles.css">
 </head><body>
 <div class="announce"><span class="tag">Rarehaus admin</span></div>
 <div class="nav">
-  <a class="logo" href="/admin">RAREHAUS <span style="font-size:13px; letter-spacing:0; color:var(--faint)">admin</span></a>
+  <a class="logo" href="/admin">${sealMark('var(--gold)', 22)}RAREHAUS <span style="font-size:13px; letter-spacing:0; color:var(--faint)">admin</span></a>
   <nav class="nav-links">
     <a href="/admin/orders">Orders</a>
     <a href="/admin/certificates">Certificates</a>

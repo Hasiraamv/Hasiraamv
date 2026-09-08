@@ -71,23 +71,24 @@ export function etaDates(minDays, maxDays, from = new Date()) {
 
 export const STYLES = `
 :root {
-  /* RAREHAUS palette: Obsidian, Ivory, Stone, Champagne, Oxblood (used sparingly). */
-  --paper: #f4f0e8;      /* Ivory */
-  --paper-alt: #eae3d5;  /* Ivory/Stone blend for alternating sections */
+  /* RAREHAUS identity system: Obsidian, Warm Ivory, Stone, Champagne, Deep Oxblood. */
+  --paper: #f4f0e8;      /* Warm Ivory */
+  --paper-alt: #e7e2d8;  /* Ivory-dim, per identity board */
   --card: #fffcf6;
   --ink: #111111;        /* Obsidian */
-  --ink-soft: #1c1c1a;
-  --text: #191817;
-  --muted: #6b6558;
+  --ink-soft: #1a1a1a;   /* Obsidian 2 */
+  --ink-softer: #2a2926; /* Obsidian 3 */
+  --text: #1c1a17;
+  --muted: #5b5751;      /* Warm Ink -- captions, metadata, SKU labels */
   /* Champagne (#B4935A) measures 2.5:1 on Ivory -- nowhere near the 4.5:1 WCAG AA floor for
-     text -- so it is used at full strength only on dark surfaces (--champagne-light) and
+     text -- so it is used at full strength only on dark surfaces (--gold-light) and
      darkened here for anything read as text or a link on a light background. */
-  --faint: #6b6558;
+  --faint: #5b5751;
   --line: #d6d0c5;       /* Stone */
-  --line-dark: #2a2825;
+  --line-dark: #2a2926;
   --gold: #6a5735;       /* Champagne, darkened for AA on Ivory (6.1:1) */
   --gold-light: #b4935a; /* Champagne, full strength -- dark surfaces only */
-  --oxblood: #481b24;    /* Limited/editorial accent -- sparingly, per brand guide */
+  --oxblood: #481b24;    /* Deep Oxblood -- reserve tier, wax seal, never a UI colour */
   --green: #3f5f45;
   --tile: #e5ddcc;
 }
@@ -128,11 +129,15 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--text);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Archivo', system-ui, -apple-system, sans-serif;
   font-size: 15px;
   line-height: 1.5;
 }
-.serif { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 400; }
+/* Didone for the object, grotesque for the transaction: .serif names the piece,
+   the base font-family runs the marketplace, .mono carries anything read back
+   exactly -- serials, SKUs, grades, certificate numbers. */
+.serif { font-family: 'Bodoni Moda', Didot, 'Bodoni MT', Georgia, serif; font-weight: 400; }
+.mono { font-family: 'IBM Plex Mono', Menlo, monospace; }
 a { color: var(--gold); text-decoration: none; }
 a:hover { color: #6b5225; }
 /* WCAG 1.4.1: a link sitting inside a run of text must not be identified by colour alone,
@@ -165,10 +170,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
   padding: 22px 72px; max-width: 1440px; margin: 0 auto; gap: 24px;
 }
 .logo {
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: 28px; font-weight: 600; letter-spacing: 0.14em;
+  display: inline-flex; align-items: center; gap: 11px;
+  font-family: 'Bodoni Moda', Didot, 'Bodoni MT', Georgia, serif;
+  font-size: 24px; font-weight: 400; letter-spacing: 0.28em; text-indent: 0.28em;
   color: var(--text); white-space: nowrap;
 }
+.logo svg { flex: none; }
 .nav-links { display: flex; gap: 30px; font-size: 13.5px; font-weight: 500; }
 .nav-links a { color: #3a362c; }
 .nav-right { display: flex; align-items: center; gap: 16px; font-size: 13px; }
@@ -229,7 +236,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .pcard .shot img { width: 100%; height: 100%; object-fit: cover; }
 .pcard .title { font-size: 14px; font-weight: 600; color: var(--text); }
 .pcard .meta { font-size: 12px; color: var(--muted); margin-top: 5px; display: flex; align-items: center; gap: 6px; }
-.pcard .price { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 19px; margin-top: 8px; }
+.pcard .price { font-family: 'Bodoni Moda', Didot, 'Bodoni MT', Georgia, serif; font-size: 19px; margin-top: 8px; }
 .pcard .sellers { font-size: 11.5px; color: var(--faint); margin-left: 8px; }
 .badge {
   position: absolute; top: 12px; left: 12px;
@@ -301,7 +308,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border: 1px solid var(--line-dark); background: #1c1813; color: #f2ede2;
   padding: 28px 32px;
 }
-.cert .no { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 26px; letter-spacing: 0.08em; }
+.cert .no { font-family: 'IBM Plex Mono', Menlo, monospace; font-size: 22px; letter-spacing: 0.06em; }
 .cert-card {
   background: #16130f; color: #f2ede2; padding: 44px; border: 1px solid var(--line-dark);
   max-width: 720px; margin: 0 auto;
@@ -355,7 +362,19 @@ button, input, select, textarea { font: inherit; color: inherit; }
 `;
 
 const FONTS =
-  'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@400;500;600&display=swap';
+  'https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,500;6..96,700&family=Archivo:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap';
+
+// The RAREHAUS vault seal: an arch open at the foot, holding a geometric RH monogram built
+// from a single stroke. From the identity board's SVG sprite (symbol#seal, viewBox 0 0 200 200).
+export function sealMark(color = 'currentColor', size = 28) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 200 200" fill="none" aria-hidden="true">
+    <path d="M33 178V100a67 67 0 0 1 134 0v78" stroke="${color}" stroke-width="10"/>
+    <g stroke="${color}" stroke-width="13" transform="translate(100 112) scale(.6) translate(-100.5 -100)">
+      <path d="M37 60V140"/><path d="M37 60h31a16 16 0 0 1 0 32H37"/><path d="M56 92l32 48"/>
+      <path d="M116 60v80"/><path d="M164 60v80"/><path d="M116 100h48"/>
+    </g>
+  </svg>`;
+}
 
 export function icon(name, color = 'currentColor', size = 16) {
   const paths = {
@@ -448,7 +467,10 @@ ${
 
 <header class="no-print">
   <div class="nav">
-    <a class="logo" href="/" aria-label="${escapeHtml(site)} home">${escapeHtml(site.toUpperCase())}</a>
+    <a class="logo" href="/" aria-label="${escapeHtml(site)} home">${sealMark(
+    'var(--gold)',
+    26
+  )}${escapeHtml(site.toUpperCase())}</a>
     <nav class="nav-links" aria-label="Categories">
       <a href="/c/sneakers">Sneakers</a>
       <a href="/c/streetwear">Streetwear</a>
@@ -490,9 +512,10 @@ ${body}
   <div class="footer-inner">
     <div class="cols">
       <div style="max-width:280px">
-        <div class="logo" style="color:#f2ede2; font-size:23px; margin-bottom:14px;">${escapeHtml(
-          site.toUpperCase()
-        )}</div>
+        <div class="logo" style="color:#f2ede2; font-size:20px; margin-bottom:14px;">${sealMark(
+          'var(--gold-light)',
+          24
+        )}${escapeHtml(site.toUpperCase())}</div>
         <div style="font-size:12.5px; line-height:1.7;">
           An authenticated marketplace for imported rare goods.<br>
           ${detail(env, 'LEGAL_NAME')}<br>${detail(env, 'REGISTERED_ADDRESS')}
