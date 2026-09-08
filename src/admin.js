@@ -81,6 +81,7 @@ export async function adminRouter(request, env, path) {
   }
   if (path === '/admin/products/create' && method === 'POST') return createProduct(request, env);
   if (path === '/admin/offers/create' && method === 'POST') return createOffer(request, env);
+  if (path === '/admin/offers/status' && method === 'POST') return setOfferStatus(request, env);
   if (path === '/admin/images/upload' && method === 'POST') return uploadImage(request, env);
   if (path === '/admin/images/delete' && method === 'POST') return removeImage(request, env);
   if (path === '/admin/images/reorder' && method === 'POST') return reorderImage(request, env);
@@ -510,10 +511,19 @@ async function revokeCert(request, env) {
 }
 
 async function productsPage(env, errorMessage, preselectProductId = null) {
-  const [categories, sellers] = await Promise.all([
+  const [categories, sellers, offersResult] = await Promise.all([
     db.getCategories(env.DB),
     env.DB.prepare('SELECT * FROM sellers ORDER BY name').all().then((r) => r.results || []),
+    env.DB.prepare(
+      `SELECT o.id, o.size_label, o.status, o.landed_price, o.stock_code, o.sourced_by,
+              p.title AS product_title, s.name AS seller_name
+         FROM offers o
+         JOIN products p ON p.id = o.product_id
+         JOIN sellers s ON s.id = o.seller_id
+        ORDER BY o.created_at DESC LIMIT 200`
+    ).all(),
   ]);
+  const offerRows = offersResult.results || [];
   const { results: products } = await env.DB.prepare(
     `SELECT p.*, c.name AS category_name,
             (SELECT COUNT(*) FROM offers o WHERE o.product_id = p.id AND o.status = 'active') AS offer_count,
@@ -719,6 +729,48 @@ ${
       })
       .join('')}
   </tbody>
+</table>
+
+<h3 class="serif" style="font-size:24px; margin:32px 0 6px;">Stock</h3>
+<p class="muted" style="font-size:12.5px; margin:0 0 14px;">
+  Sold out or mark it back live. "Reserved" and "Sold" come from a real order and are not
+  editable here.
+</p>
+<table class="table">
+  <thead><tr><th>Item</th><th>Size</th><th>Seller</th><th class="num">Price</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+    ${offerRows
+      .map((o) => {
+        const canToggle = o.status === 'active' || o.status === 'withdrawn';
+        const nextStatus = o.status === 'active' ? 'withdrawn' : 'active';
+        const label = o.status === 'active' ? 'Mark sold out' : 'Relist';
+        return `<tr>
+        <td data-label="Item"><strong>${escapeHtml(o.product_title)}</strong>
+          <div style="font-size:11px; color:var(--faint);">${escapeHtml(o.stock_code || '')}</div>
+        </td>
+        <td data-label="Size">${escapeHtml(o.size_label)}</td>
+        <td data-label="Seller">${o.sourced_by === 'inhouse' ? 'In-house' : escapeHtml(o.seller_name)}</td>
+        <td data-label="Price" class="num">${formatINR(o.landed_price)}</td>
+        <td data-label="Status">
+          <span class="tag" style="color:${
+            o.status === 'active' ? 'var(--green)' : o.status === 'withdrawn' ? 'var(--oxblood)' : 'var(--muted)'
+          };">${escapeHtml(o.status)}</span>
+        </td>
+        <td>
+          ${
+            canToggle
+              ? `<form method="post" action="/admin/offers/status">
+                   <input type="hidden" name="offer_id" value="${o.id}">
+                   <input type="hidden" name="status" value="${nextStatus}">
+                   <button class="chip" type="submit" style="cursor:pointer;">${label}</button>
+                 </form>`
+              : ''
+          }
+        </td>
+      </tr>`;
+      })
+      .join('')}
+  </tbody>
 </table>`);
 }
 
@@ -856,6 +908,21 @@ async function createOffer(request, env) {
     : '';
 
   return redirect('/admin/products' + warn);
+}
+
+// Only toggles between active and withdrawn -- reserved/sold reflect a real order and must
+// not be hand-edited out from under it.
+async function setOfferStatus(request, env) {
+  const form = await request.formData();
+  const offerId = Number(form.get('offer_id'));
+  const status = form.get('status') === 'active' ? 'active' : 'withdrawn';
+  if (!Number.isInteger(offerId)) return redirect('/admin/products');
+
+  await env.DB.prepare("UPDATE offers SET status = ? WHERE id = ? AND status IN ('active', 'withdrawn')")
+    .bind(status, offerId)
+    .run();
+
+  return redirect('/admin/products');
 }
 
 // Rates -----------------------------------------------------------------------
