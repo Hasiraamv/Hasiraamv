@@ -132,7 +132,7 @@ INSERT INTO source_cities (city, country, shipping_cost, lead_days_min, lead_day
   ('Florence', 'Italy',       3500, 20, 28);
 
 -- Internal shelf numbers for the sample offers.
-UPDATE offers SET stock_code = 'MM-' || (
+UPDATE offers SET stock_code = 'RH-' || (
   SELECT CASE c.slug
     WHEN 'sneakers' THEN 'SNK' WHEN 'streetwear' THEN 'STW' WHEN 'watches' THEN 'WCH'
     WHEN 'bags' THEN 'BAG' WHEN 'jewelry' THEN 'JWL' ELSE 'COL' END

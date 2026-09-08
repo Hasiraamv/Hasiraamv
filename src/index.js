@@ -50,7 +50,7 @@ async function route(request, env, ctx) {
   }
 
   if (path === '/favicon.svg' || path === '/favicon.ico') {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#16130f"/><text x="16" y="22" font-family="Georgia,serif" font-size="17" fill="#cba25a" text-anchor="middle">M</text></svg>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#111111"/><text x="16" y="23" font-family="Georgia,serif" font-size="18" fill="#b4935a" text-anchor="middle">R</text></svg>`;
     return new Response(svg, {
       headers: { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' },
     });
@@ -473,7 +473,7 @@ async function certificateRoute(request, env, certNo, cart) {
       title: `Certificate ${cert.certificate_no}`,
       env,
       cartCount: cart.length,
-      body: certificatePage({ cert, siteName: env.SITE_NAME || 'Mintmark' }),
+      body: certificatePage({ cert, siteName: env.SITE_NAME || 'Rarehaus' }),
     })
   );
 }

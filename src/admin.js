@@ -18,7 +18,7 @@ import {
   checkPassword,
 } from './session.js';
 
-const ADMIN_COOKIE = 'mm_admin';
+const ADMIN_COOKIE = 'rh_admin';
 
 const ORDER_STAGES = [
   'placed',
@@ -97,13 +97,13 @@ function adminHtml(body, status = 200, extraHeaders = {}) {
   return html(
     `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin · Mintmark</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Work+Sans:wght@400;500;600&display=swap">
+<title>Admin · Rarehaus</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="/styles.css">
 </head><body>
-<div class="announce"><span class="tag">Mintmark admin</span></div>
+<div class="announce"><span class="tag">Rarehaus admin</span></div>
 <div class="nav">
-  <a class="logo" href="/admin">MINTMARK <span style="font-size:13px; letter-spacing:0; color:var(--faint)">admin</span></a>
+  <a class="logo" href="/admin">RAREHAUS <span style="font-size:13px; letter-spacing:0; color:var(--faint)">admin</span></a>
   <nav class="nav-links">
     <a href="/admin/orders">Orders</a>
     <a href="/admin/certificates">Certificates</a>

@@ -17,7 +17,7 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
         before it moves, and tell you exactly when it will land.
       </p>
       <div style="display:flex; gap:14px; flex-wrap:wrap;">
-        <a class="btn btn-gold" href="/c/all">Shop ${escapeHtml(env?.SITE_NAME || 'Mintmark')}</a>
+        <a class="btn btn-gold" href="/c/all">Shop ${escapeHtml(env?.SITE_NAME || 'Rarehaus')}</a>
         <a class="btn btn-outline" href="/authentication" style="color:#f2ede2; border-color:#4a4336;">How authentication works</a>
       </div>
       <div style="display:flex; gap:32px; margin-top:34px; padding-top:22px; border-top:1px solid var(--line-dark); flex-wrap:wrap;">
@@ -29,7 +29,7 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
     <div>
       <div style="height:430px; background:linear-gradient(155deg,#3a332a,#1d1913); position:relative;">
         <span style="position:absolute; bottom:20px; left:20px; display:flex; align-items:center; gap:9px; background:rgba(22,19,15,.9); border:1px solid #3f382c; padding:8px 12px; font-size:11px; color:var(--gold-light); font-weight:600; letter-spacing:.08em;">
-          ${icon('check', '#cba25a', 12)} DUAL AUTHENTICATED
+          ${icon('check', '#b4935a', 12)} DUAL AUTHENTICATED
         </span>
       </div>
     </div>
@@ -49,7 +49,7 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
       <div style="display:flex; gap:14px; padding:26px 30px; ${
         i < 3 ? 'border-right:1px solid var(--line);' : ''
       } align-items:flex-start;">
-        ${icon(ic, '#80632e', 19)}
+        ${icon(ic, '#6a5735', 19)}
         <div>
           <div style="font-size:13.5px; font-weight:600; margin-bottom:3px;">${title}</div>
           <div style="font-size:12.5px; color:var(--muted); line-height:1.5;">${sub}</div>
@@ -70,7 +70,7 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
         (c, i) => `
       <a href="/c/${escapeHtml(c.slug)}" style="aspect-ratio:4/3; background:${
           i === 2
-            ? 'linear-gradient(160deg,#22201a,#3b352b)'
+            ? 'linear-gradient(160deg,#1c1c1a,#3b352b)'
             : 'linear-gradient(160deg,#e7e0cf,#d5cdb8)'
         }; display:flex; flex-direction:column; justify-content:flex-end; padding:22px; color:${
           i === 2 ? '#f2ede2' : 'var(--text)'
@@ -128,7 +128,7 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
     <div class="cert" style="display:flex; align-items:center; gap:32px; margin-top:52px; flex-wrap:wrap;">
       <div>
         <div class="tag" style="color:var(--gold-light)">Certificate No.</div>
-        <div class="no">MM-26-SNK-00248-G</div>
+        <div class="no">RH-26-SNK-00248-M</div>
       </div>
       <div style="flex-grow:1; min-width:260px; font-size:13.5px; color:#b3ab99; line-height:1.6;">
         Every order ships with a numbered certificate and both inspection reports.

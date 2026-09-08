@@ -71,22 +71,25 @@ export function etaDates(minDays, maxDays, from = new Date()) {
 
 export const STYLES = `
 :root {
-  --paper: #f7f4ee;
-  --paper-alt: #efe9dc;
-  --card: #fffdf8;
-  --ink: #16130f;
-  --ink-soft: #22201a;
-  --text: #22201a;
-  --muted: #6f6959;
-  /* --faint and --gold are darkened from the original palette so every text pairing clears
-     WCAG AA (4.5:1) on all four light backgrounds. The originals measured 3.2-3.8. */
-  --faint: #6e675a;
-  --line: #e0d9c8;
-  --line-dark: #2e281f;
-  --gold: #80632e;
-  --gold-light: #cba25a;
+  /* RAREHAUS palette: Obsidian, Ivory, Stone, Champagne, Oxblood (used sparingly). */
+  --paper: #f4f0e8;      /* Ivory */
+  --paper-alt: #eae3d5;  /* Ivory/Stone blend for alternating sections */
+  --card: #fffcf6;
+  --ink: #111111;        /* Obsidian */
+  --ink-soft: #1c1c1a;
+  --text: #191817;
+  --muted: #6b6558;
+  /* Champagne (#B4935A) measures 2.5:1 on Ivory -- nowhere near the 4.5:1 WCAG AA floor for
+     text -- so it is used at full strength only on dark surfaces (--champagne-light) and
+     darkened here for anything read as text or a link on a light background. */
+  --faint: #6b6558;
+  --line: #d6d0c5;       /* Stone */
+  --line-dark: #2a2825;
+  --gold: #6a5735;       /* Champagne, darkened for AA on Ivory (6.1:1) */
+  --gold-light: #b4935a; /* Champagne, full strength -- dark surfaces only */
+  --oxblood: #481b24;    /* Limited/editorial accent -- sparingly, per brand guide */
   --green: #3f5f45;
-  --tile: #ece6d9;
+  --tile: #e5ddcc;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -99,7 +102,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   outline: 3px solid #16130f;
   outline-offset: 2px;
 }
-.dark a:focus-visible, .dark button:focus-visible { outline-color: #cba25a; }
+.dark a:focus-visible, .dark button:focus-visible { outline-color: #b4935a; }
 
 .skip-link {
   position: absolute; left: -9999px; top: 0; z-index: 100;
@@ -125,11 +128,11 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--text);
-  font-family: 'Work Sans', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 15px;
   line-height: 1.5;
 }
-.serif { font-family: 'Newsreader', Georgia, serif; font-weight: 400; }
+.serif { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 400; }
 a { color: var(--gold); text-decoration: none; }
 a:hover { color: #6b5225; }
 /* WCAG 1.4.1: a link sitting inside a run of text must not be identified by colour alone,
@@ -162,8 +165,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   padding: 22px 72px; max-width: 1440px; margin: 0 auto; gap: 24px;
 }
 .logo {
-  font-family: 'Newsreader', Georgia, serif;
-  font-size: 27px; font-weight: 500; letter-spacing: 0.07em;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 28px; font-weight: 600; letter-spacing: 0.14em;
   color: var(--text); white-space: nowrap;
 }
 .nav-links { display: flex; gap: 30px; font-size: 13.5px; font-weight: 500; }
@@ -226,7 +229,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .pcard .shot img { width: 100%; height: 100%; object-fit: cover; }
 .pcard .title { font-size: 14px; font-weight: 600; color: var(--text); }
 .pcard .meta { font-size: 12px; color: var(--muted); margin-top: 5px; display: flex; align-items: center; gap: 6px; }
-.pcard .price { font-family: 'Newsreader', Georgia, serif; font-size: 19px; margin-top: 8px; }
+.pcard .price { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 19px; margin-top: 8px; }
 .pcard .sellers { font-size: 11.5px; color: var(--faint); margin-left: 8px; }
 .badge {
   position: absolute; top: 12px; left: 12px;
@@ -270,7 +273,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .field .hint { font-size: 11.5px; color: var(--faint); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .notice { padding: 14px 18px; border: 1px solid var(--line); background: var(--paper-alt); font-size: 13.5px; }
-.notice-bad { border-color: #c9a3a3; background: #f6ecec; color: #7a3030; }
+.notice-bad { border-color: #c9a5aa; background: #f5eceb; color: #481b24; }
 .notice-good { border-color: #a8bda9; background: #eef3ee; color: #2f4a34; }
 
 /* Sizes ------------------------------------------------------------- */
@@ -298,7 +301,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border: 1px solid var(--line-dark); background: #1c1813; color: #f2ede2;
   padding: 28px 32px;
 }
-.cert .no { font-family: 'Newsreader', Georgia, serif; font-size: 26px; letter-spacing: 0.08em; }
+.cert .no { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 26px; letter-spacing: 0.08em; }
 .cert-card {
   background: #16130f; color: #f2ede2; padding: 44px; border: 1px solid var(--line-dark);
   max-width: 720px; margin: 0 auto;
@@ -352,7 +355,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 `;
 
 const FONTS =
-  'https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Work+Sans:wght@400;500;600&display=swap';
+  'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@400;500;600&display=swap';
 
 export function icon(name, color = 'currentColor', size = 16) {
   const paths = {
@@ -410,7 +413,7 @@ export function productCard(p) {
 }
 
 export function layout({ title, description, body, env, cartCount = 0, activeNav = '', canonicalPath = '' }) {
-  const site = env?.SITE_NAME || 'Mintmark';
+  const site = env?.SITE_NAME || 'Rarehaus';
   const pageTitle = title ? `${title} · ${site}` : site;
   return `<!doctype html>
 <html lang="en">

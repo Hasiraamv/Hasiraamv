@@ -1,7 +1,7 @@
-// Mintmark in-house certification.
+// RAREHAUS in-house certification.
 //
-// Number format:  MM-26-SNK-04821-K
-//   MM     issuer prefix
+// Number format:  RH-26-SNK-04821-K
+//   RH     issuer prefix
 //   26     two-digit year of issue
 //   SNK    category code
 //   04821  sequence, unique within the year
@@ -65,7 +65,7 @@ function checkCharacter(payload) {
 export function buildCertificateNumber({ year, sequence, category }) {
   const yy = String(year % 100).padStart(2, '0');
   const seq = String(sequence).padStart(5, '0');
-  const body = `MM-${yy}-${category}-${seq}`;
+  const body = `RH-${yy}-${category}-${seq}`;
   return `${body}-${checkCharacter(body)}`;
 }
 
@@ -73,11 +73,11 @@ export function buildCertificateNumber({ year, sequence, category }) {
 export function parseCertificateNumber(input) {
   if (!input) return null;
   const normalised = String(input).trim().toUpperCase().replace(/\s+/g, '');
-  const match = /^MM-(\d{2})-([A-Z]{3})-(\d{5})-([0-9A-Z])$/.exec(normalised);
+  const match = /^RH-(\d{2})-([A-Z]{3})-(\d{5})-([0-9A-Z])$/.exec(normalised);
   if (!match) return null;
 
   const [, yy, category, seq, check] = match;
-  const body = `MM-${yy}-${category}-${seq}`;
+  const body = `RH-${yy}-${category}-${seq}`;
   if (checkCharacter(body) !== check) return null;
 
   return {

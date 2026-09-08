@@ -17,8 +17,12 @@ database_id = "8932b638-5ed4-4173-9fe3-c27c5203954c"
 # binding = "IMAGES"
 # bucket_name = "mintmark-images"
 
+# The Worker's technical name (top of this file) and the D1 database_name below stay
+# "mintmark" deliberately — renaming a live Worker changes its workers.dev URL and orphans
+# the old one, and that's a decision for you to make once rarehaus.in is ready to go live,
+# not something to do silently mid-rebrand. Only the customer-facing name changes here.
 [vars]
-SITE_NAME = "Mintmark"
+SITE_NAME = "Rarehaus"
 SITE_URL = "https://mintmark.rehanhussain859.workers.dev"
 CURRENCY = "INR"
 

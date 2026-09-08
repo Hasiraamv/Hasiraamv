@@ -116,7 +116,7 @@ export function refundBreakdown(order, reason = 'change_of_mind') {
   };
 }
 
-// Internal shelf number, one per physical item: MM-SNK-00042.
+// Internal shelf number, one per physical item: RH-SNK-00042.
 // Unlike a certificate number this is for you, not the buyer, so it carries no check
 // character — it is read off a label in your own warehouse, not typed by a stranger.
 export async function nextStockCode(db, categorySlug) {
@@ -125,7 +125,7 @@ export async function nextStockCode(db, categorySlug) {
     .prepare(
       `SELECT COUNT(*) AS n FROM offers WHERE stock_code LIKE ?`
     )
-    .bind(`MM-${code}-%`)
+    .bind(`RH-${code}-%`)
     .first();
 
   // Take the highest existing sequence rather than the count, so deleting an offer never
@@ -134,7 +134,7 @@ export async function nextStockCode(db, categorySlug) {
     .prepare(
       `SELECT stock_code FROM offers WHERE stock_code LIKE ? ORDER BY stock_code DESC LIMIT 1`
     )
-    .bind(`MM-${code}-%`)
+    .bind(`RH-${code}-%`)
     .first();
 
   let next = (row?.n || 0) + 1;
@@ -143,5 +143,5 @@ export async function nextStockCode(db, categorySlug) {
     if (m) next = Number(m[1]) + 1;
   }
 
-  return `MM-${code}-${String(next).padStart(5, '0')}`;
+  return `RH-${code}-${String(next).padStart(5, '0')}`;
 }

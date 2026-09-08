@@ -44,7 +44,7 @@ export function productPage({ product, offers, images, related, selectedSize, en
   <div>
     <div style="aspect-ratio:1/1; background:var(--tile); position:relative;">
       ${hero ? `<img src="${escapeHtml(hero.url)}" alt="${escapeHtml(product.title)}" style="width:100%;height:100%;object-fit:cover">` : ''}
-      <span class="badge">${icon('check', '#80632e', 12)} DUAL AUTHENTICATED</span>
+      <span class="badge">${icon('check', '#6a5735', 12)} DUAL AUTHENTICATED</span>
       ${underRetail ? `<span class="badge badge-right badge-under">UNDER RETAIL</span>` : ''}
     </div>
     ${
@@ -149,7 +149,7 @@ export function productPage({ product, offers, images, related, selectedSize, en
         The listed price includes import duty, customs clearance, dual authentication with a numbered
         certificate, and insured delivery to your door. Nothing further is payable when it arrives.
       </div>
-      <p class="refund-note" style="font-size:12px; color:var(--muted); line-height:1.6; margin:12px 0 0; padding-top:12px; border-top:1px solid #ddd5c2;">
+      <p class="refund-note" style="font-size:12px; color:var(--muted); line-height:1.6; margin:12px 0 0; padding-top:12px; border-top:1px solid #d6d0c5;">
         <strong>On refunds:</strong> if this piece is not authentic, damaged, or not as described,
         you get the full ${formatINR(best.landed_price)} back — duty and freight included, no
         deductions. If you simply change your mind, ${formatINR(
@@ -197,9 +197,9 @@ ${
               <strong style="font-size:14px;">${label}</strong>
               ${
                 o.kyc_verified
-                  ? `<span style="display:inline-flex; align-items:center; gap:4px; background:var(--paper-alt); border:1px solid #ddd5c2; padding:2px 6px; font-size:9.5px; color:var(--gold); font-weight:700;">${icon(
+                  ? `<span style="display:inline-flex; align-items:center; gap:4px; background:var(--paper-alt); border:1px solid #d6d0c5; padding:2px 6px; font-size:9.5px; color:var(--gold); font-weight:700;">${icon(
                       'check',
-                      '#80632e',
+                      '#6a5735',
                       9
                     )} KYC</span>`
                   : ''
@@ -246,7 +246,7 @@ ${
       </div>
       <div style="display:flex; flex-direction:column; gap:14px;">
         ${[
-          ['check', '#cba25a', 'Seller legit check — required to list', 'No listing goes live without an authentication report on file'],
+          ['check', '#b4935a', 'Seller legit check — required to list', 'No listing goes live without an authentication report on file'],
           ['clock', '#8b8474', 'In-house inspection — on arrival', '30-point check by our authenticator'],
           ['doc', '#8b8474', 'Certificate issued — before dispatch', 'Numbered and verifiable at /verify'],
         ]

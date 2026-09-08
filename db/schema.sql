@@ -1,4 +1,4 @@
--- Mintmark schema. All money columns are whole rupees (INTEGER), never floats.
+-- Rarehaus schema. All money columns are whole rupees (INTEGER), never floats.
 
 DROP TABLE IF EXISTS source_cities;
 DROP TABLE IF EXISTS category_rates;
@@ -64,7 +64,7 @@ CREATE INDEX idx_images_product ON product_images(product_id);
 -- landed_price is what the buyer pays, and it is the sum of the four parts below it.
 CREATE TABLE offers (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  stock_code     TEXT UNIQUE,            -- internal shelf number, generated: MM-SNK-00042
+  stock_code     TEXT UNIQUE,            -- internal shelf number, generated: RH-SNK-00042
   product_id     INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   seller_id      INTEGER NOT NULL REFERENCES sellers(id),
   size_label     TEXT NOT NULL DEFAULT 'One size',
@@ -85,8 +85,8 @@ CREATE INDEX idx_offers_price ON offers(product_id, size_label, landed_price);
 
 CREATE TABLE orders (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  public_ref      TEXT NOT NULL UNIQUE,   -- shown to the buyer, e.g. MM-4F2A19
-  certificate_no  TEXT UNIQUE,            -- issued at authentication, e.g. MM-00248-TYO
+  public_ref      TEXT NOT NULL UNIQUE,   -- shown to the buyer, e.g. RH-4F2A19
+  certificate_no  TEXT UNIQUE,            -- issued at authentication, e.g. RH-00248
   offer_id        INTEGER NOT NULL REFERENCES offers(id),
   product_id      INTEGER NOT NULL REFERENCES products(id),
   size_label      TEXT NOT NULL,
@@ -135,10 +135,9 @@ CREATE TABLE authenticators (
 -- A certificate is its own record, not a flag on an order: it outlives the sale,
 -- survives resale, and can be revoked without touching order history.
 --
--- Number format: MM-26-TYO-SNK-04821-K
---   MM     issuer
+-- Number format: RH-26-SNK-04821-K
+--   RH     issuer
 --   26     year of issue
---   TYO    source city code
 --   SNK    category code
 --   04821  zero-padded sequence, unique within year
 --   K      check character (Luhn mod 36) so typos and invented numbers fail instantly

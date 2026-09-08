@@ -38,11 +38,11 @@ export function authenticationPage(env) {
 </ol>
 
 <h3 class="serif" style="${H3}">Reading a certificate number</h3>
-<div class="serif" style="font-size:24px; letter-spacing:0.06em; margin:14px 0;">MM-26-SNK-00248-G</div>
+<div class="serif" style="font-size:24px; letter-spacing:0.06em; margin:14px 0;">RH-26-SNK-00248-M</div>
 <table class="table" style="background:none;">
   <tbody>
     ${[
-      ['MM', 'Issued by us'],
+      ['RH', 'Issued by us'],
       ['26', 'Year of issue'],
       ['SNK', 'Category — sneakers'],
       ['00248', 'Sequence within that year'],
@@ -201,7 +201,7 @@ export function returnsPage(env) {
 }
 
 export function termsPage(env) {
-  const site = env?.SITE_NAME || 'Mintmark';
+  const site = env?.SITE_NAME || 'Rarehaus';
   return page({
     eyebrow: 'Terms',
     title: 'Terms of service',
@@ -345,7 +345,7 @@ export function privacyPage(env) {
 }
 
 export function aboutPage(env) {
-  const site = env?.SITE_NAME || 'Mintmark';
+  const site = env?.SITE_NAME || 'Rarehaus';
   return page({
     eyebrow: 'About',
     title: escapeHtml(site),
@@ -396,7 +396,7 @@ export function contactPage(env) {
 
 <h3 class="serif" style="${H3}">Order questions</h3>
 <p style="${P}">
-  Have your order reference ready — it looks like MM-4F2A19 and is in your confirmation email. You can
+  Have your order reference ready — it looks like RH-4F2A19 and is in your confirmation email. You can
   check the current stage yourself at <a href="/track">order tracking</a>.
 </p>
 
@@ -415,7 +415,7 @@ export function contactPage(env) {
 }
 
 export function sellPage({ submitted, error, env }) {
-  const site = env?.SITE_NAME || 'Mintmark';
+  const site = env?.SITE_NAME || 'Rarehaus';
   return `
 <section class="dark" style="padding:64px 0;">
   <div class="wrap">
@@ -441,7 +441,7 @@ export function sellPage({ submitted, error, env }) {
       .map(
         ([ic, t, d]) => `
       <div class="panel" style="padding:22px;">
-        <div style="margin-bottom:12px;">${icon(ic, '#80632e', 20)}</div>
+        <div style="margin-bottom:12px;">${icon(ic, '#6a5735', 20)}</div>
         <div style="font-size:15px; font-weight:600; margin-bottom:7px;">${t}</div>
         <div style="font-size:13px; color:var(--muted); line-height:1.65;">${d}</div>
       </div>`

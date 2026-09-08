@@ -31,7 +31,7 @@ export function cartPage({ items, total }) {
               ${it.size_label !== 'One size' ? `Size ${escapeHtml(it.size_label)} · ` : ''}${escapeHtml(it.condition)}
             </div>
             <div style="font-size:12.5px; color:var(--muted); margin-top:4px; display:flex; align-items:center; gap:6px;">
-              ${icon('clock', '#6e675a', 11)} Arrives ${e.from}–${e.to}
+              ${icon('clock', '#6b6558', 11)} Arrives ${e.from}–${e.to}
             </div>
           </div>
           <div style="text-align:right;">
@@ -280,10 +280,10 @@ export function trackPage({ error }) {
 <section class="section" style="max-width:640px;">
   <span class="tag gold">Tracking</span>
   <h2 class="serif" style="font-size:34px; margin:10px 0 8px;">Track your order</h2>
-  <p class="muted" style="margin:0 0 22px;">Enter the reference from your confirmation email, e.g. MM-4F2A19.</p>
+  <p class="muted" style="margin:0 0 22px;">Enter the reference from your confirmation email, e.g. RH-4F2A19.</p>
   ${error ? `<div class="notice notice-bad" style="margin-bottom:16px;">${escapeHtml(error)}</div>` : ''}
   <form method="get" action="/track">
-    <div class="field"><input name="ref" placeholder="MM-XXXXXX" required maxlength="20" autocapitalize="characters"></div>
+    <div class="field"><input name="ref" placeholder="RH-XXXXXX" required maxlength="20" autocapitalize="characters"></div>
     <button class="btn" type="submit">Find my order</button>
   </form>
 </section>`;

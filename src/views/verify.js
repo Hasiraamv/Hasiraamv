@@ -15,7 +15,7 @@ export function verifyPage({ query, code, result }) {
     <div class="form-row">
       <div class="field">
         <label for="no">Certificate number</label>
-        <input id="no" name="no" value="${escapeHtml(query || '')}" placeholder="MM-26-SNK-00248-G" required maxlength="30" autocapitalize="characters">
+        <input id="no" name="no" value="${escapeHtml(query || '')}" placeholder="RH-26-SNK-00248-M" required maxlength="30" autocapitalize="characters">
       </div>
       <div class="field">
         <label for="code">Verification code (optional)</label>
@@ -30,11 +30,11 @@ export function verifyPage({ query, code, result }) {
 
   <div class="panel" style="padding:24px; margin-top:26px;">
     <h3 class="serif" style="font-size:20px; margin:0 0 12px;">How to read a certificate number</h3>
-    <div class="serif" style="font-size:22px; letter-spacing:0.06em; margin-bottom:14px;">MM-26-SNK-00248-G</div>
+    <div class="serif" style="font-size:22px; letter-spacing:0.06em; margin-bottom:14px;">RH-26-SNK-00248-M</div>
     <table class="table" style="background:none;">
       <tbody>
         ${[
-          ['MM', 'Issued by us'],
+          ['RH', 'Issued by us'],
           ['26', 'Year of issue'],
           ['SNK', 'Category — sneakers'],
           ['00248', 'Sequence within the year'],
@@ -93,7 +93,7 @@ function renderResult(result) {
         c.certificate_no
       )}</div>
     </div>
-    ${icon('shield', '#cba25a', 34)}
+    ${icon('shield', '#b4935a', 34)}
   </div>
 
   <div class="cert-row"><span class="k">Item</span><span>${escapeHtml(c.product_title)}</span></div>

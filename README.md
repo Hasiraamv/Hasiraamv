@@ -1,4 +1,4 @@
-# Mintmark
+# Rarehaus
 
 An authenticated import marketplace: many verified sellers list the same piece, buyers see
 every offer side by side, and nothing ships without being authenticated twice and certified.
@@ -22,13 +22,12 @@ server-rendered HTML directly.
 
 ## Certification
 
-Certificate numbers look like `MM-26-TYO-SNK-00248-M`:
+Certificate numbers look like `RH-26-SNK-00248-M`:
 
 | Part | Meaning |
 | --- | --- |
-| `MM` | Issuer |
+| `RH` | Issuer |
 | `26` | Year of issue |
-| `TYO` | Source city (Tokyo, Seoul, Milan, Geneva, Paris, London, Florence) |
 | `SNK` | Category (SNK, STW, WCH, BAG, JWL, COL) |
 | `00248` | Sequence within the year |
 | `M` | Check character (Luhn mod 36) |
@@ -53,7 +52,7 @@ it is not proof of authenticity.
 npm install
 
 # 1. Create the database, then paste the returned database_id into wrangler.toml
-npx wrangler d1 create mintmark
+npx wrangler d1 create mintmark  # infra name kept as-is deliberately -- see wrangler.toml
 
 # 2. Apply schema and sample data
 npm run db:schema
@@ -89,10 +88,10 @@ Adding a listing means typing a title and a seller price. Everything below is de
 | Authentication fee | Flat per category, from the same rates |
 | Shipping and lead time | From the source city's row in Rates |
 | Landed price | The four parts added up — never typed, so it cannot disagree with them |
-| Internal stock code | `MM-SNK-00042`, assigned per offer. Sequence comes from the highest existing code, so deleting an offer never reissues a number already printed on a label |
-| Certificate number | `MM-26-SNK-00248-G` on authentication — year, category, sequence, check character |
+| Internal stock code | `RH-SNK-00042`, assigned per offer. Sequence comes from the highest existing code, so deleting an offer never reissues a number already printed on a label |
+| Certificate number | `RH-26-SNK-00248-M` on authentication — year, category, sequence, check character |
 | Verification code | Random six characters at issue, shown once |
-| Order reference | `MM-7A6413` at checkout |
+| Order reference | `RH-7A6413` at checkout |
 | Delivery dates | From the offer's lead days |
 | "Under retail" badge | Whenever a retail price is set and the landed price is lower |
 | Category counts, "from ₹X" | Counted from live offers |
