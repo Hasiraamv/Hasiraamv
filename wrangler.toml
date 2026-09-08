@@ -1,0 +1,50 @@
+name = "mintmark"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# Deploying to the pocket37 domain replaces whatever that Worker currently serves.
+# Set the route only when you are ready for that switchover.
+# routes = [{ pattern = "pocket37.com/*", zone_name = "pocket37.com" }]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mintmark"
+database_id = "8932b638-5ed4-4173-9fe3-c27c5203954c"
+
+# Product photo storage. Uncomment once R2 is enabled in the dashboard and the bucket exists,
+# otherwise `wrangler deploy` fails because the bucket cannot be found.
+# [[r2_buckets]]
+# binding = "IMAGES"
+# bucket_name = "mintmark-images"
+
+# The Worker's technical name (top of this file) and the D1 database_name below stay
+# "mintmark" deliberately — renaming a live Worker changes its workers.dev URL and orphans
+# the old one, and that's a decision for you to make once rarehaus.in is ready to go live,
+# not something to do silently mid-rebrand. Only the customer-facing name changes here.
+[vars]
+SITE_NAME = "Rarehaus"
+SITE_URL = "https://mintmark.rehanhussain859.workers.dev"
+CURRENCY = "INR"
+
+# DEMO_MODE shows a banner saying the catalogue is sample data and no orders are fulfilled.
+# Leave it "true" until you are selling real stock — the listings, sellers and prices below
+# are invented, and presenting them as a live shop would mislead buyers.
+DEMO_MODE = "true"
+
+# Business details. These appear in your policies, footer and contact page. Every page that
+# needs them reads from here, so fill them in once. Leaving a value blank shows a visible
+# placeholder rather than silently omitting a legally required detail.
+LEGAL_NAME = ""
+REGISTERED_ADDRESS = ""
+SUPPORT_EMAIL = ""
+SUPPORT_WHATSAPP = ""
+GSTIN = ""
+CIN = ""
+GRIEVANCE_OFFICER = ""
+GRIEVANCE_EMAIL = ""
+GRIEVANCE_PHONE = ""
+JURISDICTION_CITY = ""
+
+# Secrets (set with `wrangler secret put <NAME>`, never commit them):
+#   ADMIN_PASSWORD   password for /admin
+#   SESSION_SECRET   random string used to sign admin and cart cookies
