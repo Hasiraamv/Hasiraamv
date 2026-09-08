@@ -22,6 +22,7 @@ import {
 import { readCart, writeCart, sameOrigin, publicRef } from './session.js';
 import { getClerkAuth, getClerkUserProfile, verifyClerkWebhook, clerkConfigured } from './clerk.js';
 import { sendWelcomeEmail } from './email.js';
+import { handleChat } from './chatbot.js';
 import { signInPage, signUpPage, accountPage, clerkNotConfiguredPage } from './views/account.js';
 
 export default {
@@ -73,6 +74,7 @@ async function route(request, env, ctx) {
   }
 
   if (path === '/webhooks/clerk' && method === 'POST') return clerkWebhook(request, env, ctx);
+  if (path === '/chat' && method === 'POST') return handleChat(request, env);
 
   if (path.startsWith('/admin')) {
     return adminRouter(request, env, path);

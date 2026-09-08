@@ -375,6 +375,37 @@ button, input, select, textarea { font: inherit; color: inherit; }
   body { background: #fff; }
   .cert-card { border: 1px solid #000; }
 }
+
+/* Chat widget -------------------------------------------------------- */
+.chat-fab {
+  position: fixed; bottom: 22px; right: 22px; z-index: 60;
+  width: 52px; height: 52px; border-radius: 50%; border: 0;
+  background: var(--ink); color: var(--gold-light); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 12px 28px -10px rgba(17, 17, 17, 0.45);
+}
+.chat-panel {
+  position: fixed; bottom: 86px; right: 22px; z-index: 60;
+  width: min(360px, calc(100vw - 44px)); height: min(480px, calc(100vh - 140px));
+  background: var(--card); border: 1px solid var(--line);
+  box-shadow: 0 26px 60px -20px rgba(17, 17, 17, 0.35);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.chat-panel[hidden] { display: none; }
+.chat-head {
+  background: var(--ink); color: var(--paper); padding: 14px 16px;
+  font-family: 'Bodoni Moda', Didot, 'Bodoni MT', Georgia, serif; font-size: 15px; letter-spacing: 0.04em;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.chat-head button { background: none; border: 0; color: #8b8474; cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 4px; }
+.chat-log { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.chat-msg { font-size: 13.5px; line-height: 1.55; max-width: 88%; padding: 8px 12px; }
+.chat-msg.user { align-self: flex-end; background: var(--ink); color: var(--paper); }
+.chat-msg.bot { align-self: flex-start; background: var(--paper-alt); color: var(--text); border: 1px solid var(--line); }
+.chat-form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+.chat-form input { flex: 1; border: 1px solid #ddd5c2; padding: 10px 12px; font-size: 13px; outline: none; }
+.chat-form input:focus { border-color: var(--gold); }
+.chat-form button { background: var(--ink); color: var(--paper); border: 0; padding: 0 16px; cursor: pointer; font-size: 13px; }
 `;
 
 const FONTS =
@@ -446,6 +477,81 @@ export function productCard(p) {
     </span>
   </span>
 </a>`;
+}
+
+function chatWidget(site) {
+  return `
+<button class="chat-fab no-print" id="chat-fab" aria-label="Open help chat" aria-expanded="false">${icon(
+    'whatsapp',
+    'currentColor',
+    22
+  )}</button>
+<div class="chat-panel no-print" id="chat-panel" hidden>
+  <div class="chat-head">
+    <span>${escapeHtml(site)} help</span>
+    <button type="button" id="chat-close" aria-label="Close chat">&times;</button>
+  </div>
+  <div class="chat-log" id="chat-log">
+    <div class="chat-msg bot">Hi — ask about authentication, shipping, returns, or an order reference (RH-XXXXXX).</div>
+  </div>
+  <form class="chat-form" id="chat-form">
+    <label for="chat-input" class="visually-hidden">Message</label>
+    <input id="chat-input" type="text" placeholder="Type a message…" maxlength="800" autocomplete="off" required>
+    <button type="submit">Send</button>
+  </form>
+</div>
+<script>
+(function () {
+  var fab = document.getElementById('chat-fab');
+  var panel = document.getElementById('chat-panel');
+  var log = document.getElementById('chat-log');
+  var form = document.getElementById('chat-form');
+  var input = document.getElementById('chat-input');
+  var history = [];
+  var busy = false;
+
+  fab.addEventListener('click', function () {
+    var open = panel.hasAttribute('hidden');
+    if (open) { panel.removeAttribute('hidden'); input.focus(); } else { panel.setAttribute('hidden', ''); }
+    fab.setAttribute('aria-expanded', String(open));
+  });
+  document.getElementById('chat-close').addEventListener('click', function () {
+    panel.setAttribute('hidden', '');
+    fab.setAttribute('aria-expanded', 'false');
+  });
+
+  function addMsg(role, text) {
+    var div = document.createElement('div');
+    div.className = 'chat-msg ' + (role === 'user' ? 'user' : 'bot');
+    div.textContent = text;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = input.value.trim();
+    if (!text || busy) return;
+    addMsg('user', text);
+    history.push({ role: 'user', content: text });
+    input.value = '';
+    busy = true;
+    fetch('/chat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: text, history: history.slice(0, -1) }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var reply = data.reply || "Sorry, I couldn't reply just now.";
+        addMsg('bot', reply);
+        history.push({ role: 'assistant', content: reply });
+      })
+      .catch(function () { addMsg('bot', "Sorry, something went wrong. Try /contact instead."); })
+      .finally(function () { busy = false; });
+  });
+})();
+</script>`;
 }
 
 export function layout({ title, description, body, env, cartCount = 0, activeNav = '', canonicalPath = '', user = null }) {
@@ -578,6 +684,7 @@ ${body}
     </div>
   </div>
 </footer>
+${env?.GROQ_API_KEY ? chatWidget(site) : ''}
 <script>
   document.addEventListener('click', function (e) {
     document.querySelectorAll('.nav-pop[open]').forEach(function (d) {

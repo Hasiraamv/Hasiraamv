@@ -70,6 +70,11 @@ JURISDICTION_CITY = "Guwahati"
 CLERK_PUBLISHABLE_KEY = ""
 RESEND_FROM = "Rarehaus <welcome@rarehaus.in>"
 
+# Help chat, via Groq (a fast, free-tier OpenAI-compatible inference API -- console.groq.com).
+# The chat bubble in the footer only renders when GROQ_API_KEY is set (see render.js), so
+# leaving it unset just means no chat widget, nothing breaks.
+GROQ_MODEL = "llama-3.3-70b-versatile"
+
 # Secrets (set with `wrangler secret put <NAME>`, never commit them):
 #   ADMIN_PASSWORD        password for /admin
 #   SESSION_SECRET        random string used to sign admin and cart cookies
@@ -77,3 +82,4 @@ RESEND_FROM = "Rarehaus <welcome@rarehaus.in>"
 #   CLERK_WEBHOOK_SECRET  from the Clerk dashboard's Webhooks page, for the endpoint at
 #                         /webhooks/clerk (subscribe it to the user.created event)
 #   RESEND_API_KEY        from your Resend account, used to send the welcome email
+#   GROQ_API_KEY          from console.groq.com -- turns the help chat bubble on
