@@ -163,32 +163,32 @@ export function returnsPage(env) {
 
 <h3 class="serif" style="${H3}">If a piece arrives damaged or is not as described</h3>
 <p style="${P}">
-  Tell us within <strong>[YOUR WINDOW, e.g. 48 hours]</strong> of delivery, with photographs. If the
-  piece does not match its listed condition we arrange collection and refund the full amount,
-  including duty and freight. Do not wear or alter the item, and keep the seal and packaging — a
-  broken seal makes the claim much harder to assess.
+  Tell us within <strong>${detail(env, 'DAMAGE_REPORT_WINDOW')}</strong> of delivery, with
+  photographs. If the piece does not match its listed condition we arrange collection and refund
+  the full amount, including duty and freight. Do not wear or alter the item, and keep the seal and
+  packaging — a broken seal makes the claim much harder to assess.
 </p>
 
 <h3 class="serif" style="${H3}">Change of mind</h3>
 <p style="${P}">
-  <strong>[SET YOUR WINDOW AND CONDITIONS HERE.]</strong> Within that window, the piece and
-  authentication fee are refunded; duty and freight are not, for the reasons above. Most
-  marketplaces of this kind either do not accept change-of-mind returns at all, or accept them
-  within a short window with this same duty-and-freight deduction. Pick one and apply it
-  consistently.
+  Every piece is sourced and imported specifically to fulfil your order, so once it has been
+  dispatched to you, duty has been paid and freight has been flown on your behalf — there is no
+  change-of-mind return or exchange at that point. Before dispatch, cancel any time free of charge
+  under "Cancellations" below. This does not affect your right to a return if the piece is faulty,
+  damaged, or not as described, under the sections above.
 </p>
 
 <h3 class="serif" style="${H3}">Cancellations</h3>
 <p style="${P}">
   You may cancel free of charge, with a full refund of everything paid, any time before the piece is
-  dispatched to you — nothing has been imported yet at that point. After dispatch, cancellation is
-  treated as a return under the terms above.
+  dispatched to you — nothing has been imported yet at that point. After dispatch, the piece can
+  only be returned under the terms above.
 </p>
 
 <h3 class="serif" style="${H3}">How refunds are paid</h3>
 <p style="${P}">
-  Refunds go to the original payment method within <strong>[YOUR TIMEFRAME, e.g. 7 working
-  days]</strong> of approval. We confirm by email when it is issued.
+  Refunds go to the original payment method within <strong>${detail(env, 'REFUND_TIMEFRAME')}</strong>
+  of approval. We confirm by email when it is issued.
 </p>
 
 <h3 class="serif" style="${H3}">How to start a return</h3>
@@ -232,6 +232,34 @@ export function termsPage(env) {
   insured delivery. Applicable taxes are included as shown at checkout. Prices change with the market
   and currency; the price that applies is the one displayed when you place your order.
 </p>
+<p style="${P}">
+  If a listing shows an incorrect price because of a technical, pricing or human error, we may
+  cancel the affected order and refund you in full rather than dispatch it at the mistaken price. We
+  will always tell you if this happens.
+</p>
+
+<h3 class="serif" style="${H3}">Coupons and promotions</h3>
+<p style="${P}">
+  A coupon or promotional code is valid only for the scope, minimum order value, expiry and use
+  limit shown when it was issued, has no cash value, and cannot be combined with another offer
+  unless we say so. We may end or change a promotion at any time and may cancel an order or void a
+  code used in a way that abuses its terms — for example, a code shared beyond its intended
+  audience or used to place bulk or fraudulent orders.
+</p>
+
+<h3 class="serif" style="${H3}">Order review and fraud prevention</h3>
+<p style="${P}">
+  Because every piece is individually imported on your behalf, we may hold, request further
+  verification for, or cancel an order we reasonably suspect is fraudulent, placed in error, or in
+  breach of these terms, before it ships. Where we cancel an order for this reason, you are refunded
+  in full.
+</p>
+
+<h3 class="serif" style="${H3}">Eligibility</h3>
+<p style="${P}">
+  You must be at least 18 years old and able to form a binding contract under Indian law to place an
+  order.
+</p>
 
 <h3 class="serif" style="${H3}">Delivery estimates</h3>
 <p style="${P}">
@@ -258,6 +286,20 @@ export function termsPage(env) {
   Give accurate delivery and contact details — we cannot be responsible for a parcel sent to an
   address you entered incorrectly. Do not use the site to place fraudulent orders or to resell
   counterfeit goods to us.
+</p>
+
+<h3 class="serif" style="${H3}">Site content</h3>
+<p style="${P}">
+  Photography, text, and the ${escapeHtml(site)} name and marks on this site are ours or used with
+  permission, and may not be copied or reused without asking us first.
+</p>
+
+<h3 class="serif" style="${H3}">Events outside our control</h3>
+<p style="${P}">
+  We are not liable for a delay or failure caused by something reasonably outside our control —
+  customs action, a natural disaster, a strike, or a failure of a courier, payment or import
+  partner we rely on. We will still keep you informed and, where a resulting delay becomes
+  unreasonable, you may cancel for a full refund under <a href="/returns">returns</a>.
 </p>
 
 <h3 class="serif" style="${H3}">Limits</h3>
@@ -325,15 +367,22 @@ export function privacyPage(env) {
 
 <h3 class="serif" style="${H3}">How long we keep it</h3>
 <p style="${P}">
-  Order and certificate records are kept for <strong>[YOUR PERIOD, e.g. 8 years]</strong> because tax
-  and customs rules require it, and because a certificate has to remain verifiable long after the sale.
+  Order and certificate records are kept for <strong>${detail(env, 'DATA_RETENTION_PERIOD')}</strong>
+  because tax and customs rules require it, and because a certificate has to remain verifiable long
+  after the sale.
 </p>
 
 <h3 class="serif" style="${H3}">Your choices</h3>
 <p style="${P}">
   You can ask for a copy of your data, ask us to correct it, or ask us to delete it where we are not
   required to keep it. Write to ${detail(env, 'SUPPORT_EMAIL')} and we will respond within
-  <strong>[YOUR TIMEFRAME]</strong>.
+  <strong>${detail(env, 'PRIVACY_REQUEST_TIMEFRAME')}</strong>.
+</p>
+
+<h3 class="serif" style="${H3}">If something goes wrong</h3>
+<p style="${P}">
+  If a data breach puts your personal data at risk, we will tell you and the relevant authority
+  without undue delay, and explain what we are doing about it.
 </p>
 
 <h3 class="serif" style="${H3}">Contact</h3>
