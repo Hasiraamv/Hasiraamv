@@ -577,7 +577,7 @@ async function sourcingSubmit(request, env) {
   const contact = String(form.get('contact') || '').trim().slice(0, 120);
   if (!item || !contact) return redirect('/?sourcing=invalid');
 
-  const budgetRaw = String(form.get('budget') || '').replace(/[^\d]/g, '');
+  const budgetRaw = String(form.get('budget') || '').split('.')[0].replace(/[^\d]/g, '');
   await db.createSourcingRequest(env.DB, {
     item,
     sizeLabel: String(form.get('size') || '').trim().slice(0, 40) || null,

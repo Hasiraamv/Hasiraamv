@@ -52,6 +52,7 @@ const ROUTE_RULES = [
   { test: (p) => p === '/admin/orders', roles: ['owner', 'authenticator', 'warehouse', 'support'] },
   { test: (p) => p === '/admin/orders/advance', roles: ['owner', 'authenticator', 'warehouse'] },
   { test: (p) => p.startsWith('/admin/certificates'), roles: ['owner', 'authenticator'] },
+  { test: (p) => p.startsWith('/admin/authentication'), roles: ['owner', 'authenticator'] },
   { test: (p) => p === '/admin/listings' || p === '/admin/offers/status', roles: ['owner', 'authenticator', 'warehouse'] },
   {
     test: (p) =>
@@ -175,11 +176,21 @@ export async function adminRouter(request, env, path) {
 
   if (path === '/admin') return dashboard(env, currentUser);
   if (path === '/admin/orders')
-    return ordersPage(env, new URL(request.url).searchParams.get('issued'));
+    return ordersPage(env, new URL(request.url).searchParams.get('issued'), new URL(request.url).searchParams.get('error'));
   if (path === '/admin/orders/advance' && method === 'POST') return advanceOrder(request, env, currentUser);
   if (path === '/admin/certificates') return certificatesPage(env);
   if (path === '/admin/certificates/issue' && method === 'POST') return issueCert(request, env, currentUser);
   if (path === '/admin/certificates/revoke' && method === 'POST') return revokeCert(request, env, currentUser);
+  if (path === '/admin/authentication')
+    return authenticationPage(env, currentUser, new URL(request.url).searchParams.get('error'));
+  {
+    const m = path.match(/^\/admin\/authentication\/(\d+)\/assign$/);
+    if (m && method === 'POST') return assignAuthCase(request, env, Number(m[1]), currentUser);
+  }
+  {
+    const m = path.match(/^\/admin\/authentication\/(\d+)\/decide$/);
+    if (m && method === 'POST') return decideAuthCase(request, env, Number(m[1]), currentUser);
+  }
   if (path === '/admin/products') {
     const qs = new URL(request.url).searchParams;
     const forOffer = Number(qs.get('offer_for'));
@@ -248,6 +259,7 @@ function adminHtml(body, status = 200, extraHeaders = {}) {
   <nav class="nav-links">
     <a href="/admin/orders">Orders</a>
     <a href="/admin/certificates">Certificates</a>
+    <a href="/admin/authentication">Authentication</a>
     <a href="/admin/listings">Listings</a>
     <a href="/admin/products">Add &amp; edit</a>
     <a href="/admin/rates">Rates</a>
@@ -391,7 +403,11 @@ function ordersTable(orders) {
             : '<span class="faint">—</span>'
         }</td>
         <td data-label="Advance">${
-          next
+          o.status === 'authentication_failed'
+            ? '<span style="color:var(--oxblood); font-weight:600;">Failed authentication</span>'
+            : next === 'authenticated'
+            ? `<a class="chip" href="/admin/authentication">→ Authenticate</a>`
+            : next
             ? `<form method="post" action="/admin/orders/advance" style="display:flex; gap:6px;">
                  <input type="hidden" name="order_id" value="${o.id}">
                  <input type="hidden" name="status" value="${next}">
@@ -408,7 +424,7 @@ function ordersTable(orders) {
 </table>`;
 }
 
-async function ordersPage(env, issuedNo) {
+async function ordersPage(env, issuedNo, errorMessage) {
   const orders = await db.listOrders(env.DB, 100);
 
   let banner = '';
@@ -440,9 +456,11 @@ async function ordersPage(env, issuedNo) {
   return adminHtml(`
 <h2 class="serif" style="font-size:32px; margin:0 0 8px;">Orders</h2>
 <p class="muted" style="margin:0 0 22px; font-size:13.5px;">
-  Advancing an order adds a stage to the buyer's tracking timeline immediately. Moving one to
-  <strong>authenticated</strong> issues its certificate automatically.
+  Advancing an order adds a stage to the buyer's tracking timeline immediately. Authentication
+  itself happens on the <a href="/admin/authentication">Authentication</a> page, not here --
+  passing it is what issues the certificate and moves the order on.
 </p>
+${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${escapeHtml(errorMessage)}</div>` : ''}
 ${banner}
 ${ordersTable(orders)}`);
 }
@@ -453,10 +471,18 @@ async function advanceOrder(request, env, currentUser) {
   const status = String(form.get('status') || '');
   if (!Number.isInteger(orderId) || !ORDER_STAGES.includes(status)) return redirect('/admin/orders');
 
+  // Authentication is no longer a stage you can just click through -- it needs an actual
+  // decision recorded on a case (see /admin/authentication), which is what is allowed to move
+  // an order on to "authenticated" (and so issue its certificate). ordersTable no longer
+  // offers this as a button, but the route itself refuses it too, since a POST can be crafted
+  // by hand regardless of what the UI shows.
+  if (status === 'authenticated') {
+    return redirect('/admin/orders?error=' + encodeURIComponent('Authenticate this order from the Authentication page, not here.'));
+  }
+
   const notes = {
     seller_shipped: 'Seller dispatched the piece to our authentication facility.',
     authenticating: 'Arrived at our facility. 30-point inspection under way.',
-    authenticated: 'Passed inspection. Certificate issued and package sealed.',
     in_transit: 'Duties paid. In transit and clearing customs.',
     out_for_delivery: 'With the local courier for delivery.',
     delivered: 'Delivered and signed for.',
@@ -470,13 +496,10 @@ async function advanceOrder(request, env, currentUser) {
     request,
   });
 
-  // Passing authentication is what earns a certificate, so issue it here rather than
-  // leaving it as a separate step someone can forget.
-  if (status === 'authenticated') {
-    const issued = await issueCertificateForOrder(env, orderId);
-    if (issued) {
-      return redirect(`/admin/orders?issued=${encodeURIComponent(issued.certificateNo)}`);
-    }
+  // Arriving at the facility opens its authentication case, so there's always exactly one
+  // case per order and it exists the moment there's actually something to inspect.
+  if (status === 'authenticating') {
+    await env.DB.prepare('INSERT OR IGNORE INTO authentication_cases (order_id) VALUES (?)').bind(orderId).run();
   }
 
   if (status === 'delivered') {
@@ -534,9 +557,14 @@ async function certificatesPage(env) {
       ORDER BY c.created_at DESC LIMIT 100`
   ).all();
 
+  // Only orders whose authentication case has actually passed -- issuing a certificate is
+  // what the case's "Pass" decision is for, this panel is a manual re-issue/override path,
+  // not a way around the case system.
   const { results: awaiting } = await env.DB.prepare(
     `SELECT o.id, o.public_ref, o.size_label, p.title AS product_title
-       FROM orders o JOIN products p ON p.id = o.product_id
+       FROM orders o
+       JOIN products p ON p.id = o.product_id
+       JOIN authentication_cases ac ON ac.order_id = o.id AND ac.status = 'passed'
       WHERE o.certificate_no IS NULL
       ORDER BY o.created_at DESC LIMIT 50`
   ).all();
@@ -686,6 +714,180 @@ async function revokeCert(request, env, currentUser) {
     request,
   });
   return redirect('/admin/certificates');
+}
+
+// Authentication -----------------------------------------------------------------------
+// A dedicated case per order (see authentication_cases in db/schema.sql), separate from
+// ordinary order-status editing. Passing one is the only way an order reaches "authenticated"
+// and gets its certificate; failing one sends it to "authentication_failed" instead. Owner
+// and Authenticator roles only.
+
+async function authenticationPage(env, currentUser, errorMessage) {
+  const { results: cases } = await env.DB.prepare(
+    `SELECT ac.*, o.public_ref, o.size_label, o.buyer_name, p.title AS product_title,
+            au.name AS assigned_name
+       FROM authentication_cases ac
+       JOIN orders o ON o.id = ac.order_id
+       JOIN products p ON p.id = o.product_id
+       LEFT JOIN admin_users au ON au.id = ac.assigned_to
+      WHERE ac.status IN ('not_started', 'assigned')
+      ORDER BY ac.created_at`
+  ).all();
+
+  const { results: recent } = await env.DB.prepare(
+    `SELECT ac.*, o.public_ref, p.title AS product_title
+       FROM authentication_cases ac
+       JOIN orders o ON o.id = ac.order_id
+       JOIN products p ON p.id = o.product_id
+      WHERE ac.status IN ('passed', 'failed')
+      ORDER BY ac.decided_at DESC LIMIT 20`
+  ).all();
+
+  const { results: auths } = await env.DB.prepare('SELECT * FROM authenticators WHERE active = 1 ORDER BY initials').all();
+
+  const row = (c) => {
+    const mine = c.assigned_to === currentUser.id;
+    return `<div class="panel" style="padding:20px; margin-bottom:16px;">
+      <div style="display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px;">
+        <div>
+          <strong style="font-size:15px;">${escapeHtml(c.product_title)}</strong>${c.size_label && c.size_label !== 'One size' ? ` · ${escapeHtml(c.size_label)}` : ''}
+          <div style="font-size:12px; color:var(--faint); margin-top:2px;">
+            <a href="/order/${encodeURIComponent(c.public_ref)}" target="_blank">${escapeHtml(c.public_ref)}</a>
+            &middot; buyer ${escapeHtml(c.buyer_name)}
+          </div>
+        </div>
+        <span class="tag" style="color:${c.status === 'assigned' ? 'var(--gold)' : 'var(--muted)'};">
+          ${c.status === 'assigned' ? `Assigned to ${escapeHtml(c.assigned_name || '?')}` : 'Not started'}
+        </span>
+      </div>
+
+      ${
+        c.status === 'not_started'
+          ? `<form method="post" action="/admin/authentication/${c.id}/assign">
+               <button class="chip" type="submit" style="cursor:pointer;">Assign to me</button>
+             </form>`
+          : mine || currentUser.role === 'owner'
+          ? `<form method="post" action="/admin/authentication/${c.id}/decide">
+               <div class="form-row">
+                 <div class="field"><label for="auth_id_${c.id}">Signed by</label>
+                   <select id="auth_id_${c.id}" name="authenticator_id">
+                     <option value="">—</option>
+                     ${(auths || []).map((a) => `<option value="${a.id}">${escapeHtml(a.initials)} — ${escapeHtml(a.full_name)}</option>`).join('')}
+                   </select>
+                 </div>
+                 <div class="field"><label for="report_${c.id}">Seller report reference</label><input id="report_${c.id}" name="report" maxlength="60" placeholder="LC-000000"></div>
+               </div>
+               <div class="field"><label for="notes_${c.id}">Inspection notes</label><textarea id="notes_${c.id}" name="notes" rows="2" maxlength="1000" placeholder="Material, hardware, stitching, logo, packaging..."></textarea></div>
+               <div style="display:flex; gap:10px;">
+                 <button class="btn" type="submit" name="result" value="pass" style="background:var(--green,#3f5f45);">Pass — issue certificate</button>
+                 <button class="btn" type="submit" name="result" value="fail" style="background:var(--oxblood);">Fail</button>
+               </div>
+             </form>`
+          : `<p class="muted" style="font-size:12.5px; margin:0;">Assigned to ${escapeHtml(c.assigned_name || 'someone else')}. Only they (or an Owner) can record the result.</p>`
+      }
+    </div>`;
+  };
+
+  return adminHtml(`
+<h2 class="serif" style="font-size:32px; margin:0 0 8px;">Authentication</h2>
+<p class="muted" style="margin:0 0 22px; font-size:13.5px; max-width:640px;">
+  Every order opens a case here the moment it arrives at the facility. Passing one issues its
+  certificate and moves the order on; failing one stops it there instead -- neither happens
+  from the Orders page any more.
+</p>
+${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${escapeHtml(errorMessage)}</div>` : ''}
+
+${(cases || []).length ? cases.map(row).join('') : '<div class="notice">Nothing waiting on authentication right now.</div>'}
+
+${
+  (recent || []).length
+    ? `<h3 class="serif" style="font-size:22px; margin:32px 0 14px;">Recently decided</h3>
+       <table class="table">
+         <thead><tr><th>Item</th><th>Order</th><th>Result</th><th>When</th></tr></thead>
+         <tbody>
+           ${recent
+             .map(
+               (c) => `<tr>
+             <td data-label="Item">${escapeHtml(c.product_title)}</td>
+             <td data-label="Order"><a href="/order/${encodeURIComponent(c.public_ref)}" target="_blank">${escapeHtml(c.public_ref)}</a></td>
+             <td data-label="Result"><span class="tag" style="color:${c.status === 'passed' ? 'var(--green)' : 'var(--oxblood)'};">${escapeHtml(c.status)}</span></td>
+             <td data-label="When" style="font-size:12px;">${escapeHtml(String(c.decided_at || '').slice(0, 16).replace('T', ' '))}</td>
+           </tr>`
+             )
+             .join('')}
+         </tbody>
+       </table>`
+    : ''
+}`);
+}
+
+async function assignAuthCase(request, env, caseId, currentUser) {
+  await env.DB.prepare(
+    "UPDATE authentication_cases SET status = 'assigned', assigned_to = ? WHERE id = ? AND status = 'not_started'"
+  )
+    .bind(currentUser.id, caseId)
+    .run();
+  await logAudit(env, currentUser, 'authentication.assigned', { entityType: 'authentication_case', entityId: caseId, request });
+  return redirect('/admin/authentication');
+}
+
+async function decideAuthCase(request, env, caseId, currentUser) {
+  const form = await request.formData();
+  const result = form.get('result') === 'pass' ? 'passed' : 'fail';
+  const notes = String(form.get('notes') || '').trim().slice(0, 1000) || null;
+
+  const authCase = await env.DB.prepare(
+    `SELECT ac.*, o.id AS order_id FROM authentication_cases ac JOIN orders o ON o.id = ac.order_id WHERE ac.id = ?`
+  )
+    .bind(caseId)
+    .first();
+  if (!authCase) return redirect('/admin/authentication');
+
+  // Only the person it's assigned to, or an Owner, can record the result -- an Authenticator
+  // can't quietly pass their own unassigned case by hitting this route directly.
+  if (authCase.assigned_to !== currentUser.id && currentUser.role !== 'owner') {
+    return redirect('/admin/authentication?error=' + encodeURIComponent('This case is assigned to someone else.'));
+  }
+
+  if (result === 'passed') {
+    const issued = await issueCertificateForOrder(env, authCase.order_id, {
+      authenticatorId: Number(form.get('authenticator_id')) || null,
+      sellerReportRef: String(form.get('report') || '').trim() || null,
+      notes,
+    });
+    if (!issued) {
+      return redirect('/admin/authentication?error=' + encodeURIComponent('Could not issue a certificate for this order -- it may already have one.'));
+    }
+    await env.DB.prepare(
+      "UPDATE authentication_cases SET status = 'passed', notes = ?, decided_by = ?, decided_at = datetime('now') WHERE id = ?"
+    )
+      .bind(notes, currentUser.id, caseId)
+      .run();
+    await db.addOrderEvent(env.DB, authCase.order_id, 'authenticated', 'Passed inspection. Certificate issued and package sealed.');
+    await logAudit(env, currentUser, 'authentication.passed', {
+      entityType: 'authentication_case',
+      entityId: caseId,
+      detail: `certificate ${issued.certificateNo}`,
+      request,
+    });
+    return redirect(`/admin/orders?issued=${encodeURIComponent(issued.certificateNo)}`);
+  }
+
+  await env.DB.prepare(
+    "UPDATE authentication_cases SET status = 'failed', notes = ?, decided_by = ?, decided_at = datetime('now') WHERE id = ?"
+  )
+    .bind(notes, currentUser.id, caseId)
+    .run();
+  await env.DB.prepare("UPDATE orders SET status = 'authentication_failed' WHERE id = ?").bind(authCase.order_id).run();
+  await db.addOrderEvent(
+    env.DB,
+    authCase.order_id,
+    'authentication_failed',
+    'This piece did not pass our independent authentication check. We are in touch about a full refund.'
+  );
+  await logAudit(env, currentUser, 'authentication.failed', { entityType: 'authentication_case', entityId: caseId, detail: notes, request });
+
+  return redirect('/admin/authentication');
 }
 
 // The day-to-day page: everything that is (or should be) for sale, with the controls that
@@ -1273,7 +1475,7 @@ async function createProduct(request, env, currentUser) {
   if (!title || !Number.isInteger(categoryId)) return redirect('/admin/products');
 
   const num = (k) => {
-    const v = String(form.get(k) || '').replace(/[^\d]/g, '');
+    const v = String(form.get(k) || '').split('.')[0].replace(/[^\d]/g, '');
     return v ? Number(v) : null;
   };
 
@@ -1338,13 +1540,13 @@ async function createProduct(request, env, currentUser) {
 
   // A product with no offer has no price and cannot be bought, so the price fields live on
   // this same form: fill one in and the listing goes live in a single step.
-  const sellerPrice = Number(String(form.get('price') || '').replace(/[^\d]/g, '')) || 0;
+  const sellerPrice = Number(String(form.get('price') || '').split('.')[0].replace(/[^\d]/g, '')) || 0;
   if (sellerPrice > 0) {
     const inhouse = form.get('inhouse') === '1';
     const sellerId = inhouse ? await ensureHouseSeller(env) : Number(form.get('seller_id'));
     if (Number.isInteger(sellerId)) {
       const city = String(form.get('ships_from') || '').trim();
-      const rawNum = (k) => String(form.get(k) || '').replace(/[^\d]/g, '');
+      const rawNum = (k) => String(form.get(k) || '').split('.')[0].replace(/[^\d]/g, '');
       const priced = await insertOffer(env, {
         productId,
         inhouse,
@@ -1475,7 +1677,7 @@ function pricingWarning(priced, city) {
 
 async function createOffer(request, env, currentUser) {
   const form = await request.formData();
-  const raw = (k) => String(form.get(k) || '').replace(/[^\d]/g, '');
+  const raw = (k) => String(form.get(k) || '').split('.')[0].replace(/[^\d]/g, '');
 
   const productId = Number(form.get('product_id'));
   const inhouse = form.get('inhouse') === '1';
@@ -1642,7 +1844,7 @@ async function updateProduct(request, env, productId, currentUser) {
   if (!title || !Number.isInteger(categoryId)) return redirect(`/admin/products/${productId}/edit`);
 
   const num = (k) => {
-    const v = String(form.get(k) || '').replace(/[^\d]/g, '');
+    const v = String(form.get(k) || '').split('.')[0].replace(/[^\d]/g, '');
     return v ? Number(v) : null;
   };
 
@@ -1775,7 +1977,7 @@ async function editOfferPage(env, offerId) {
 
 async function updateOffer(request, env, offerId, currentUser) {
   const form = await request.formData();
-  const raw = (k) => Number(String(form.get(k) || '').replace(/[^\d]/g, '')) || 0;
+  const raw = (k) => Number(String(form.get(k) || '').split('.')[0].replace(/[^\d]/g, '')) || 0;
 
   const before = await env.DB.prepare('SELECT seller_price, landed_price, status FROM offers WHERE id = ?').bind(offerId).first();
 
@@ -1940,7 +2142,7 @@ async function saveCategoryRates(request, env, currentUser) {
   const changes = [];
   for (const c of categories) {
     const duty = Number(String(form.get(`duty_${c.id}`) || '').replace(/[^\d.]/g, ''));
-    const auth = Number(String(form.get(`auth_${c.id}`) || '').replace(/[^\d]/g, ''));
+    const auth = Number(String(form.get(`auth_${c.id}`) || '').split('.')[0].replace(/[^\d]/g, ''));
     const dutyVal = Number.isFinite(duty) ? duty : 0;
     const authVal = Number.isFinite(auth) ? auth : 0;
     changes.push(`${c.name}: ${dutyVal}% / ₹${authVal}`);
@@ -1965,7 +2167,7 @@ async function saveCity(request, env, currentUser) {
   if (!city) return redirect('/admin/rates');
 
   const num = (k, fallback) => {
-    const n = Number(String(form.get(k) || '').replace(/[^\d]/g, ''));
+    const n = Number(String(form.get(k) || '').split('.')[0].replace(/[^\d]/g, ''));
     return Number.isFinite(n) && n > 0 ? n : fallback;
   };
 

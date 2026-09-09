@@ -64,6 +64,23 @@ CREATE TABLE audit_log (
 CREATE INDEX idx_audit_created ON audit_log(created_at DESC);
 CREATE INDEX idx_audit_entity ON audit_log(entity_type, entity_id);
 
+-- A dedicated case per order, rather than authentication being a checkbox on the way to
+-- issuing a certificate. Created automatically when an order reaches "authenticating" (see
+-- advanceOrder in admin.js); its decision is what is allowed to move the order on to
+-- "authenticated" (and therefore issue the certificate) or send it to "authentication_failed"
+-- -- there is deliberately no direct route from one to the other any more.
+CREATE TABLE authentication_cases (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id      INTEGER NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
+  status        TEXT NOT NULL DEFAULT 'not_started', -- not_started | assigned | passed | failed
+  assigned_to   INTEGER REFERENCES admin_users(id),
+  notes         TEXT,
+  decided_by    INTEGER REFERENCES admin_users(id),
+  decided_at    TEXT,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_authcases_status ON authentication_cases(status);
+
 CREATE TABLE categories (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   slug       TEXT NOT NULL UNIQUE,
