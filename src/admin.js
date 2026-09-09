@@ -199,8 +199,12 @@ export async function adminRouter(request, env, path) {
   }
   if (path === '/admin/products') {
     const qs = new URL(request.url).searchParams;
+    return productsPage(env, qs.get('error'));
+  }
+  if (path === '/admin/offers/new') {
+    const qs = new URL(request.url).searchParams;
     const forOffer = Number(qs.get('offer_for'));
-    return productsPage(env, qs.get('error'), Number.isInteger(forOffer) ? forOffer : null);
+    return addOfferPage(env, qs.get('error'), Number.isInteger(forOffer) ? forOffer : null);
   }
   if (path === '/admin/listings')
     return listingsPage(env, new URL(request.url).searchParams.get('error'));
@@ -995,7 +999,7 @@ async function listingsPage(env, errorMessage) {
         ${
           r.offer_id
             ? `<a href="/admin/offers/${r.offer_id}/edit" style="font-size:12.5px;">Edit</a>`
-            : `<a href="/admin/products?offer_for=${r.product_id}#offer-form" style="font-size:12.5px; color:var(--oxblood);">Add a price</a>`
+            : `<a href="/admin/offers/new?offer_for=${r.product_id}" style="font-size:12.5px; color:var(--oxblood);">Add a price</a>`
         }
         &middot; <a href="/p/${escapeHtml(r.slug)}" target="_blank" style="font-size:12.5px;">View</a>
         ${
@@ -1121,7 +1125,7 @@ function sizeField({ idPrefix, name, sizeType, selected = '', label = 'Size', mu
   return `<div class="field"><label for="${idPrefix}_text">${label}</label><input id="${idPrefix}_text" name="${name}" value="${escapeHtml(Array.isArray(selected) ? selected[0] || '' : selected || 'One size')}" maxlength="40"></div>`;
 }
 
-async function productsPage(env, errorMessage, preselectProductId = null) {
+async function productsPage(env, errorMessage) {
   const [categories, sellers, offersResult, cities] = await Promise.all([
     db.getCategories(env.DB),
     env.DB.prepare('SELECT * FROM sellers ORDER BY name').all().then((r) => r.results || []),
@@ -1154,7 +1158,10 @@ async function productsPage(env, errorMessage, preselectProductId = null) {
   }
 
   return adminHtml(`
-<h2 class="serif" style="font-size:32px; margin:0 0 22px;">Products &amp; offers</h2>
+<div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom:22px; flex-wrap:wrap;">
+  <h2 class="serif" style="font-size:32px; margin:0;">Products &amp; offers</h2>
+  <a href="/admin/offers/new" class="btn" style="width:auto;">Add a seller offer</a>
+</div>
 ${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${escapeHtml(errorMessage)}</div>` : ''}
 ${
   imageStore(env)
@@ -1174,7 +1181,7 @@ ${
     : ''
 }
 
-<div class="grid grid-2" style="gap:24px; align-items:start; margin-bottom:32px;">
+<div style="max-width:640px; margin-bottom:32px;">
   <div class="panel" style="padding:22px;">
     <h3 class="serif" style="font-size:20px; margin:0 0 14px;">Add a product</h3>
     <form method="post" action="/admin/products/create" enctype="multipart/form-data">
@@ -1242,9 +1249,17 @@ ${
         </p>
         <div class="form-row">
           <div class="field"><label for="price">Your cost (₹)</label><input id="price" name="price" inputmode="numeric" maxlength="12">
-            <span class="hint">What you pay. Duty, authentication and shipping are added on top, based on the category's rate and the ships-from city's country below &mdash; India-sourced pieces pay no import duty.</span>
+            <span class="hint">What you pay. Duty and shipping are added on top &mdash; automatically from the category's rate and the ships-from city's country below, unless you switch to manual entry.</span>
           </div>
           ${shipsFromField(cities, { id: 'p_ships_from', name: 'ships_from' })}
+        </div>
+        <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
+          <input type="checkbox" id="p_auto_calc" name="auto_calc" value="1" style="width:auto;" checked>
+          <label for="p_auto_calc" style="margin:0;">Calculate duty &amp; shipping automatically from Rates</label>
+        </div>
+        <div class="form-row" id="p_manual_wrap" hidden>
+          <div class="field"><label for="p_duty">Duty (₹)</label><input id="p_duty" name="duty" inputmode="numeric" maxlength="12" disabled></div>
+          <div class="field"><label for="p_shipping">Shipping (₹)</label><input id="p_shipping" name="shipping" inputmode="numeric" maxlength="12" disabled></div>
         </div>
         <div class="form-row">
           <div id="offer_size_wrap">${sizeField({ idPrefix: 'offer_size', name: 'offer_size', sizeType: 'none', multiple: true })}</div>
@@ -1265,9 +1280,8 @@ ${
         </div>
 
         <p class="hint" style="margin:2px 0 0;">
-          Need to fine-tune duty, authentication fee or shipping for this exact piece? Save it
-          here first, then adjust those on the <a href="/admin/listings">Listings</a> page --
-          keeps this form to just what you need for a normal listing.
+          Need to fine-tune the authentication fee for this exact piece? Save it here first, then
+          adjust it on the <a href="/admin/listings">Listings</a> page.
         </p>
       </div>
 
@@ -1295,77 +1309,13 @@ ${
       if (sizingSelect) {
         sizingSelect.addEventListener('change', function () { render(sizingSelect.value); });
       }
-    })();
-    </script>
-  </div>
-
-  <div class="panel" style="padding:22px;" id="offer-form">
-    <h3 class="serif" style="font-size:20px; margin:0 0 14px;">Add a seller offer</h3>
-    <p class="muted" style="font-size:12.5px; margin:0 0 14px;">The landed price is the sum of the four parts — that is what the buyer pays and what the breakdown shows.</p>
-    <form method="post" action="/admin/offers/create">
-      <div class="field"><label for="product_id">Product</label>
-        <select id="product_id" name="product_id" required data-size-types='${JSON.stringify(
-          Object.fromEntries((products || []).map((p) => [p.id, p.size_type]))
-        )}'>
-          ${(products || [])
-            .map(
-              (p) =>
-                `<option value="${p.id}" data-size-type="${p.size_type}"${p.id === preselectProductId ? ' selected' : ''}>${escapeHtml(p.title)}</option>`
-            )
-            .join('')}
-        </select>
-      </div>
-      <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
-        <input type="checkbox" id="inhouse" name="inhouse" value="1" style="width:auto;">
-        <label for="inhouse" style="margin:0;">Inhaus — sourced and imported by us directly (no seller commission)</label>
-      </div>
-      <div class="form-row">
-        <div class="field"><label for="seller_id">Seller</label>
-          <select id="seller_id" name="seller_id" required>
-            ${sellers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)} — ${escapeHtml(s.city)}</option>`).join('')}
-          </select>
-          <span class="hint">Ignored if "Inhaus" above is checked.</span>
-        </div>
-        <div id="size_label_wrap">${sizeField({ idPrefix: 'size_label_o', name: 'size_label', sizeType: (products || []).find((p) => p.id === preselectProductId)?.size_type, multiple: true })}</div>
-      </div>
-      <div class="form-row">
-        ${shipsFromField(cities, { required: true })}
-        <div class="field"><label for="condition_o">Condition</label><input id="condition_o" name="condition" value="Deadstock" maxlength="60"></div>
-      </div>
-      <div class="field"><label for="seller_price">Seller price (₹)</label><input id="seller_price" name="seller_price" required inputmode="numeric" maxlength="12">
-        <span class="hint">Duty, authentication, shipping and lead time are worked out from your
-        <a href="/admin/rates">rates</a> and the ships-from city's country &mdash; India-sourced pieces pay no import duty. Leave the overrides below blank unless this one is unusual.</span>
-      </div>
-      ${stockLabelField('stock_label_o', 'stock_label')}
-
-      <p class="hint" style="margin:-8px 0 14px;">
-        Need to fine-tune duty, authentication fee or shipping for this exact offer? Save it
-        here first, then adjust those from the <a href="/admin/listings">Listings</a> page.
-      </p>
-
-      <button class="btn btn-block" type="submit">Add offer</button>
-    </form>
-    <script>
-    (function () {
-      var SHOE_SIZES = ${JSON.stringify(SHOE_SIZE_LABELS)};
-      var select = document.getElementById('product_id');
-      var wrap = document.getElementById('size_label_wrap');
-      function render(sizeType, keepValue) {
-        if (sizeType === 'uk') {
-          var chips = SHOE_SIZES.map(function (l, i) {
-            return '<input type="checkbox" class="visually-hidden size-radio" id="size_label_o_' + i + '" name="size_label" value="' + l + '"' +
-              (l === keepValue ? ' checked' : '') + '><label for="size_label_o_' + i + '" class="size"><span class="n">' + l + '</span></label>';
-          }).join('');
-          wrap.innerHTML = '<div class="field"><label>Size</label><div class="sizes" style="grid-template-columns:repeat(4,minmax(0,1fr));">' + chips + '</div></div>';
-        } else {
-          wrap.innerHTML = '<div class="field"><label for="size_label_o">Size</label><input id="size_label_o" name="size_label" value="' +
-            (keepValue && SHOE_SIZES.indexOf(keepValue) === -1 ? keepValue : 'One size') + '" maxlength="40"></div>';
-        }
-      }
-      if (select) {
-        select.addEventListener('change', function () {
-          var opt = select.options[select.selectedIndex];
-          render(opt ? opt.dataset.sizeType : '', '');
+      var autoCalc = document.getElementById('p_auto_calc');
+      var manualWrap = document.getElementById('p_manual_wrap');
+      if (autoCalc && manualWrap) {
+        autoCalc.addEventListener('change', function () {
+          manualWrap.hidden = autoCalc.checked;
+          var inputs = manualWrap.querySelectorAll('input');
+          for (var i = 0; i < inputs.length; i++) inputs[i].disabled = autoCalc.checked;
         });
       }
     })();
@@ -1443,7 +1393,7 @@ ${
         </td>
         <td data-label="Offers" class="num">
           ${p.offer_count}
-          ${!p.offer_count ? `<div><a href="/admin/products?offer_for=${p.id}#offer-form" style="font-size:11px; color:var(--oxblood);">Add an offer &rarr;</a></div>` : ''}
+          ${!p.offer_count ? `<div><a href="/admin/offers/new?offer_for=${p.id}" style="font-size:11px; color:var(--oxblood);">Add an offer &rarr;</a></div>` : ''}
         </td>
         <td data-label="Lowest" class="num">${p.lowest ? formatINRWords(p.lowest, { tag: 'div' }) : '—'}</td>
         <td><a href="/p/${escapeHtml(p.slug)}" target="_blank">View</a> &middot; <a href="/admin/products/${p.id}/edit">Edit</a></td>
@@ -1495,6 +1445,108 @@ ${
       .join('')}
   </tbody>
 </table>`);
+}
+
+async function addOfferPage(env, errorMessage, preselectProductId = null) {
+  const [sellers, cities, { results: products }] = await Promise.all([
+    env.DB.prepare('SELECT * FROM sellers ORDER BY name').all().then((r) => r.results || []),
+    listSourceCities(env.DB),
+    env.DB.prepare('SELECT id, title, size_type FROM products ORDER BY title').all(),
+  ]);
+
+  return adminHtml(`
+<h2 class="serif" style="font-size:32px; margin:0 0 22px;">Add a seller offer</h2>
+${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${escapeHtml(errorMessage)}</div>` : ''}
+<div style="max-width:640px;">
+  <div class="panel" style="padding:22px;">
+    <p class="muted" style="font-size:12.5px; margin:0 0 14px;">The landed price is the sum of the parts — that is what the buyer pays and what the breakdown shows.</p>
+    <form method="post" action="/admin/offers/create">
+      <div class="field"><label for="product_id">Product</label>
+        <select id="product_id" name="product_id" required data-size-types='${JSON.stringify(
+          Object.fromEntries((products || []).map((p) => [p.id, p.size_type]))
+        )}'>
+          ${(products || [])
+            .map(
+              (p) =>
+                `<option value="${p.id}" data-size-type="${p.size_type}"${p.id === preselectProductId ? ' selected' : ''}>${escapeHtml(p.title)}</option>`
+            )
+            .join('')}
+        </select>
+      </div>
+      <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
+        <input type="checkbox" id="inhouse" name="inhouse" value="1" style="width:auto;">
+        <label for="inhouse" style="margin:0;">Inhaus — sourced and imported by us directly (no seller commission)</label>
+      </div>
+      <div class="form-row">
+        <div class="field"><label for="seller_id">Seller</label>
+          <select id="seller_id" name="seller_id" required>
+            ${sellers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)} — ${escapeHtml(s.city)}</option>`).join('')}
+          </select>
+          <span class="hint">Ignored if "Inhaus" above is checked.</span>
+        </div>
+        <div id="size_label_wrap">${sizeField({ idPrefix: 'size_label_o', name: 'size_label', sizeType: (products || []).find((p) => p.id === preselectProductId)?.size_type, multiple: true })}</div>
+      </div>
+      <div class="form-row">
+        ${shipsFromField(cities, { required: true })}
+        <div class="field"><label for="condition_o">Condition</label><input id="condition_o" name="condition" value="Deadstock" maxlength="60"></div>
+      </div>
+      <div class="field"><label for="seller_price">Seller price (₹)</label><input id="seller_price" name="seller_price" required inputmode="numeric" maxlength="12">
+        <span class="hint">Duty and shipping are worked out automatically from your
+        <a href="/admin/rates">rates</a> and the ships-from city's country, unless you switch to manual entry below &mdash; India-sourced pieces pay no import duty.</span>
+      </div>
+      <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
+        <input type="checkbox" id="o_auto_calc" name="auto_calc" value="1" style="width:auto;" checked>
+        <label for="o_auto_calc" style="margin:0;">Calculate duty &amp; shipping automatically from Rates</label>
+      </div>
+      <div class="form-row" id="o_manual_wrap" hidden>
+        <div class="field"><label for="o_duty">Duty (₹)</label><input id="o_duty" name="duty" inputmode="numeric" maxlength="12" disabled></div>
+        <div class="field"><label for="o_shipping">Shipping (₹)</label><input id="o_shipping" name="shipping" inputmode="numeric" maxlength="12" disabled></div>
+      </div>
+      ${stockLabelField('stock_label_o', 'stock_label')}
+
+      <p class="hint" style="margin:-8px 0 14px;">
+        Need to fine-tune the authentication fee for this exact offer? Save it here first, then
+        adjust it from the <a href="/admin/listings">Listings</a> page.
+      </p>
+
+      <button class="btn btn-block" type="submit">Add offer</button>
+    </form>
+    <script>
+    (function () {
+      var SHOE_SIZES = ${JSON.stringify(SHOE_SIZE_LABELS)};
+      var select = document.getElementById('product_id');
+      var wrap = document.getElementById('size_label_wrap');
+      function render(sizeType, keepValue) {
+        if (sizeType === 'uk') {
+          var chips = SHOE_SIZES.map(function (l, i) {
+            return '<input type="checkbox" class="visually-hidden size-radio" id="size_label_o_' + i + '" name="size_label" value="' + l + '"' +
+              (l === keepValue ? ' checked' : '') + '><label for="size_label_o_' + i + '" class="size"><span class="n">' + l + '</span></label>';
+          }).join('');
+          wrap.innerHTML = '<div class="field"><label>Size</label><div class="sizes" style="grid-template-columns:repeat(4,minmax(0,1fr));">' + chips + '</div></div>';
+        } else {
+          wrap.innerHTML = '<div class="field"><label for="size_label_o">Size</label><input id="size_label_o" name="size_label" value="' +
+            (keepValue && SHOE_SIZES.indexOf(keepValue) === -1 ? keepValue : 'One size') + '" maxlength="40"></div>';
+        }
+      }
+      if (select) {
+        select.addEventListener('change', function () {
+          var opt = select.options[select.selectedIndex];
+          render(opt ? opt.dataset.sizeType : '', '');
+        });
+      }
+      var autoCalc = document.getElementById('o_auto_calc');
+      var manualWrap = document.getElementById('o_manual_wrap');
+      if (autoCalc && manualWrap) {
+        autoCalc.addEventListener('change', function () {
+          manualWrap.hidden = autoCalc.checked;
+          var inputs = manualWrap.querySelectorAll('input');
+          for (var i = 0; i < inputs.length; i++) inputs[i].disabled = autoCalc.checked;
+        });
+      }
+    })();
+    </script>
+  </div>
+</div>`);
 }
 
 function slugify(text) {
@@ -1733,11 +1785,11 @@ async function createOffer(request, env, currentUser) {
   const productId = Number(form.get('product_id'));
   const inhouse = form.get('inhouse') === '1';
   const sellerId = inhouse ? await ensureHouseSeller(env) : Number(form.get('seller_id'));
-  if (!Number.isInteger(productId) || !Number.isInteger(sellerId)) return redirect('/admin/products');
+  if (!Number.isInteger(productId) || !Number.isInteger(sellerId)) return redirect('/admin/offers/new');
 
   const sellerPrice = Number(raw('seller_price')) || 0;
   if (sellerPrice <= 0) {
-    return redirect('/admin/products?error=' + encodeURIComponent('Enter a seller price.'));
+    return redirect('/admin/offers/new?error=' + encodeURIComponent('Enter a seller price.'));
   }
 
   const city = String(form.get('ships_from') || '').trim();
@@ -1766,7 +1818,7 @@ async function createOffer(request, env, currentUser) {
     });
     if (result) priced = result;
   }
-  if (!priced) return redirect('/admin/products');
+  if (!priced) return redirect('/admin/offers/new');
 
   const warn = !priced.rate_found
     ? '?error=' + encodeURIComponent('Offer(s) added, but no duty rate is set for that category — duty was charged at 0. Set it under Rates.')
