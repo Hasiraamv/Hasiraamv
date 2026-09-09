@@ -1,4 +1,4 @@
-import { escapeHtml, formatINR, html, redirect, sealMark } from './render.js';
+import { escapeHtml, formatINR, formatINRWords, html, redirect, sealMark } from './render.js';
 import * as db from './db.js';
 import { issueCertificate } from './certificates.js';
 import { storeImage, deleteImage, storeVideo, normalizeImageUrl, imageStore } from './images.js';
@@ -63,7 +63,35 @@ const ROUTE_RULES = [
   },
   { test: (p) => p.startsWith('/admin/sellers') || p === '/admin/sourcing', roles: ['owner', 'support'] },
   { test: (p) => p.startsWith('/admin/users'), roles: ['owner'] },
+  { test: (p) => p === '/admin/audit', roles: ['owner'] },
 ];
+
+// Writes one audit_log row. Never throws into the caller -- a logging failure must not be
+// the reason a real action (a price change, a refund, disabling an account) gets rolled back
+// or reported as failed to the person doing it. `request` is optional; when given, the
+// client's IP is recorded (Cloudflare sets cf-connecting-ip on every request it proxies).
+async function logAudit(env, currentUser, action, { entityType, entityId, detail, request } = {}) {
+  try {
+    const ip = request ? request.headers.get('cf-connecting-ip') : null;
+    await env.DB.prepare(
+      `INSERT INTO audit_log (admin_user_id, admin_name, admin_email, action, entity_type, entity_id, detail, ip)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(
+        currentUser?.id ?? null,
+        currentUser?.name ?? 'system',
+        currentUser?.email ?? '',
+        action,
+        entityType ?? null,
+        entityId != null ? String(entityId) : null,
+        detail ?? null,
+        ip
+      )
+      .run();
+  } catch (err) {
+    console.error('audit log write failed', err);
+  }
+}
 
 function roleCanAccess(path, role) {
   const rule = ROUTE_RULES.find((r) => r.test(path));
@@ -135,7 +163,7 @@ export async function adminRouter(request, env, path) {
     return adminHtml(changePasswordForm());
   }
   if (path === '/admin/users') return adminUsersPage(env, currentUser, new URL(request.url).searchParams.get('error'));
-  if (path === '/admin/users/create' && method === 'POST') return createAdminUser(request, env);
+  if (path === '/admin/users/create' && method === 'POST') return createAdminUser(request, env, currentUser);
   {
     const m = path.match(/^\/admin\/users\/(\d+)\/status$/);
     if (m && method === 'POST') return setAdminUserStatus(request, env, Number(m[1]), currentUser);
@@ -148,10 +176,10 @@ export async function adminRouter(request, env, path) {
   if (path === '/admin') return dashboard(env, currentUser);
   if (path === '/admin/orders')
     return ordersPage(env, new URL(request.url).searchParams.get('issued'));
-  if (path === '/admin/orders/advance' && method === 'POST') return advanceOrder(request, env);
+  if (path === '/admin/orders/advance' && method === 'POST') return advanceOrder(request, env, currentUser);
   if (path === '/admin/certificates') return certificatesPage(env);
-  if (path === '/admin/certificates/issue' && method === 'POST') return issueCert(request, env);
-  if (path === '/admin/certificates/revoke' && method === 'POST') return revokeCert(request, env);
+  if (path === '/admin/certificates/issue' && method === 'POST') return issueCert(request, env, currentUser);
+  if (path === '/admin/certificates/revoke' && method === 'POST') return revokeCert(request, env, currentUser);
   if (path === '/admin/products') {
     const qs = new URL(request.url).searchParams;
     const forOffer = Number(qs.get('offer_for'));
@@ -159,9 +187,9 @@ export async function adminRouter(request, env, path) {
   }
   if (path === '/admin/listings')
     return listingsPage(env, new URL(request.url).searchParams.get('error'));
-  if (path === '/admin/products/create' && method === 'POST') return createProduct(request, env);
-  if (path === '/admin/offers/create' && method === 'POST') return createOffer(request, env);
-  if (path === '/admin/offers/status' && method === 'POST') return setOfferStatus(request, env);
+  if (path === '/admin/products/create' && method === 'POST') return createProduct(request, env, currentUser);
+  if (path === '/admin/offers/create' && method === 'POST') return createOffer(request, env, currentUser);
+  if (path === '/admin/offers/status' && method === 'POST') return setOfferStatus(request, env, currentUser);
 
   {
     const m = path.match(/^\/admin\/products\/(\d+)\/edit$/);
@@ -169,11 +197,11 @@ export async function adminRouter(request, env, path) {
   }
   {
     const m = path.match(/^\/admin\/products\/(\d+)\/update$/);
-    if (m && method === 'POST') return updateProduct(request, env, Number(m[1]));
+    if (m && method === 'POST') return updateProduct(request, env, Number(m[1]), currentUser);
   }
   {
     const m = path.match(/^\/admin\/products\/(\d+)\/delete$/);
-    if (m && method === 'POST') return deleteProduct(request, env, Number(m[1]));
+    if (m && method === 'POST') return deleteProduct(request, env, Number(m[1]), currentUser);
   }
   {
     const m = path.match(/^\/admin\/offers\/(\d+)\/edit$/);
@@ -181,11 +209,11 @@ export async function adminRouter(request, env, path) {
   }
   {
     const m = path.match(/^\/admin\/offers\/(\d+)\/update$/);
-    if (m && method === 'POST') return updateOffer(request, env, Number(m[1]));
+    if (m && method === 'POST') return updateOffer(request, env, Number(m[1]), currentUser);
   }
   {
     const m = path.match(/^\/admin\/offers\/(\d+)\/delete$/);
-    if (m && method === 'POST') return deleteOffer(request, env, Number(m[1]));
+    if (m && method === 'POST') return deleteOffer(request, env, Number(m[1]), currentUser);
   }
   if (path === '/admin/images/upload' && method === 'POST') return uploadImage(request, env);
   if (path === '/admin/images/delete' && method === 'POST') return removeImage(request, env);
@@ -194,11 +222,12 @@ export async function adminRouter(request, env, path) {
   if (path === '/admin/products/video-remove' && method === 'POST') return removeVideo(request, env);
   if (path === '/admin/rates')
     return ratesPage(env, new URL(request.url).searchParams.get('saved'));
-  if (path === '/admin/rates/categories' && method === 'POST') return saveCategoryRates(request, env);
-  if (path === '/admin/rates/cities' && method === 'POST') return saveCity(request, env);
+  if (path === '/admin/rates/categories' && method === 'POST') return saveCategoryRates(request, env, currentUser);
+  if (path === '/admin/rates/cities' && method === 'POST') return saveCity(request, env, currentUser);
   if (path === '/admin/sourcing') return sourcingPage(env);
   if (path === '/admin/sellers') return sellerApplicationsPage(env);
-  if (path === '/admin/sellers/decide' && method === 'POST') return decideApplication(request, env);
+  if (path === '/admin/sellers/decide' && method === 'POST') return decideApplication(request, env, currentUser);
+  if (path === '/admin/audit') return auditLogPage(env, new URL(request.url).searchParams.get('entity'));
 
   return adminHtml('<div class="notice">Unknown admin page.</div>', 404);
 }
@@ -225,6 +254,7 @@ function adminHtml(body, status = 200, extraHeaders = {}) {
     <a href="/admin/sellers">Seller applications</a>
     <a href="/admin/sourcing">Sourcing requests</a>
     <a href="/admin/users">Employees</a>
+    <a href="/admin/audit">Audit log</a>
   </nav>
   <div class="nav-right">
     <a href="/" target="_blank">View site</a>
@@ -417,7 +447,7 @@ ${banner}
 ${ordersTable(orders)}`);
 }
 
-async function advanceOrder(request, env) {
+async function advanceOrder(request, env, currentUser) {
   const form = await request.formData();
   const orderId = Number(form.get('order_id'));
   const status = String(form.get('status') || '');
@@ -433,6 +463,12 @@ async function advanceOrder(request, env) {
   };
 
   await db.addOrderEvent(env.DB, orderId, status, notes[status] || null);
+  await logAudit(env, currentUser, 'order.stage_advanced', {
+    entityType: 'order',
+    entityId: orderId,
+    detail: `stage -> ${status}`,
+    request,
+  });
 
   // Passing authentication is what earns a certificate, so issue it here rather than
   // leaving it as a separate step someone can forget.
@@ -592,7 +628,7 @@ ${
 }`);
 }
 
-async function issueCert(request, env) {
+async function issueCert(request, env, currentUser) {
   const form = await request.formData();
   const orderId = Number(form.get('order_id'));
   if (!Number.isInteger(orderId)) return redirect('/admin/certificates');
@@ -603,6 +639,12 @@ async function issueCert(request, env) {
     notes: String(form.get('notes') || '').trim() || null,
   });
   if (!issued) return redirect('/admin/certificates');
+  await logAudit(env, currentUser, 'certificate.issued', {
+    entityType: 'certificate',
+    entityId: issued.certificateNo,
+    detail: `order #${orderId}`,
+    request,
+  });
 
   return adminHtml(`
 <div class="notice notice-good">
@@ -628,7 +670,7 @@ async function issueCert(request, env) {
 </div>`);
 }
 
-async function revokeCert(request, env) {
+async function revokeCert(request, env, currentUser) {
   const form = await request.formData();
   const certificateNo = String(form.get('certificate_no') || '').toUpperCase();
   const reason = String(form.get('reason') || '').trim().slice(0, 120) || 'Revoked by admin';
@@ -637,6 +679,12 @@ async function revokeCert(request, env) {
   )
     .bind(reason, certificateNo)
     .run();
+  await logAudit(env, currentUser, 'certificate.revoked', {
+    entityType: 'certificate',
+    entityId: certificateNo,
+    detail: reason,
+    request,
+  });
   return redirect('/admin/certificates');
 }
 
@@ -680,7 +728,7 @@ async function listingsPage(env, errorMessage) {
         </div>
       </td>
       <td data-label="Source">${r.sourced_by === 'inhouse' ? 'Inhaus' : escapeHtml(r.seller_name || '—')}</td>
-      <td data-label="Price" class="num">${r.landed_price ? formatINR(r.landed_price) : '—'}</td>
+      <td data-label="Price" class="num">${r.landed_price ? formatINRWords(r.landed_price, { tag: 'div' }) : '—'}</td>
       <td data-label="Status">
         ${
           r.offer_id
@@ -1158,7 +1206,7 @@ ${
           ${p.offer_count}
           ${!p.offer_count ? `<div><a href="/admin/products?offer_for=${p.id}#offer-form" style="font-size:11px; color:var(--oxblood);">Add an offer &rarr;</a></div>` : ''}
         </td>
-        <td data-label="Lowest" class="num">${p.lowest ? formatINR(p.lowest) : '—'}</td>
+        <td data-label="Lowest" class="num">${p.lowest ? formatINRWords(p.lowest, { tag: 'div' }) : '—'}</td>
         <td><a href="/p/${escapeHtml(p.slug)}" target="_blank">View</a> &middot; <a href="/admin/products/${p.id}/edit">Edit</a></td>
       </tr>`;
       })
@@ -1185,7 +1233,7 @@ ${
         </td>
         <td data-label="Size">${escapeHtml(o.size_label)}</td>
         <td data-label="Seller">${o.sourced_by === 'inhouse' ? 'Inhaus' : escapeHtml(o.seller_name)}</td>
-        <td data-label="Price" class="num">${formatINR(o.landed_price)}</td>
+        <td data-label="Price" class="num">${formatINRWords(o.landed_price, { tag: 'div' })}</td>
         <td data-label="Status">
           <span class="tag" style="color:${
             o.status === 'active' ? 'var(--green)' : o.status === 'withdrawn' ? 'var(--oxblood)' : 'var(--muted)'
@@ -1218,7 +1266,7 @@ function slugify(text) {
     .slice(0, 80);
 }
 
-async function createProduct(request, env) {
+async function createProduct(request, env, currentUser) {
   const form = await request.formData();
   const title = String(form.get('title') || '').trim();
   const categoryId = Number(form.get('category_id'));
@@ -1257,6 +1305,7 @@ async function createProduct(request, env) {
     .run();
 
   const productId = result.meta.last_row_id;
+  await logAudit(env, currentUser, 'product.created', { entityType: 'product', entityId: productId, detail: title, request });
 
   // Uploaded files win over a pasted URL: they are hosted by us, so they cannot break later.
   // Several photos can be picked at once; they are stored in the order the browser sent them,
@@ -1312,6 +1361,8 @@ async function createProduct(request, env) {
           lead_days_min: rawNum('lead_min'),
           lead_days_max: rawNum('lead_max'),
         },
+        currentUser,
+        request,
       });
       const warn = pricingWarning(priced, city);
       if (uploadError) {
@@ -1356,7 +1407,7 @@ async function ensureHouseSeller(env) {
 
 // Shared by the one-step "Add a product" form and the standalone offer form, so a listing
 // priced either way goes through exactly the same duty/fee/shipping rules.
-async function insertOffer(env, { productId, inhouse, sellerId, sizeLabel, condition, city, sellerPrice, stockLabel, overrides = {} }) {
+async function insertOffer(env, { productId, inhouse, sellerId, sizeLabel, condition, city, sellerPrice, stockLabel, overrides = {}, currentUser, request } = {}) {
   const product = await env.DB.prepare(
     'SELECT p.id, p.category_id, c.slug AS category_slug FROM products p JOIN categories c ON c.id = p.category_id WHERE p.id = ?'
   )
@@ -1399,6 +1450,13 @@ async function insertOffer(env, { productId, inhouse, sellerId, sizeLabel, condi
     )
     .run();
 
+  await logAudit(env, currentUser, 'offer.created', {
+    entityType: 'offer',
+    entityId: stockCode,
+    detail: `product #${productId}, seller price ${priced.seller_price}, landed ${priced.landed_price}`,
+    request,
+  });
+
   return priced;
 }
 
@@ -1415,7 +1473,7 @@ function pricingWarning(priced, city) {
   return '';
 }
 
-async function createOffer(request, env) {
+async function createOffer(request, env, currentUser) {
   const form = await request.formData();
   const raw = (k) => String(form.get(k) || '').replace(/[^\d]/g, '');
 
@@ -1447,6 +1505,8 @@ async function createOffer(request, env) {
       lead_days_min: raw('lead_min'),
       lead_days_max: raw('lead_max'),
     },
+    currentUser,
+    request,
   });
   if (!priced) return redirect('/admin/products');
 
@@ -1461,7 +1521,7 @@ async function createOffer(request, env) {
 
 // Only toggles between active and withdrawn -- reserved/sold reflect a real order and must
 // not be hand-edited out from under it.
-async function setOfferStatus(request, env) {
+async function setOfferStatus(request, env, currentUser) {
   const form = await request.formData();
   const offerId = Number(form.get('offer_id'));
   const status = form.get('status') === 'active' ? 'active' : 'withdrawn';
@@ -1470,6 +1530,7 @@ async function setOfferStatus(request, env) {
   await env.DB.prepare("UPDATE offers SET status = ? WHERE id = ? AND status IN ('active', 'withdrawn')")
     .bind(status, offerId)
     .run();
+  await logAudit(env, currentUser, 'offer.status_changed', { entityType: 'offer', entityId: offerId, detail: `status -> ${status}`, request });
 
   return redirect('/admin/products');
 }
@@ -1574,7 +1635,7 @@ async function editProductPage(env, productId) {
 <p style="margin-top:20px;"><a href="/admin/products">&larr; Back to products</a></p>`);
 }
 
-async function updateProduct(request, env, productId) {
+async function updateProduct(request, env, productId, currentUser) {
   const form = await request.formData();
   const title = String(form.get('title') || '').trim();
   const categoryId = Number(form.get('category_id'));
@@ -1605,11 +1666,12 @@ async function updateProduct(request, env, productId) {
       productId
     )
     .run();
+  await logAudit(env, currentUser, 'product.updated', { entityType: 'product', entityId: productId, detail: title, request });
 
   return redirect('/admin/products');
 }
 
-async function deleteProduct(request, env, productId) {
+async function deleteProduct(request, env, productId, currentUser) {
   const orderCount = await env.DB.prepare(
     `SELECT COUNT(*) AS n FROM orders o JOIN offers ofr ON ofr.id = o.offer_id WHERE ofr.product_id = ?`
   )
@@ -1621,12 +1683,13 @@ async function deleteProduct(request, env, productId) {
   for (const im of images.results || []) {
     await deleteImage(env, im.url);
   }
-  const product = await env.DB.prepare('SELECT video_url FROM products WHERE id = ?').bind(productId).first();
+  const product = await env.DB.prepare('SELECT title, video_url FROM products WHERE id = ?').bind(productId).first();
   if (product?.video_url) await deleteImage(env, product.video_url);
 
   // product_images and offers both reference products with ON DELETE CASCADE, so this
   // takes the rest of the row's data with it.
   await env.DB.prepare('DELETE FROM products WHERE id = ?').bind(productId).run();
+  await logAudit(env, currentUser, 'product.deleted', { entityType: 'product', entityId: productId, detail: product?.title, request });
   return redirect('/admin/products');
 }
 
@@ -1710,9 +1773,11 @@ async function editOfferPage(env, offerId) {
 <p style="margin-top:20px;"><a href="/admin/products">&larr; Back to products</a></p>`);
 }
 
-async function updateOffer(request, env, offerId) {
+async function updateOffer(request, env, offerId, currentUser) {
   const form = await request.formData();
   const raw = (k) => Number(String(form.get(k) || '').replace(/[^\d]/g, '')) || 0;
+
+  const before = await env.DB.prepare('SELECT seller_price, landed_price, status FROM offers WHERE id = ?').bind(offerId).first();
 
   const inhouse = form.get('inhouse') === '1';
   const sellerId = inhouse ? await ensureHouseSeller(env) : Number(form.get('seller_id'));
@@ -1750,13 +1815,22 @@ async function updateOffer(request, env, offerId) {
     )
     .run();
 
+  const landedAfter = sellerPrice + duty + authFee + shipping;
+  await logAudit(env, currentUser, 'offer.updated', {
+    entityType: 'offer',
+    entityId: offerId,
+    detail: `landed price ${before?.landed_price ?? '?'} -> ${landedAfter}, status ${before?.status ?? '?'} -> ${status}`,
+    request,
+  });
+
   return redirect('/admin/products');
 }
 
-async function deleteOffer(request, env, offerId) {
+async function deleteOffer(request, env, offerId, currentUser) {
   const orderCount = await env.DB.prepare('SELECT COUNT(*) AS n FROM orders WHERE offer_id = ?').bind(offerId).first();
   if ((orderCount?.n || 0) > 0) return redirect('/admin/products');
   await env.DB.prepare('DELETE FROM offers WHERE id = ?').bind(offerId).run();
+  await logAudit(env, currentUser, 'offer.deleted', { entityType: 'offer', entityId: offerId, request });
   return redirect('/admin/products');
 }
 
@@ -1858,29 +1932,34 @@ ${message ? `<div class="notice notice-good" style="margin-bottom:20px;">${escap
 </div>`);
 }
 
-async function saveCategoryRates(request, env) {
+async function saveCategoryRates(request, env, currentUser) {
   const form = await request.formData();
   const categories = await db.getCategories(env.DB);
 
   const writes = [];
+  const changes = [];
   for (const c of categories) {
     const duty = Number(String(form.get(`duty_${c.id}`) || '').replace(/[^\d.]/g, ''));
     const auth = Number(String(form.get(`auth_${c.id}`) || '').replace(/[^\d]/g, ''));
+    const dutyVal = Number.isFinite(duty) ? duty : 0;
+    const authVal = Number.isFinite(auth) ? auth : 0;
+    changes.push(`${c.name}: ${dutyVal}% / ₹${authVal}`);
     writes.push(
       env.DB.prepare(
         `INSERT INTO category_rates (category_id, duty_pct, auth_fee, updated_at)
          VALUES (?, ?, ?, datetime('now'))
          ON CONFLICT(category_id) DO UPDATE SET
            duty_pct = excluded.duty_pct, auth_fee = excluded.auth_fee, updated_at = datetime('now')`
-      ).bind(c.id, Number.isFinite(duty) ? duty : 0, Number.isFinite(auth) ? auth : 0)
+      ).bind(c.id, dutyVal, authVal)
     );
   }
   await env.DB.batch(writes);
+  await logAudit(env, currentUser, 'rates.category_updated', { entityType: 'rate', detail: changes.join('; '), request });
 
   return redirect('/admin/rates?saved=' + encodeURIComponent('Category rates saved.'));
 }
 
-async function saveCity(request, env) {
+async function saveCity(request, env, currentUser) {
   const form = await request.formData();
   const city = String(form.get('city') || '').trim().slice(0, 60);
   if (!city) return redirect('/admin/rates');
@@ -1906,6 +1985,12 @@ async function saveCity(request, env) {
       num('lead_days_max', 28)
     )
     .run();
+  await logAudit(env, currentUser, 'rates.city_updated', {
+    entityType: 'rate',
+    entityId: city,
+    detail: `shipping ${num('shipping_cost', 0)}`,
+    request,
+  });
 
   return redirect('/admin/rates?saved=' + encodeURIComponent(`Saved ${city}.`));
 }
@@ -2091,7 +2176,7 @@ async function sellerApplicationsPage(env) {
 </table>`);
 }
 
-async function decideApplication(request, env) {
+async function decideApplication(request, env, currentUser) {
   const form = await request.formData();
   const id = Number(form.get('id'));
   const decision = String(form.get('decision') || '');
@@ -2120,6 +2205,13 @@ async function decideApplication(request, env) {
         .run();
     }
   }
+
+  await logAudit(env, currentUser, 'seller_application.decided', {
+    entityType: 'seller_application',
+    entityId: id,
+    detail: `${app.business_name}: ${decision}`,
+    request,
+  });
 
   return redirect('/admin/sellers');
 }
@@ -2238,7 +2330,7 @@ ${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${e
 </div>`);
 }
 
-async function createAdminUser(request, env) {
+async function createAdminUser(request, env, currentUser) {
   const form = await request.formData();
   const name = String(form.get('name') || '').trim();
   const email = String(form.get('email') || '').trim().toLowerCase();
@@ -2255,9 +2347,15 @@ async function createAdminUser(request, env) {
   }
 
   const hash = await hashPassword(password);
-  await env.DB.prepare('INSERT INTO admin_users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
+  const result = await env.DB.prepare('INSERT INTO admin_users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
     .bind(name, email, hash, role)
     .run();
+  await logAudit(env, currentUser, 'admin_user.created', {
+    entityType: 'admin_user',
+    entityId: result.meta.last_row_id,
+    detail: `${name} <${email}>, role ${role}`,
+    request,
+  });
 
   return redirect('/admin/users');
 }
@@ -2267,6 +2365,7 @@ async function setAdminUserStatus(request, env, userId, currentUser) {
   const form = await request.formData();
   const status = form.get('status') === 'disabled' ? 'disabled' : 'active';
   await env.DB.prepare('UPDATE admin_users SET status = ? WHERE id = ?').bind(status, userId).run();
+  await logAudit(env, currentUser, 'admin_user.status_changed', { entityType: 'admin_user', entityId: userId, detail: `status -> ${status}`, request });
   return redirect('/admin/users');
 }
 
@@ -2274,6 +2373,7 @@ async function resetAdminUserPassword(request, env, userId, currentUser) {
   const temp = randomTempPassword();
   const hash = await hashPassword(temp);
   await env.DB.prepare('UPDATE admin_users SET password_hash = ? WHERE id = ?').bind(hash, userId).run();
+  await logAudit(env, currentUser, 'admin_user.password_reset', { entityType: 'admin_user', entityId: userId, request });
   // Rendered directly rather than redirected with the password in the URL -- a redirect would
   // put it in the browser's address bar and history for a page that gets shared and revisited.
   return adminUsersPage(env, currentUser, null, `New temporary password: ${temp} — tell them directly, it will not be shown again.`);
@@ -2305,5 +2405,61 @@ async function changeOwnPassword(request, env, currentUser) {
 
   const hash = await hashPassword(next);
   await env.DB.prepare('UPDATE admin_users SET password_hash = ? WHERE id = ?').bind(hash, currentUser.id).run();
+  await logAudit(env, currentUser, 'admin_user.password_changed_self', { entityType: 'admin_user', entityId: currentUser.id, request });
   return adminHtml(changePasswordForm(null, 'Password updated.'));
+}
+
+// Audit log --------------------------------------------------------------------------
+// Read-only, immutable (no update/delete route exists for this table), Owner-only.
+
+async function auditLogPage(env, entityFilter) {
+  const binds = [];
+  let where = '';
+  if (entityFilter) {
+    where = 'WHERE entity_type = ?';
+    binds.push(entityFilter);
+  }
+  const { results } = await env.DB.prepare(
+    `SELECT * FROM audit_log ${where} ORDER BY created_at DESC LIMIT 300`
+  )
+    .bind(...binds)
+    .all();
+
+  const entityTypes = ['product', 'offer', 'order', 'certificate', 'admin_user', 'rate', 'seller_application'];
+
+  return adminHtml(`
+<h2 class="serif" style="font-size:32px; margin:0 0 8px;">Audit log</h2>
+<p class="muted" style="margin:0 0 20px; font-size:13.5px; max-width:640px;">
+  Every price change, certificate, order stage, rate edit and employee-account change, with
+  who did it and when. Nothing here is ever edited or deleted -- the most recent 300 entries
+  are shown.
+</p>
+
+<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;">
+  <a class="chip${!entityFilter ? ' active' : ''}" href="/admin/audit">All</a>
+  ${entityTypes
+    .map((t) => `<a class="chip${entityFilter === t ? ' active' : ''}" href="/admin/audit?entity=${encodeURIComponent(t)}">${escapeHtml(t)}</a>`)
+    .join('')}
+</div>
+
+${
+  results.length
+    ? `<table class="table">
+      <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Entity</th><th>Detail</th></tr></thead>
+      <tbody>
+        ${results
+          .map(
+            (r) => `<tr>
+              <td data-label="When" style="white-space:nowrap; font-size:12px;">${escapeHtml(String(r.created_at).slice(0, 16).replace('T', ' '))}</td>
+              <td data-label="Who">${escapeHtml(r.admin_name)}<div style="font-size:11px; color:var(--faint);">${escapeHtml(r.admin_email)}</div></td>
+              <td data-label="Action"><code style="font-size:11.5px;">${escapeHtml(r.action)}</code></td>
+              <td data-label="Entity">${r.entity_type ? `${escapeHtml(r.entity_type)}${r.entity_id ? ` #${escapeHtml(String(r.entity_id))}` : ''}` : '—'}</td>
+              <td data-label="Detail" style="font-size:12.5px; max-width:340px;">${escapeHtml(r.detail || '')}</td>
+            </tr>`
+          )
+          .join('')}
+      </tbody>
+    </table>`
+    : '<div class="notice">Nothing logged yet.</div>'
+}`);
 }

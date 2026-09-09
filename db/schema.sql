@@ -45,6 +45,25 @@ CREATE TABLE admin_users (
   last_login_at  TEXT
 );
 
+-- Every sensitive admin action, immutable once written (the app never issues an UPDATE or
+-- DELETE against this table). admin_user_id is nullable and name/email are copied in at write
+-- time rather than only joined live, so a row still reads sensibly if that employee's account
+-- is later disabled -- their history shouldn't vanish along with their access.
+CREATE TABLE audit_log (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  admin_user_id  INTEGER REFERENCES admin_users(id),
+  admin_name     TEXT NOT NULL,
+  admin_email    TEXT NOT NULL,
+  action         TEXT NOT NULL,          -- short verb.noun code, e.g. "offer.price_changed"
+  entity_type    TEXT,                   -- 'product' | 'offer' | 'order' | 'certificate' | 'admin_user' | 'rate' | ...
+  entity_id      TEXT,
+  detail         TEXT,                   -- short human-readable summary, e.g. "seller_price 8000 -> 9500"
+  ip             TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_audit_created ON audit_log(created_at DESC);
+CREATE INDEX idx_audit_entity ON audit_log(entity_type, entity_id);
+
 CREATE TABLE categories (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   slug       TEXT NOT NULL UNIQUE,
