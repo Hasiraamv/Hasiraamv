@@ -215,10 +215,28 @@ async function homeRoute(request, env, cart, user) {
       GROUP BY c.slug`
   ).all();
   const countMap = new Map((counts || []).map((r) => [r.slug, r]));
+
+  // A category tile shows the cover photo of its most recently listed piece instead of
+  // sitting on a bare placeholder -- picks the newest published product in that category
+  // with a live offer, falling back to an older one if the newest has no photo yet.
+  const { results: tileImages } = await env.DB.prepare(
+    `SELECT c.slug,
+       (SELECT pi.url
+          FROM products p
+          JOIN product_images pi ON pi.product_id = p.id
+         WHERE p.category_id = c.id AND p.is_published = 1
+           AND EXISTS (SELECT 1 FROM offers o WHERE o.product_id = p.id AND o.status = 'active')
+         ORDER BY p.created_at DESC, pi.sort_order ASC
+         LIMIT 1) AS image_url
+       FROM categories c`
+  ).all();
+  const imageMap = new Map((tileImages || []).map((r) => [r.slug, r.image_url]));
+
   for (const c of categories) {
     const row = countMap.get(c.slug);
     c.listing_count = row?.listing_count || 0;
     c.from_price = row?.from_price || null;
+    c.tile_image = imageMap.get(c.slug) || null;
   }
 
   return html(
