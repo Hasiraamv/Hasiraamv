@@ -16,7 +16,8 @@ import {
   clearCookie,
   createAdminToken,
   verifyAdminToken,
-  checkPassword,
+  hashPassword,
+  verifyPassword,
 } from './session.js';
 
 const ADMIN_COOKIE = 'rh_admin';
@@ -31,14 +32,51 @@ const ORDER_STAGES = [
   'delivered',
 ];
 
+// Employee roles. Kept to four, matched to a small team doing real jobs rather than the full
+// permission matrix a company with a dedicated security team would build -- see ROUTE_RULES
+// below for exactly what each one can reach. "owner" is the only role that can manage other
+// admin accounts, touch pricing/rates, or edit the catalogue.
+const ROLES = ['owner', 'authenticator', 'warehouse', 'support'];
+const ROLE_LABELS = {
+  owner: 'Owner',
+  authenticator: 'Authenticator',
+  warehouse: 'Warehouse',
+  support: 'Support',
+};
+
+// Coarse, route-group permissions. An unmatched path defaults to owner-only rather than open
+// access, so a new route added later is safe by default until someone deliberately widens it.
+const ROUTE_RULES = [
+  { test: (p) => p === '/admin', roles: ROLES },
+  { test: (p) => p === '/admin/account/password', roles: ROLES },
+  { test: (p) => p === '/admin/orders', roles: ['owner', 'authenticator', 'warehouse', 'support'] },
+  { test: (p) => p === '/admin/orders/advance', roles: ['owner', 'authenticator', 'warehouse'] },
+  { test: (p) => p.startsWith('/admin/certificates'), roles: ['owner', 'authenticator'] },
+  { test: (p) => p === '/admin/listings' || p === '/admin/offers/status', roles: ['owner', 'authenticator', 'warehouse'] },
+  {
+    test: (p) =>
+      p.startsWith('/admin/products') ||
+      p.startsWith('/admin/offers') ||
+      p.startsWith('/admin/images') ||
+      p.startsWith('/admin/rates'),
+    roles: ['owner'],
+  },
+  { test: (p) => p.startsWith('/admin/sellers') || p === '/admin/sourcing', roles: ['owner', 'support'] },
+  { test: (p) => p.startsWith('/admin/users'), roles: ['owner'] },
+];
+
+function roleCanAccess(path, role) {
+  const rule = ROUTE_RULES.find((r) => r.test(path));
+  return rule ? rule.roles.includes(role) : role === 'owner';
+}
+
 export async function adminRouter(request, env, path) {
   const method = request.method.toUpperCase();
 
-  if (!env.SESSION_SECRET || !env.ADMIN_PASSWORD) {
+  if (!env.SESSION_SECRET) {
     return adminHtml(
       `<div class="notice notice-bad">
-         Admin is disabled because its secrets are not set. Run
-         <code>wrangler secret put ADMIN_PASSWORD</code> and
+         Admin is disabled because its secret is not set. Run
          <code>wrangler secret put SESSION_SECRET</code>, then redeploy.
        </div>`,
       503
@@ -48,15 +86,25 @@ export async function adminRouter(request, env, path) {
   if (path === '/admin/login') {
     if (method === 'POST') {
       const form = await request.formData();
-      if (checkPassword(form.get('password'), env.ADMIN_PASSWORD)) {
-        const token = await createAdminToken(env.SESSION_SECRET);
+      const email = String(form.get('email') || '').trim().toLowerCase();
+      const password = String(form.get('password') || '');
+      const user = email
+        ? await env.DB.prepare('SELECT * FROM admin_users WHERE email = ? COLLATE NOCASE').bind(email).first()
+        : null;
+      const ok = !!user && user.status === 'active' && (await verifyPassword(password, user.password_hash));
+      if (ok) {
+        const token = await createAdminToken(env.SESSION_SECRET, user.id);
+        await env.DB.prepare("UPDATE admin_users SET last_login_at = datetime('now') WHERE id = ?")
+          .bind(user.id)
+          .run();
         return redirect('/admin', {
           'set-cookie': cookieHeader(ADMIN_COOKIE, token, { maxAge: 60 * 60 * 8 }),
         });
       }
-      return adminHtml(loginForm('That password is not right.'), 401);
+      return adminHtml(loginForm('That email or password is not right.'), 401);
     }
-    return adminHtml(loginForm());
+    const anyUsers = await env.DB.prepare('SELECT id FROM admin_users LIMIT 1').first();
+    return adminHtml(loginForm(null, !anyUsers));
   }
 
   if (path === '/admin/logout') {
@@ -64,11 +112,40 @@ export async function adminRouter(request, env, path) {
   }
 
   const token = parseCookies(request)[ADMIN_COOKIE];
-  if (!(await verifyAdminToken(env.SESSION_SECRET, token))) {
-    return redirect('/admin/login');
+  const userId = await verifyAdminToken(env.SESSION_SECRET, token);
+  if (!userId) return redirect('/admin/login');
+
+  // Re-read the account on every request rather than trusting anything cached in the token,
+  // so disabling someone or changing their role takes effect on their very next click instead
+  // of waiting out an up-to-8-hour-old session.
+  const currentUser = await env.DB.prepare('SELECT * FROM admin_users WHERE id = ?').bind(userId).first();
+  if (!currentUser || currentUser.status !== 'active') {
+    return redirect('/admin/login', { 'set-cookie': clearCookie(ADMIN_COOKIE) });
   }
 
-  if (path === '/admin') return dashboard(env);
+  if (!roleCanAccess(path, currentUser.role)) {
+    return adminHtml(
+      `<div class="notice notice-bad">Your role (${escapeHtml(ROLE_LABELS[currentUser.role] || currentUser.role)}) does not have access to this page.</div>`,
+      403
+    );
+  }
+
+  if (path === '/admin/account/password') {
+    if (method === 'POST') return changeOwnPassword(request, env, currentUser);
+    return adminHtml(changePasswordForm());
+  }
+  if (path === '/admin/users') return adminUsersPage(env, currentUser, new URL(request.url).searchParams.get('error'));
+  if (path === '/admin/users/create' && method === 'POST') return createAdminUser(request, env);
+  {
+    const m = path.match(/^\/admin\/users\/(\d+)\/status$/);
+    if (m && method === 'POST') return setAdminUserStatus(request, env, Number(m[1]), currentUser);
+  }
+  {
+    const m = path.match(/^\/admin\/users\/(\d+)\/reset-password$/);
+    if (m && method === 'POST') return resetAdminUserPassword(request, env, Number(m[1]), currentUser);
+  }
+
+  if (path === '/admin') return dashboard(env, currentUser);
   if (path === '/admin/orders')
     return ordersPage(env, new URL(request.url).searchParams.get('issued'));
   if (path === '/admin/orders/advance' && method === 'POST') return advanceOrder(request, env);
@@ -147,8 +224,13 @@ function adminHtml(body, status = 200, extraHeaders = {}) {
     <a href="/admin/rates">Rates</a>
     <a href="/admin/sellers">Seller applications</a>
     <a href="/admin/sourcing">Sourcing requests</a>
+    <a href="/admin/users">Employees</a>
   </nav>
-  <div class="nav-right"><a href="/" target="_blank">View site</a><a href="/admin/logout">Sign out</a></div>
+  <div class="nav-right">
+    <a href="/" target="_blank">View site</a>
+    <a href="/admin/account/password">My account</a>
+    <a href="/admin/logout">Sign out</a>
+  </div>
 </div>
 <main class="section" style="padding-top:32px;">${body}</main>
 </body></html>`,
@@ -157,15 +239,27 @@ function adminHtml(body, status = 200, extraHeaders = {}) {
   );
 }
 
-function loginForm(error) {
+function loginForm(error, noAccountsYet = false) {
   return `
 <div style="max-width:380px;">
   <h2 class="serif" style="font-size:30px; margin:0 0 16px;">Sign in</h2>
+  ${
+    noAccountsYet
+      ? `<div class="notice notice-bad" style="margin-bottom:14px;">
+           No employee accounts exist yet. Create the first one (an Owner) directly in the
+           database, then sign in here with its email and password.
+         </div>`
+      : ''
+  }
   ${error ? `<div class="notice notice-bad" style="margin-bottom:14px;">${escapeHtml(error)}</div>` : ''}
   <form method="post" action="/admin/login">
     <div class="field">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" required autofocus autocomplete="username">
+    </div>
+    <div class="field">
       <label for="password">Password</label>
-      <input id="password" name="password" type="password" required autofocus autocomplete="current-password">
+      <input id="password" name="password" type="password" required autocomplete="current-password">
     </div>
     <button class="btn btn-block" type="submit">Sign in</button>
   </form>
@@ -174,7 +268,7 @@ function loginForm(error) {
 
 // Pages ----------------------------------------------------------------------
 
-async function dashboard(env) {
+async function dashboard(env, currentUser) {
   const [orders, requests, stats] = await Promise.all([
     db.listOrders(env.DB, 8),
     db.listSourcingRequests(env.DB, 5),
@@ -183,19 +277,26 @@ async function dashboard(env) {
   const pendingCerts = await env.DB.prepare(
     `SELECT COUNT(*) AS n FROM orders WHERE certificate_no IS NULL AND status IN ('authenticating','authenticated','seller_shipped')`
   ).first();
-  const revenue = await env.DB.prepare(
-    `SELECT COALESCE(SUM(amount),0) AS total FROM orders WHERE payment_status = 'paid'`
-  ).first();
+
+  // Revenue is a financial figure, not an operational one -- shown to the owner only. Everyone
+  // else who can reach the dashboard (authenticator, warehouse, support) sees the operational
+  // tiles that matter for their own job.
+  const tiles = [
+    ['Live listings', stats.listings],
+    ['Orders', orders.length],
+    ['Awaiting certificate', pendingCerts?.n || 0],
+  ];
+  if (currentUser?.role === 'owner') {
+    const revenue = await env.DB.prepare(
+      `SELECT COALESCE(SUM(amount),0) AS total FROM orders WHERE payment_status = 'paid'`
+    ).first();
+    tiles.push(['Paid revenue', formatINR(revenue?.total || 0)]);
+  }
 
   return adminHtml(`
 <h2 class="serif" style="font-size:32px; margin:0 0 22px;">Today</h2>
 <div class="grid grid-4" style="margin-bottom:32px;">
-  ${[
-    ['Live listings', stats.listings],
-    ['Orders', orders.length],
-    ['Awaiting certificate', pendingCerts?.n || 0],
-    ['Paid revenue', formatINR(revenue?.total || 0)],
-  ]
+  ${tiles
     .map(
       ([k, v]) =>
         `<div class="panel" style="padding:20px;"><div class="tag muted">${k}</div><div class="serif" style="font-size:28px; margin-top:6px;">${v}</div></div>`
@@ -2047,4 +2148,162 @@ ${
         .join('')}</tbody></table>`
     : '<div class="notice">No requests yet.</div>'
 }`);
+}
+
+// Employee accounts -----------------------------------------------------------------
+// Owner-only: create accounts, disable/re-enable them, and reset a forgotten password.
+// Deleting an account is deliberately not offered -- disabling keeps the row (and its
+// last_login_at / created_at history) intact, the same soft-deletion principle used
+// everywhere else business records live.
+
+function randomTempPassword() {
+  const bytes = crypto.getRandomValues(new Uint8Array(9));
+  return [...bytes].map((b) => b.toString(36).padStart(2, '0')).join('').slice(0, 12);
+}
+
+async function adminUsersPage(env, currentUser, errorMessage, notice) {
+  const { results: users } = await env.DB.prepare(
+    'SELECT id, name, email, role, status, created_at, last_login_at FROM admin_users ORDER BY created_at'
+  ).all();
+
+  return adminHtml(`
+<h2 class="serif" style="font-size:32px; margin:0 0 8px;">Employees</h2>
+<p class="muted" style="margin:0 0 22px; font-size:13.5px; max-width:640px;">
+  Each person signs in with their own email and password instead of a shared one. Their role
+  decides which admin pages they can reach -- see the note on each role below.
+</p>
+${notice ? `<div class="notice notice-good" style="margin-bottom:20px;">${escapeHtml(notice)}</div>` : ''}
+${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${escapeHtml(errorMessage)}</div>` : ''}
+
+<table class="table" style="margin-bottom:32px;">
+  <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last signed in</th><th></th></tr></thead>
+  <tbody>
+    ${(users || [])
+      .map(
+        (u) => `<tr>
+          <td data-label="Name">${escapeHtml(u.name)}${u.id === currentUser.id ? ' <span class="tag muted">you</span>' : ''}</td>
+          <td data-label="Email">${escapeHtml(u.email)}</td>
+          <td data-label="Role">${escapeHtml(ROLE_LABELS[u.role] || u.role)}</td>
+          <td data-label="Status"><span class="tag" style="color:${u.status === 'active' ? 'var(--green)' : 'var(--oxblood)'};">${escapeHtml(u.status)}</span></td>
+          <td data-label="Last signed in">${u.last_login_at ? escapeHtml(String(u.last_login_at).slice(0, 16).replace('T', ' ')) : 'Never'}</td>
+          <td style="white-space:nowrap; font-size:12.5px;">
+            ${
+              u.id === currentUser.id
+                ? ''
+                : `<form method="post" action="/admin/users/${u.id}/status" style="display:inline;">
+                     <input type="hidden" name="status" value="${u.status === 'active' ? 'disabled' : 'active'}">
+                     <button class="chip" type="submit" style="cursor:pointer;">${u.status === 'active' ? 'Disable' : 'Re-enable'}</button>
+                   </form>`
+            }
+            <form method="post" action="/admin/users/${u.id}/reset-password" style="display:inline;" onsubmit="return confirm('Set a new temporary password for ${escapeHtml(u.name)}? Tell them the new password directly -- it will not be emailed.');">
+              <button class="chip" type="submit" style="cursor:pointer;">Reset password</button>
+            </form>
+          </td>
+        </tr>`
+      )
+      .join('')}
+  </tbody>
+</table>
+
+<div class="panel" style="padding:22px; max-width:480px;">
+  <h3 class="serif" style="font-size:20px; margin:0 0 6px;">Add an employee</h3>
+  <p class="muted" style="font-size:12.5px; margin:0 0 16px;">
+    Set a temporary password here and tell them directly -- it is not emailed. They can change
+    it from "My account" once signed in.
+  </p>
+  <form method="post" action="/admin/users/create">
+    <div class="field"><label for="u_name">Name</label><input id="u_name" name="name" required maxlength="120"></div>
+    <div class="field"><label for="u_email">Email</label><input id="u_email" name="email" type="email" required maxlength="200"></div>
+    <div class="field"><label for="u_role">Role</label>
+      <select id="u_role" name="role">
+        ${ROLES.filter((r) => r !== 'owner')
+          .map((r) => `<option value="${r}">${ROLE_LABELS[r]}</option>`)
+          .join('')}
+        <option value="owner">Owner (full access, including managing other employees)</option>
+      </select>
+    </div>
+    <div class="field"><label for="u_password">Temporary password</label><input id="u_password" name="password" required minlength="8" maxlength="72">
+      <span class="hint">At least 8 characters. Tell it to them yourself.</span>
+    </div>
+    <button class="btn btn-block" type="submit">Add employee</button>
+  </form>
+</div>
+
+<div class="notice" style="margin-top:28px; max-width:640px; font-size:12.5px; line-height:1.7;">
+  <strong>What each role can reach:</strong><br>
+  <strong>Owner</strong> — everything, including pricing, rates, the catalogue, and managing employees.<br>
+  <strong>Authenticator</strong> — orders (view and advance) and certificates.<br>
+  <strong>Warehouse</strong> — orders (view and advance) and listings, for packing and dispatch.<br>
+  <strong>Support</strong> — orders (view only), seller applications, and sourcing requests.
+</div>`);
+}
+
+async function createAdminUser(request, env) {
+  const form = await request.formData();
+  const name = String(form.get('name') || '').trim();
+  const email = String(form.get('email') || '').trim().toLowerCase();
+  const password = String(form.get('password') || '');
+  const role = ROLES.includes(form.get('role')) ? form.get('role') : 'support';
+
+  if (!name || !email || password.length < 8) {
+    return redirect('/admin/users?error=' + encodeURIComponent('Name, email and an at-least-8-character password are all required.'));
+  }
+
+  const existing = await env.DB.prepare('SELECT id FROM admin_users WHERE email = ? COLLATE NOCASE').bind(email).first();
+  if (existing) {
+    return redirect('/admin/users?error=' + encodeURIComponent(`${email} already has an account.`));
+  }
+
+  const hash = await hashPassword(password);
+  await env.DB.prepare('INSERT INTO admin_users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
+    .bind(name, email, hash, role)
+    .run();
+
+  return redirect('/admin/users');
+}
+
+async function setAdminUserStatus(request, env, userId, currentUser) {
+  if (userId === currentUser.id) return redirect('/admin/users'); // never let someone lock themselves out
+  const form = await request.formData();
+  const status = form.get('status') === 'disabled' ? 'disabled' : 'active';
+  await env.DB.prepare('UPDATE admin_users SET status = ? WHERE id = ?').bind(status, userId).run();
+  return redirect('/admin/users');
+}
+
+async function resetAdminUserPassword(request, env, userId, currentUser) {
+  const temp = randomTempPassword();
+  const hash = await hashPassword(temp);
+  await env.DB.prepare('UPDATE admin_users SET password_hash = ? WHERE id = ?').bind(hash, userId).run();
+  // Rendered directly rather than redirected with the password in the URL -- a redirect would
+  // put it in the browser's address bar and history for a page that gets shared and revisited.
+  return adminUsersPage(env, currentUser, null, `New temporary password: ${temp} — tell them directly, it will not be shown again.`);
+}
+
+function changePasswordForm(error, notice) {
+  return `
+<h2 class="serif" style="font-size:32px; margin:0 0 20px;">My account</h2>
+<div class="panel" style="padding:22px; max-width:420px;">
+  <h3 class="serif" style="font-size:20px; margin:0 0 14px;">Change password</h3>
+  ${notice ? `<div class="notice notice-good" style="margin-bottom:14px;">${escapeHtml(notice)}</div>` : ''}
+  ${error ? `<div class="notice notice-bad" style="margin-bottom:14px;">${escapeHtml(error)}</div>` : ''}
+  <form method="post" action="/admin/account/password">
+    <div class="field"><label for="current_password">Current password</label><input id="current_password" name="current_password" type="password" required autocomplete="current-password"></div>
+    <div class="field"><label for="new_password">New password</label><input id="new_password" name="new_password" type="password" required minlength="8" maxlength="72" autocomplete="new-password"></div>
+    <button class="btn btn-block" type="submit">Update password</button>
+  </form>
+</div>`;
+}
+
+async function changeOwnPassword(request, env, currentUser) {
+  const form = await request.formData();
+  const current = String(form.get('current_password') || '');
+  const next = String(form.get('new_password') || '');
+
+  const ok = await verifyPassword(current, currentUser.password_hash);
+  if (!ok) return adminHtml(changePasswordForm('Your current password is not right.'));
+  if (next.length < 8) return adminHtml(changePasswordForm('The new password must be at least 8 characters.'));
+
+  const hash = await hashPassword(next);
+  await env.DB.prepare('UPDATE admin_users SET password_hash = ? WHERE id = ?').bind(hash, currentUser.id).run();
+  return adminHtml(changePasswordForm(null, 'Password updated.'));
 }

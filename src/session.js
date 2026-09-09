@@ -54,25 +54,68 @@ function timingSafeEqual(a, b) {
   return diff === 0;
 }
 
-export async function createAdminToken(secret, ttlSeconds = 60 * 60 * 8) {
+// The token identifies which admin_users row is signed in; it does not carry the role, so a
+// role change or a disabled account takes effect on the very next request rather than waiting
+// out an up-to-8-hour-old token -- adminRouter re-reads the row every time.
+export async function createAdminToken(secret, userId, ttlSeconds = 60 * 60 * 8) {
   const expires = Date.now() + ttlSeconds * 1000;
-  const payload = `admin.${expires}`;
+  const payload = `admin.${userId}.${expires}`;
   return `${payload}.${await sign(secret, payload)}`;
 }
 
+// Returns the signed-in admin_users id, or null if the token is missing, malformed, expired,
+// or its signature does not match.
 export async function verifyAdminToken(secret, token) {
-  if (!token) return false;
+  if (!token) return null;
   const parts = String(token).split('.');
-  if (parts.length !== 3 || parts[0] !== 'admin') return false;
-  const expires = Number(parts[1]);
-  if (!Number.isFinite(expires) || Date.now() > expires) return false;
-  const expected = await sign(secret, `admin.${parts[1]}`);
-  return timingSafeEqual(expected, parts[2]);
+  if (parts.length !== 4 || parts[0] !== 'admin') return null;
+  const userId = Number(parts[1]);
+  const expires = Number(parts[2]);
+  if (!Number.isInteger(userId) || userId <= 0 || !Number.isFinite(expires) || Date.now() > expires) {
+    return null;
+  }
+  const expected = await sign(secret, `admin.${parts[1]}.${parts[2]}`);
+  return timingSafeEqual(expected, parts[3]) ? userId : null;
 }
 
-export function checkPassword(supplied, actual) {
-  if (!actual) return false;
-  return timingSafeEqual(String(supplied || ''), String(actual));
+// Password hashing for employee admin accounts. The Workers runtime has no native bcrypt or
+// argon2 without a WASM dependency; PBKDF2-HMAC-SHA256 at a high iteration count via the
+// standard Web Crypto API is a well-established, dependency-free alternative and is what this
+// uses. Never compare or store a password in plain text.
+const PBKDF2_ITERATIONS = 100000;
+
+function toHex(bytes) {
+  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function fromHex(hex) {
+  const bytes = hex.match(/.{2}/g) || [];
+  return new Uint8Array(bytes.map((b) => parseInt(b, 16)));
+}
+
+async function pbkdf2(password, salt, iterations) {
+  const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations },
+    key,
+    256
+  );
+  return toHex(bits);
+}
+
+export async function hashPassword(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const hash = await pbkdf2(password, salt, PBKDF2_ITERATIONS);
+  return `pbkdf2:${PBKDF2_ITERATIONS}:${toHex(salt)}:${hash}`;
+}
+
+export async function verifyPassword(password, stored) {
+  const parts = String(stored || '').split(':');
+  if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false;
+  const iterations = Number(parts[1]);
+  if (!Number.isInteger(iterations) || iterations <= 0) return false;
+  const hash = await pbkdf2(password, fromHex(parts[2]), iterations);
+  return timingSafeEqual(hash, parts[3]);
 }
 
 // A cart is a list of offer ids. Prices are always recomputed from the database, never

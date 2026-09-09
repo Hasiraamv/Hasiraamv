@@ -29,6 +29,22 @@ CREATE TABLE users (
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Employee accounts for /admin, replacing the single shared ADMIN_PASSWORD. Each person gets
+-- their own login and a role that limits what they can reach -- see ROUTE_RULES in admin.js
+-- for exactly what each role can do. status = 'disabled' revokes access immediately, without
+-- deleting the account or its history (last_login_at, created_at) -- the same soft-deletion
+-- principle as everywhere else business records live.
+CREATE TABLE admin_users (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  name           TEXT NOT NULL,
+  email          TEXT NOT NULL UNIQUE,
+  password_hash  TEXT NOT NULL,          -- see hashPassword() in session.js -- PBKDF2, never plaintext
+  role           TEXT NOT NULL DEFAULT 'owner', -- owner | authenticator | warehouse | support
+  status         TEXT NOT NULL DEFAULT 'active', -- active | disabled
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  last_login_at  TEXT
+);
+
 CREATE TABLE categories (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   slug       TEXT NOT NULL UNIQUE,
