@@ -64,6 +64,7 @@ const ROUTE_RULES = [
     roles: ['owner'],
   },
   { test: (p) => p.startsWith('/admin/sellers') || p === '/admin/sourcing', roles: ['owner', 'support'] },
+  { test: (p) => p.startsWith('/admin/discounts'), roles: ['owner'] },
   { test: (p) => p.startsWith('/admin/users'), roles: ['owner'] },
   { test: (p) => p === '/admin/audit', roles: ['owner'] },
   { test: (p) => p.startsWith('/admin/product-audit'), roles: ['owner'] },
@@ -210,6 +211,12 @@ export async function adminRouter(request, env, path) {
   }
   if (path === '/admin/listings')
     return listingsPage(env, new URL(request.url).searchParams.get('error'));
+  if (path === '/admin/discounts')
+    return discountsPage(env, new URL(request.url).searchParams.get('error'));
+  {
+    const m = path.match(/^\/admin\/discounts\/(\d+)\/update$/);
+    if (m && method === 'POST') return updateDiscount(request, env, Number(m[1]), currentUser);
+  }
   if (path === '/admin/products/create' && method === 'POST') return createProduct(request, env, currentUser);
   if (path === '/admin/offers/create' && method === 'POST') return createOffer(request, env, currentUser);
   if (path === '/admin/offers/status' && method === 'POST') return setOfferStatus(request, env, currentUser);
@@ -289,6 +296,7 @@ function adminHtml(body, status = 200, extraHeaders = {}, loggedIn = true) {
     <a href="/admin/authentication">Authentication</a>
     <a href="/admin/listings">Listings</a>
     <a href="/admin/products">Add &amp; edit</a>
+    <a href="/admin/discounts">Discounts</a>
     <a href="/admin/rates">Rates</a>
     <a href="/admin/sellers">Seller applications</a>
     <a href="/admin/sourcing">Sourcing requests</a>
@@ -1559,6 +1567,69 @@ ${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${e
 </div>`);
 }
 
+// A dedicated page for setting MRP vs. the current lowest live price -- the "under retail"
+// discount shown on the storefront -- without wading into the full Add/Edit product form.
+async function discountsPage(env, errorMessage) {
+  const { results: products } = await env.DB.prepare(
+    `SELECT p.id, p.title, p.slug, p.retail_price,
+            (SELECT MIN(landed_price) FROM offers o WHERE o.product_id = p.id AND o.status = 'active') AS lowest
+       FROM products p
+      ORDER BY p.title`
+  ).all();
+
+  return adminHtml(`
+<h2 class="serif" style="font-size:32px; margin:0 0 8px;">Discounts</h2>
+<p class="muted" style="font-size:13px; margin:0 0 22px;">
+  Set each piece's MRP here. When it's above the lowest live price, the storefront shows it
+  struck through with the discount percentage next to it -- leave it blank to show no MRP at all.
+</p>
+${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${escapeHtml(errorMessage)}</div>` : ''}
+<table class="table">
+  <thead><tr><th>Product</th><th class="num">Lowest live price</th><th>MRP (₹)</th><th class="num">Discount</th><th></th></tr></thead>
+  <tbody>
+    ${(products || [])
+      .map((p) => {
+        const pct =
+          p.retail_price && p.lowest && p.lowest < p.retail_price
+            ? Math.round(((p.retail_price - p.lowest) / p.retail_price) * 100)
+            : null;
+        return `<tr>
+        <td data-label="Product"><strong>${escapeHtml(p.title)}</strong></td>
+        <td data-label="Lowest live price" class="num">${p.lowest ? formatINRWords(p.lowest, { tag: 'div' }) : '—'}</td>
+        <td data-label="MRP (₹)">
+          <form method="post" action="/admin/discounts/${p.id}/update" style="display:flex; gap:8px; align-items:center;">
+            <input name="retail" inputmode="numeric" maxlength="12" value="${p.retail_price || ''}" placeholder="No MRP" style="width:140px; border:1px solid #ddd5c2; background:var(--card); padding:8px 10px; font-size:13px;">
+            <button class="chip" type="submit" style="cursor:pointer;">Save</button>
+          </form>
+        </td>
+        <td data-label="Discount" class="num">${pct !== null ? `<span style="color:var(--green); font-weight:600;">${pct}% off</span>` : '—'}</td>
+        <td>${p.slug ? `<a href="/p/${escapeHtml(p.slug)}" target="_blank">View</a>` : ''}</td>
+      </tr>`;
+      })
+      .join('')}
+  </tbody>
+</table>`);
+}
+
+async function updateDiscount(request, env, productId, currentUser) {
+  const form = await request.formData();
+  const raw = String(form.get('retail') || '').split('.')[0].replace(/[^\d]/g, '');
+  const retail = raw ? Number(raw) : null;
+
+  const before = await env.DB.prepare('SELECT title, retail_price FROM products WHERE id = ?').bind(productId).first();
+  if (!before) return redirect('/admin/discounts?error=' + encodeURIComponent('No such product.'));
+
+  await env.DB.prepare('UPDATE products SET retail_price = ? WHERE id = ?').bind(retail, productId).run();
+  await logAudit(env, currentUser, 'product.mrp_updated', {
+    entityType: 'product',
+    entityId: productId,
+    detail: `${before.title}: MRP ${before.retail_price ?? 'none'} -> ${retail ?? 'none'}`,
+    request,
+  });
+
+  return redirect('/admin/discounts');
+}
+
 function slugify(text) {
   return String(text)
     .toLowerCase()
@@ -2107,29 +2178,25 @@ async function editOfferPage(env, offerId) {
   return adminHtml(`
 <h2 class="serif" style="font-size:32px; margin:0 0 6px;">Edit offer</h2>
 <p class="muted" style="font-size:13px; margin:0 0 20px;">${escapeHtml(offer.product_title)} &middot; ${escapeHtml(offer.stock_code || '')}</p>
-<div class="panel" style="padding:22px; max-width:640px;">
+<div class="panel" style="padding:22px; max-width:520px;">
   <form method="post" action="/admin/offers/${offer.id}/update">
-    <div class="form-row">
-      <div class="field"><label for="seller_id">Seller</label>
-        <select id="seller_id" name="seller_id" required>
-          ${sellers
-            .map(
-              (s) =>
-                `<option value="${s.id}"${s.id === offer.seller_id ? ' selected' : ''}>${escapeHtml(s.name)} — ${escapeHtml(s.city)}</option>`
-            )
-            .join('')}
-        </select>
-      </div>
-      ${sizeField({ idPrefix: 'size_label', name: 'size_label', sizeType: offer.product_size_type, selected: offer.size_label })}
+    <div class="field"><label for="seller_id">Seller</label>
+      <select id="seller_id" name="seller_id" required>
+        ${sellers
+          .map(
+            (s) =>
+              `<option value="${s.id}"${s.id === offer.seller_id ? ' selected' : ''}>${escapeHtml(s.name)} — ${escapeHtml(s.city)}</option>`
+          )
+          .join('')}
+      </select>
     </div>
     <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
       <input type="checkbox" id="inhouse" name="inhouse" value="1" style="width:auto;" ${offer.sourced_by === 'inhouse' ? 'checked' : ''}>
       <label for="inhouse" style="margin:0;">Inhaus — sourced by us (ignores the seller above)</label>
     </div>
-    <div class="form-row">
-      ${shipsFromField(cities, { required: true, selected: offer.ships_from })}
-      <div class="field"><label for="condition_o">Condition</label><input id="condition_o" name="condition" value="${escapeHtml(offer.condition)}" maxlength="60"></div>
-    </div>
+    ${sizeField({ idPrefix: 'size_label', name: 'size_label', sizeType: offer.product_size_type, selected: offer.size_label })}
+    <div class="field"><label for="condition_o">Condition</label><input id="condition_o" name="condition" value="${escapeHtml(offer.condition)}" maxlength="60"></div>
+    ${shipsFromField(cities, { required: true, selected: offer.ships_from })}
     <div class="form-row">
       <div class="field"><label for="seller_price">Seller price (₹)</label><input id="seller_price" name="seller_price" required inputmode="numeric" maxlength="12" value="${offer.seller_price}"></div>
       <div class="field"><label for="status">Status</label>
