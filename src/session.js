@@ -134,6 +134,20 @@ export function writeCart(ids) {
   return cookieHeader('cart', [...new Set(ids)].join(','));
 }
 
+// The coupon cookie only ever carries the code typed in -- never a discount amount -- so it
+// is re-validated against the database and the live cart on every read (see coupons.js).
+export function readCoupon(request) {
+  return parseCookies(request).coupon || '';
+}
+
+export function writeCoupon(code) {
+  return cookieHeader('coupon', code);
+}
+
+export function clearCoupon() {
+  return clearCookie('coupon');
+}
+
 // Rejects cross-site form posts. Same-origin only.
 export function sameOrigin(request) {
   const origin = request.headers.get('origin');

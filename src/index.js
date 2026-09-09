@@ -20,7 +20,8 @@ import {
   cookiesPage,
   sellPage,
 } from './views/pages.js';
-import { readCart, writeCart, sameOrigin, publicRef } from './session.js';
+import { readCart, writeCart, readCoupon, writeCoupon, clearCoupon, sameOrigin, publicRef } from './session.js';
+import { findCoupon, evaluateCoupon } from './coupons.js';
 import { getClerkAuth, getClerkUserProfile, verifyClerkWebhook, clerkConfigured } from './clerk.js';
 import { sendWelcomeEmail } from './email.js';
 import { handleChat } from './chatbot.js';
@@ -104,6 +105,8 @@ async function route(request, env, ctx) {
   if (path === '/cart') return cartRoute(request, env, cart, user);
   if (path === '/cart/add' && method === 'POST') return cartAdd(request, env, cart, user);
   if (path === '/cart/remove' && method === 'POST') return cartRemove(request, env, cart, user);
+  if (path === '/cart/coupon' && method === 'POST') return cartApplyCoupon(request, env, cart, user);
+  if (path === '/cart/coupon/remove' && method === 'POST') return cartRemoveCoupon(request, env, cart, user);
 
   if (path === '/checkout' && method === 'GET') return checkoutRoute(request, env, cart, user);
   if (path === '/checkout' && method === 'POST') return checkoutSubmit(request, env, cart, user);
@@ -355,11 +358,30 @@ async function loadCartItems(env, cart) {
   return items;
 }
 
+// Re-evaluates whatever coupon code is in the cookie against the live cart. Never trusts a
+// stored discount amount -- only the code itself survives between requests.
+async function loadCartCoupon(env, request, items) {
+  const code = readCoupon(request);
+  if (!code || !items.length) return null;
+  const coupon = await findCoupon(env.DB, code);
+  const result = evaluateCoupon(coupon, items);
+  return { code, ...result };
+}
+
 async function cartRoute(request, env, cart, user) {
   const items = await loadCartItems(env, cart);
   const total = items.reduce((s, i) => s + i.landed_price, 0);
+  const couponResult = await loadCartCoupon(env, request, items);
+  const discount = couponResult?.ok ? couponResult.totalDiscount : 0;
+  const couponError = new URL(request.url).searchParams.get('coupon_error');
   return html(
-    layout({ title: 'Your bag', env, user, cartCount: items.length, body: cartPage({ items, total }) })
+    layout({
+      title: 'Your bag',
+      env,
+      user,
+      cartCount: items.length,
+      body: cartPage({ items, total, discount, couponResult, couponError }),
+    })
   );
 }
 
@@ -379,12 +401,36 @@ async function cartRemove(request, env, cart, user) {
   return redirect('/cart', { 'set-cookie': writeCart(next) });
 }
 
+async function cartApplyCoupon(request, env, cart, user) {
+  const form = await request.formData();
+  const code = String(form.get('code') || '');
+  const items = await loadCartItems(env, cart);
+  const coupon = await findCoupon(env.DB, code);
+  const result = evaluateCoupon(coupon, items);
+  if (!result.ok) {
+    return redirect('/cart?coupon_error=' + encodeURIComponent(result.error));
+  }
+  return redirect('/cart', { 'set-cookie': writeCoupon(code) });
+}
+
+async function cartRemoveCoupon(request, env, cart, user) {
+  return redirect('/cart', { 'set-cookie': clearCoupon() });
+}
+
 async function checkoutRoute(request, env, cart, user) {
   const items = await loadCartItems(env, cart);
   if (!items.length) return redirect('/cart');
   const total = items.reduce((s, i) => s + i.landed_price, 0);
+  const couponResult = await loadCartCoupon(env, request, items);
+  const discount = couponResult?.ok ? couponResult.totalDiscount : 0;
   return html(
-    layout({ title: 'Checkout', env, user, cartCount: items.length, body: checkoutPage({ items, total }) })
+    layout({
+      title: 'Checkout',
+      env,
+      user,
+      cartCount: items.length,
+      body: checkoutPage({ items, total, discount, couponResult }),
+    })
   );
 }
 
@@ -429,23 +475,32 @@ async function checkoutSubmit(request, env, cart, user) {
     );
   }
 
+  // Re-checked here rather than trusted from the cookie or the cart page's render -- the
+  // coupon must still be valid, in date, under its use limit and applicable to this exact
+  // cart at the moment of payment, not just when it was typed in.
+  const couponResult = await loadCartCoupon(env, request, items);
+  const appliedCoupon = couponResult?.ok ? couponResult : null;
+
   // One order per offer. Prices come from the database row, never the form.
   let firstRef = null;
   for (const offer of items) {
     const eta = etaDates(offer.lead_days_min, offer.lead_days_max);
     const ref = publicRef();
     if (!firstRef) firstRef = ref;
+    const itemDiscount = appliedCoupon?.perItem.get(offer.id) || 0;
     const orderId = await db.createOrder(env.DB, {
       publicRef: ref,
       userId: user?.id,
       offerId: offer.id,
       productId: offer.product_id,
       sizeLabel: offer.size_label,
-      amount: offer.landed_price,
+      amount: offer.landed_price - itemDiscount,
       sellerPrice: offer.seller_price,
       duty: offer.duty,
       authFee: offer.auth_fee,
       shipping: offer.shipping,
+      discountAmount: itemDiscount,
+      couponCode: appliedCoupon ? appliedCoupon.coupon.code : null,
       etaMin: eta.from,
       etaMax: eta.to,
       ...data,
@@ -455,7 +510,7 @@ async function checkoutSubmit(request, env, cart, user) {
     // dispatch, not an automatic decline. See risk.js for exactly what it checks and why.
     const risk = await computeOrderRisk(env, {
       orderId,
-      amount: offer.landed_price,
+      amount: offer.landed_price - itemDiscount,
       userId: user?.id,
       buyerEmail: data.buyerEmail,
       buyerPhone: data.buyerPhone,
@@ -468,6 +523,14 @@ async function checkoutSubmit(request, env, cart, user) {
     }
   }
 
+  // Counted once per checkout, not once per item -- a 3-item order using one code is one use
+  // of it, not three.
+  if (appliedCoupon) {
+    await env.DB.prepare('UPDATE coupons SET used_count = used_count + 1 WHERE id = ?')
+      .bind(appliedCoupon.coupon.id)
+      .run();
+  }
+
   const order = await db.getOrderByRef(env.DB, firstRef);
   return html(
     layout({
@@ -478,7 +541,7 @@ async function checkoutSubmit(request, env, cart, user) {
       body: orderPlacedPage({ order }),
     }),
     200,
-    { 'set-cookie': writeCart([]) }
+    { 'set-cookie': [writeCart([]), clearCoupon()] }
   );
 }
 

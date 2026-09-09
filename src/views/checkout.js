@@ -1,7 +1,7 @@
 import { escapeHtml, formatINR, icon, etaDates } from '../render.js';
 import { refundBreakdown } from '../pricing.js';
 
-export function cartPage({ items, total }) {
+export function cartPage({ items, total, discount = 0, couponResult, couponError }) {
   if (!items.length) {
     return `
 <section class="section">
@@ -55,10 +55,33 @@ export function cartPage({ items, total }) {
         <div style="display:flex; justify-content:space-between;"><span>Import duty &amp; customs</span><span style="color:var(--green); font-weight:600;">Included</span></div>
         <div style="display:flex; justify-content:space-between;"><span>Authentication &amp; certificate</span><span style="color:var(--green); font-weight:600;">Included</span></div>
         <div style="display:flex; justify-content:space-between;"><span>Insured delivery</span><span style="color:var(--green); font-weight:600;">Included</span></div>
+        ${
+          discount > 0
+            ? `<div style="display:flex; justify-content:space-between; color:var(--green); font-weight:600;"><span>Coupon ${escapeHtml(
+                couponResult.coupon.code
+              )}</span><span>&minus;${formatINR(discount)}</span></div>`
+            : ''
+        }
         <div style="display:flex; justify-content:space-between; padding-top:12px; margin-top:4px; border-top:1px solid var(--line); font-weight:600; color:var(--text); font-size:16px;">
-          <span>Total</span><span class="serif" style="font-size:22px;">${formatINR(total)}</span>
+          <span>Total</span><span class="serif" style="font-size:22px;">${formatINR(total - discount)}</span>
         </div>
       </div>
+
+      <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--line);">
+        ${
+          discount > 0
+            ? `<div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px;">
+                 <span>Coupon <strong>${escapeHtml(couponResult.coupon.code)}</strong> applied</span>
+                 <form method="post" action="/cart/coupon/remove"><button class="chip" type="submit" style="cursor:pointer;">Remove</button></form>
+               </div>`
+            : `<form method="post" action="/cart/coupon" style="display:flex; gap:8px;">
+                 <input name="code" placeholder="Coupon code" maxlength="40" style="flex:1; border:1px solid #ddd5c2; background:var(--card); padding:10px 12px; font-size:13px; text-transform:uppercase;">
+                 <button class="chip" type="submit" style="cursor:pointer; white-space:nowrap;">Apply</button>
+               </form>
+               ${couponError ? `<p style="font-size:12px; color:var(--oxblood); margin:8px 0 0;">${escapeHtml(couponError)}</p>` : ''}`
+        }
+      </div>
+
       <a class="btn btn-block" href="/checkout" style="margin-top:18px;">Checkout</a>
       <p style="font-size:11.5px; color:var(--faint); margin:12px 0 0; line-height:1.5;">
         The price you see is the price you pay. Nothing further is payable on delivery.
@@ -68,7 +91,7 @@ export function cartPage({ items, total }) {
 </section>`;
 }
 
-export function checkoutPage({ items, total, error }) {
+export function checkoutPage({ items, total, error, discount = 0, couponResult }) {
   return `
 <section class="section">
   <div class="section-head"><div><span class="tag gold">Checkout</span><h2 class="serif">Where should it land?</h2></div></div>
@@ -131,8 +154,15 @@ export function checkoutPage({ items, total, error }) {
       <div style="font-size:12.5px; color:#5c5748; margin-bottom:12px; line-height:1.6;">
         Import duty, customs, authentication and insured delivery are all included in this total.
       </div>
+      ${
+        discount > 0
+          ? `<div style="display:flex; justify-content:space-between; color:var(--green); font-weight:600; font-size:13px; margin-bottom:8px;"><span>Coupon ${escapeHtml(
+              couponResult.coupon.code
+            )}</span><span>&minus;${formatINR(discount)}</span></div>`
+          : ''
+      }
       <div style="display:flex; justify-content:space-between; font-weight:600; font-size:16px; padding-top:12px; border-top:1px solid var(--line);">
-        <span>Total</span><span class="serif" style="font-size:22px;">${formatINR(total)}</span>
+        <span>Total</span><span class="serif" style="font-size:22px;">${formatINR(total - discount)}</span>
       </div>
       <button class="btn btn-block" type="submit" style="margin-top:18px;">Place order</button>
       <p style="font-size:11.5px; color:var(--faint); margin:12px 0 0; line-height:1.5;">
