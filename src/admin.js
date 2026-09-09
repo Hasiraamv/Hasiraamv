@@ -1088,20 +1088,26 @@ function stockLabelField(id, name, selected = '') {
 // product isn't sized in UK (apparel, "one size", etc). `sizeType` decides which renders; when
 // it isn't known server-side (the product is picked from a dropdown on the same form), both
 // render and a small script swaps between them as the selection changes.
-function shoeSizeChips(idPrefix, name, selected = '') {
+function shoeSizeChips(idPrefix, name, selected = '', multiple = false) {
+  const selectedList = Array.isArray(selected) ? selected : [selected];
+  const type = multiple ? 'checkbox' : 'radio';
   return `<div class="sizes" style="grid-template-columns:repeat(4,minmax(0,1fr));">
     ${SHOE_SIZE_LABELS.map(
-      (label, i) => `<input type="radio" class="visually-hidden size-radio" id="${idPrefix}_${i}" name="${name}" value="${escapeHtml(label)}"${label === selected ? ' checked' : ''}>
+      (label, i) => `<input type="${type}" class="visually-hidden size-radio" id="${idPrefix}_${i}" name="${name}" value="${escapeHtml(label)}"${selectedList.includes(label) ? ' checked' : ''}>
         <label for="${idPrefix}_${i}" class="size"><span class="n">${escapeHtml(label)}</span></label>`
     ).join('')}
   </div>`;
 }
 
-function sizeField({ idPrefix, name, sizeType, selected = '', label = 'Size' }) {
+// `multiple: true` turns the box grid into checkboxes instead of radios, so one form
+// submission can create several offers at once -- the same seller, price and terms, several
+// sizes of the same piece, without repeating the whole form per size. Both share the same
+// .size-radio CSS (:checked works identically on a checkbox and a radio input).
+function sizeField({ idPrefix, name, sizeType, selected = '', label = 'Size', multiple = false }) {
   if (sizeType === 'uk') {
-    return `<div class="field"><label>${label}</label>${shoeSizeChips(`${idPrefix}_uk`, name, selected)}</div>`;
+    return `<div class="field"><label>${label}${multiple ? ' <span class="hint" style="font-weight:400;">(pick as many as you have)</span>' : ''}</label>${shoeSizeChips(`${idPrefix}_uk`, name, selected, multiple)}</div>`;
   }
-  return `<div class="field"><label for="${idPrefix}_text">${label}</label><input id="${idPrefix}_text" name="${name}" value="${escapeHtml(selected || 'One size')}" maxlength="40"></div>`;
+  return `<div class="field"><label for="${idPrefix}_text">${label}</label><input id="${idPrefix}_text" name="${name}" value="${escapeHtml(Array.isArray(selected) ? selected[0] || '' : selected || 'One size')}" maxlength="40"></div>`;
 }
 
 async function productsPage(env, errorMessage, preselectProductId = null) {
@@ -1230,7 +1236,7 @@ ${
           ${shipsFromField(cities, { id: 'p_ships_from', name: 'ships_from' })}
         </div>
         <div class="form-row">
-          <div id="offer_size_wrap">${sizeField({ idPrefix: 'offer_size', name: 'offer_size', sizeType: 'none' })}</div>
+          <div id="offer_size_wrap">${sizeField({ idPrefix: 'offer_size', name: 'offer_size', sizeType: 'none', multiple: true })}</div>
           <div class="field"><label for="offer_condition">Condition</label><input id="offer_condition" name="offer_condition" value="Deadstock" maxlength="60"></div>
         </div>
         <div class="form-row">
@@ -1274,7 +1280,7 @@ ${
       function chipsHtml(idPrefix, name) {
         return '<div class="sizes" style="grid-template-columns:repeat(4,minmax(0,1fr));">' +
           SHOE_SIZES.map(function (l, i) {
-            return '<input type="radio" class="visually-hidden size-radio" id="' + idPrefix + '_' + i + '" name="' + name + '" value="' + l + '">' +
+            return '<input type="checkbox" class="visually-hidden size-radio" id="' + idPrefix + '_' + i + '" name="' + name + '" value="' + l + '">' +
               '<label for="' + idPrefix + '_' + i + '" class="size"><span class="n">' + l + '</span></label>';
           }).join('') + '</div>';
       }
@@ -1319,7 +1325,7 @@ ${
           </select>
           <span class="hint">Ignored if "Inhaus" above is checked.</span>
         </div>
-        <div id="size_label_wrap">${sizeField({ idPrefix: 'size_label_o', name: 'size_label', sizeType: (products || []).find((p) => p.id === preselectProductId)?.size_type })}</div>
+        <div id="size_label_wrap">${sizeField({ idPrefix: 'size_label_o', name: 'size_label', sizeType: (products || []).find((p) => p.id === preselectProductId)?.size_type, multiple: true })}</div>
       </div>
       <div class="form-row">
         ${shipsFromField(cities, { required: true })}
@@ -1356,7 +1362,7 @@ ${
       function render(sizeType, keepValue) {
         if (sizeType === 'uk') {
           var chips = SHOE_SIZES.map(function (l, i) {
-            return '<input type="radio" class="visually-hidden size-radio" id="size_label_o_' + i + '" name="size_label" value="' + l + '"' +
+            return '<input type="checkbox" class="visually-hidden size-radio" id="size_label_o_' + i + '" name="size_label" value="' + l + '"' +
               (l === keepValue ? ' checked' : '') + '><label for="size_label_o_' + i + '" class="size"><span class="n">' + l + '</span></label>';
           }).join('');
           wrap.innerHTML = '<div class="field"><label>Size</label><div class="sizes" style="grid-template-columns:repeat(4,minmax(0,1fr));">' + chips + '</div></div>';
@@ -1587,26 +1593,40 @@ async function createProduct(request, env, currentUser) {
     if (Number.isInteger(sellerId)) {
       const city = String(form.get('ships_from') || '').trim();
       const rawNum = (k) => String(form.get(k) || '').split('.')[0].replace(/[^\d]/g, '');
-      const priced = await insertOffer(env, {
-        productId,
-        inhouse,
-        sellerId,
-        sizeLabel: String(form.get('offer_size') || 'One size').trim(),
-        condition: String(form.get('offer_condition') || 'Deadstock').trim(),
-        city,
-        sellerPrice,
-        stockLabel: form.get('stock_label'),
-        overrides: {
-          duty: rawNum('duty'),
-          auth_fee: rawNum('auth_fee'),
-          shipping: rawNum('shipping'),
-          lead_days_min: rawNum('lead_min'),
-          lead_days_max: rawNum('lead_max'),
-        },
-        currentUser,
-        request,
-      });
-      const warn = pricingWarning(priced, city);
+      // A shoe size picker allows checking several boxes -- one offer per size checked, all
+      // the same seller/price/terms, so restocking a piece in multiple sizes doesn't mean
+      // repeating this whole form once per size.
+      const sizes = form.getAll('offer_size').map((v) => String(v).trim()).filter(Boolean);
+      let priced = null;
+      let city_found_all = true;
+      let rate_found_all = true;
+      for (const sizeLabel of sizes.length ? sizes : ['One size']) {
+        const result = await insertOffer(env, {
+          productId,
+          inhouse,
+          sellerId,
+          sizeLabel,
+          condition: String(form.get('offer_condition') || 'Deadstock').trim(),
+          city,
+          sellerPrice,
+          stockLabel: form.get('stock_label'),
+          overrides: {
+            duty: rawNum('duty'),
+            auth_fee: rawNum('auth_fee'),
+            shipping: rawNum('shipping'),
+            lead_days_min: rawNum('lead_min'),
+            lead_days_max: rawNum('lead_max'),
+          },
+          currentUser,
+          request,
+        });
+        if (result) {
+          priced = result;
+          if (!result.city_found) city_found_all = false;
+          if (!result.rate_found) rate_found_all = false;
+        }
+      }
+      const warn = priced ? pricingWarning({ ...priced, city_found: city_found_all, rate_found: rate_found_all }, city) : '';
       if (uploadError) {
         return redirect('/admin/listings?error=' + encodeURIComponent(uploadError.trim()));
       }
@@ -1730,32 +1750,37 @@ async function createOffer(request, env, currentUser) {
   }
 
   const city = String(form.get('ships_from') || '').trim();
+  const sizes = form.getAll('size_label').map((v) => String(v).trim()).filter(Boolean);
 
-  const priced = await insertOffer(env, {
-    productId,
-    inhouse,
-    sellerId,
-    sizeLabel: String(form.get('size_label') || 'One size').trim(),
-    condition: String(form.get('condition') || 'Deadstock').trim(),
-    city,
-    sellerPrice,
-    stockLabel: form.get('stock_label'),
-    overrides: {
-      duty: raw('duty'),
-      auth_fee: raw('auth_fee'),
-      shipping: raw('shipping'),
-      lead_days_min: raw('lead_min'),
-      lead_days_max: raw('lead_max'),
-    },
-    currentUser,
-    request,
-  });
+  let priced = null;
+  for (const sizeLabel of sizes.length ? sizes : ['One size']) {
+    const result = await insertOffer(env, {
+      productId,
+      inhouse,
+      sellerId,
+      sizeLabel,
+      condition: String(form.get('condition') || 'Deadstock').trim(),
+      city,
+      sellerPrice,
+      stockLabel: form.get('stock_label'),
+      overrides: {
+        duty: raw('duty'),
+        auth_fee: raw('auth_fee'),
+        shipping: raw('shipping'),
+        lead_days_min: raw('lead_min'),
+        lead_days_max: raw('lead_max'),
+      },
+      currentUser,
+      request,
+    });
+    if (result) priced = result;
+  }
   if (!priced) return redirect('/admin/products');
 
   const warn = !priced.rate_found
-    ? '?error=' + encodeURIComponent('Offer added, but no duty rate is set for that category — duty was charged at 0. Set it under Rates.')
+    ? '?error=' + encodeURIComponent('Offer(s) added, but no duty rate is set for that category — duty was charged at 0. Set it under Rates.')
     : !priced.city_found
-    ? '?error=' + encodeURIComponent(`Offer added, but "${city}" is not in your source cities — shipping was charged at 0. Add it under Rates.`)
+    ? '?error=' + encodeURIComponent(`Offer(s) added, but "${city}" is not in your source cities — shipping was charged at 0. Add it under Rates.`)
     : '';
 
   return redirect('/admin/products' + warn);
