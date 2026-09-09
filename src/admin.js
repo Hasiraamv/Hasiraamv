@@ -3,6 +3,7 @@ import * as db from './db.js';
 import { issueCertificate } from './certificates.js';
 import { storeImage, deleteImage, storeVideo, normalizeImageUrl, imageStore } from './images.js';
 import { SHOE_SIZE_LABELS } from './sizing.js';
+import { riskLabel } from './risk.js';
 import {
   computeOfferPricing,
   listCategoryRates,
@@ -176,8 +177,12 @@ export async function adminRouter(request, env, path) {
 
   if (path === '/admin') return dashboard(env, currentUser);
   if (path === '/admin/orders')
-    return ordersPage(env, new URL(request.url).searchParams.get('issued'), new URL(request.url).searchParams.get('error'));
+    return ordersPage(env, new URL(request.url).searchParams.get('issued'), new URL(request.url).searchParams.get('error'), currentUser);
   if (path === '/admin/orders/advance' && method === 'POST') return advanceOrder(request, env, currentUser);
+  {
+    const m = path.match(/^\/admin\/orders\/(\d+)\/clear-risk$/);
+    if (m && method === 'POST') return clearOrderRisk(request, env, Number(m[1]), currentUser);
+  }
   if (path === '/admin/certificates') return certificatesPage(env);
   if (path === '/admin/certificates/issue' && method === 'POST') return issueCert(request, env, currentUser);
   if (path === '/admin/certificates/revoke' && method === 'POST') return revokeCert(request, env, currentUser);
@@ -323,11 +328,16 @@ async function dashboard(env, currentUser) {
   // Revenue is a financial figure, not an operational one -- shown to the owner only. Everyone
   // else who can reach the dashboard (authenticator, warehouse, support) sees the operational
   // tiles that matter for their own job.
+  const flaggedCount = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM orders WHERE risk_flags IS NOT NULL AND risk_cleared_at IS NULL"
+  ).first();
+
   const tiles = [
     ['Live listings', stats.listings],
     ['Orders', orders.length],
     ['Awaiting certificate', pendingCerts?.n || 0],
   ];
+  if (flaggedCount?.n) tiles.push(['Awaiting fraud review', flaggedCount.n]);
   if (currentUser?.role === 'owner') {
     const revenue = await env.DB.prepare(
       `SELECT COALESCE(SUM(amount),0) AS total FROM orders WHERE payment_status = 'paid'`
@@ -347,7 +357,7 @@ async function dashboard(env, currentUser) {
 </div>
 
 <h3 class="serif" style="font-size:24px; margin:0 0 14px;">Recent orders</h3>
-${ordersTable(orders)}
+${ordersTable(orders, currentUser)}
 
 <h3 class="serif" style="font-size:24px; margin:32px 0 14px;">Latest sourcing requests</h3>
 ${
@@ -369,7 +379,7 @@ ${
 }`);
 }
 
-function ordersTable(orders) {
+function ordersTable(orders, currentUser) {
   if (!orders.length) return '<div class="notice">No orders yet.</div>';
   return `
 <table class="table">
@@ -379,10 +389,28 @@ function ordersTable(orders) {
       .map((o) => {
         const idx = ORDER_STAGES.indexOf(o.status);
         const next = idx >= 0 && idx < ORDER_STAGES.length - 1 ? ORDER_STAGES[idx + 1] : null;
-        return `<tr>
+        const flagged = o.risk_flags && !o.risk_cleared_at;
+        return `<tr${flagged ? ' style="background:#fbf1ee;"' : ''}>
         <td data-label="Ref"><a href="/order/${encodeURIComponent(o.public_ref)}" target="_blank">${escapeHtml(
           o.public_ref
-        )}</a></td>
+        )}</a>
+          ${
+            flagged
+              ? `<div style="margin-top:4px;">
+                   <div style="font-size:10.5px; color:var(--oxblood); font-weight:700; line-height:1.5;">
+                     ⚠ ${o.risk_flags.split(',').map((f) => escapeHtml(riskLabel(f))).join(', ')}
+                   </div>
+                   ${
+                     currentUser?.role === 'owner'
+                       ? `<form method="post" action="/admin/orders/${o.id}/clear-risk" style="display:inline;">
+                            <button class="chip" type="submit" style="cursor:pointer; font-size:10px; padding:2px 7px;">Clear</button>
+                          </form>`
+                       : ''
+                   }
+                 </div>`
+              : ''
+          }
+        </td>
         <td data-label="Item">${escapeHtml(o.product_title)}${
           o.size_label !== 'One size' ? ` · ${escapeHtml(o.size_label)}` : ''
         }</td>
@@ -424,7 +452,7 @@ function ordersTable(orders) {
 </table>`;
 }
 
-async function ordersPage(env, issuedNo, errorMessage) {
+async function ordersPage(env, issuedNo, errorMessage, currentUser) {
   const orders = await db.listOrders(env.DB, 100);
 
   let banner = '';
@@ -462,7 +490,7 @@ async function ordersPage(env, issuedNo, errorMessage) {
 </p>
 ${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${escapeHtml(errorMessage)}</div>` : ''}
 ${banner}
-${ordersTable(orders)}`);
+${ordersTable(orders, currentUser)}`);
 }
 
 async function advanceOrder(request, env, currentUser) {
@@ -507,6 +535,18 @@ async function advanceOrder(request, env, currentUser) {
       .bind(orderId)
       .run();
   }
+  return redirect('/admin/orders');
+}
+
+// Acknowledges a fraud-review flag without touching the order's real status -- the flag was
+// never a block, just something for a human to have actually looked at before this order
+// keeps moving. Owner only (see ROUTE_RULES's default), and it's on the audit log like
+// everything else here.
+async function clearOrderRisk(request, env, orderId, currentUser) {
+  await env.DB.prepare("UPDATE orders SET risk_cleared_by = ?, risk_cleared_at = datetime('now') WHERE id = ?")
+    .bind(currentUser.id, orderId)
+    .run();
+  await logAudit(env, currentUser, 'order.risk_cleared', { entityType: 'order', entityId: orderId, request });
   return redirect('/admin/orders');
 }
 

@@ -182,6 +182,10 @@ CREATE TABLE orders (
   payment_ref     TEXT,
   eta_min         TEXT,
   eta_max         TEXT,
+  risk_score      INTEGER NOT NULL DEFAULT 0,   -- see computeOrderRisk() in risk.js
+  risk_flags      TEXT,                          -- comma-separated reason codes, e.g. "first_order,high_value"
+  risk_cleared_by INTEGER REFERENCES admin_users(id),
+  risk_cleared_at TEXT,
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_orders_created ON orders(created_at DESC);
