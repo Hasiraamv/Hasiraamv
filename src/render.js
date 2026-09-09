@@ -227,11 +227,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: var(--text); white-space: nowrap;
 }
 .logo svg { flex: none; }
+/* flex-wrap lets the whole row flow onto a second line instead of either squeezing
+   a label onto two lines ("ADD & EDIT", "BAGS LEATHER") or scrolling items off-screen
+   with no sign they're there -- every link stays fully visible and readable, on a
+   page with many of them (the admin nav) as much as one with a short label list. */
 .nav-links {
-  display: flex; gap: 28px;
+  display: flex; flex: 1 1 auto; min-width: 0; flex-wrap: wrap; gap: 8px 28px;
   font-size: 11.5px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
 }
-.nav-links a { color: var(--muted); }
+.nav-links a { color: var(--muted); white-space: nowrap; flex-shrink: 0; }
 .nav-links a:hover { color: var(--text); }
 .nav-right {
   display: flex; align-items: center; gap: 22px;
@@ -403,7 +407,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 @media (max-width: 900px) {
   .wrap, .nav, .section, .footer { padding-left: 20px; padding-right: 20px; }
   .nav { flex-wrap: wrap; gap: 12px; }
-  .nav-links { order: 3; width: 100%; overflow-x: auto; gap: 20px; padding-bottom: 4px; }
+  .nav-links { order: 3; width: 100%; gap: 10px 20px; }
   .section { padding-top: 44px; }
   .section-head h2 { font-size: 27px; }
   .grid-2 { grid-template-columns: 1fr; }
@@ -413,6 +417,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
   .form-row { grid-template-columns: 1fr; }
   .hero-split, .pdp, .split { grid-template-columns: 1fr !important; }
+  .hero-h1 { font-size: 38px !important; }
   .sizes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .table thead { display: none; }
   .table tr { display: block; border-bottom: 1px solid var(--line); padding: 12px 0; }
