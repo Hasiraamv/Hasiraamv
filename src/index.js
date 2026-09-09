@@ -8,6 +8,7 @@ import { verifyPage, certificatePage } from './views/verify.js';
 import { adminRouter } from './admin.js';
 import { verifyCertificate } from './certificates.js';
 import { serveImage } from './images.js';
+import { computeOrderRisk } from './risk.js';
 import {
   authenticationPage,
   shippingPage,
@@ -434,7 +435,7 @@ async function checkoutSubmit(request, env, cart, user) {
     const eta = etaDates(offer.lead_days_min, offer.lead_days_max);
     const ref = publicRef();
     if (!firstRef) firstRef = ref;
-    await db.createOrder(env.DB, {
+    const orderId = await db.createOrder(env.DB, {
       publicRef: ref,
       userId: user?.id,
       offerId: offer.id,
@@ -449,6 +450,22 @@ async function checkoutSubmit(request, env, cart, user) {
       etaMax: eta.to,
       ...data,
     });
+
+    // A flag here never blocks the order -- it is something for a human to glance at before
+    // dispatch, not an automatic decline. See risk.js for exactly what it checks and why.
+    const risk = await computeOrderRisk(env, {
+      orderId,
+      amount: offer.landed_price,
+      userId: user?.id,
+      buyerEmail: data.buyerEmail,
+      buyerPhone: data.buyerPhone,
+      request,
+    });
+    if (risk.flags.length) {
+      await env.DB.prepare('UPDATE orders SET risk_score = ?, risk_flags = ? WHERE id = ?')
+        .bind(risk.score, risk.flags.join(','), orderId)
+        .run();
+    }
   }
 
   const order = await db.getOrderByRef(env.DB, firstRef);

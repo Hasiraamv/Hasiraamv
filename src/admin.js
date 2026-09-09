@@ -3,6 +3,7 @@ import * as db from './db.js';
 import { issueCertificate } from './certificates.js';
 import { storeImage, deleteImage, storeVideo, normalizeImageUrl, imageStore } from './images.js';
 import { SHOE_SIZE_LABELS } from './sizing.js';
+import { riskLabel } from './risk.js';
 import {
   computeOfferPricing,
   listCategoryRates,
@@ -65,6 +66,7 @@ const ROUTE_RULES = [
   { test: (p) => p.startsWith('/admin/sellers') || p === '/admin/sourcing', roles: ['owner', 'support'] },
   { test: (p) => p.startsWith('/admin/users'), roles: ['owner'] },
   { test: (p) => p === '/admin/audit', roles: ['owner'] },
+  { test: (p) => p.startsWith('/admin/product-audit'), roles: ['owner'] },
 ];
 
 // Writes one audit_log row. Never throws into the caller -- a logging failure must not be
@@ -176,8 +178,12 @@ export async function adminRouter(request, env, path) {
 
   if (path === '/admin') return dashboard(env, currentUser);
   if (path === '/admin/orders')
-    return ordersPage(env, new URL(request.url).searchParams.get('issued'), new URL(request.url).searchParams.get('error'));
+    return ordersPage(env, new URL(request.url).searchParams.get('issued'), new URL(request.url).searchParams.get('error'), currentUser);
   if (path === '/admin/orders/advance' && method === 'POST') return advanceOrder(request, env, currentUser);
+  {
+    const m = path.match(/^\/admin\/orders\/(\d+)\/clear-risk$/);
+    if (m && method === 'POST') return clearOrderRisk(request, env, Number(m[1]), currentUser);
+  }
   if (path === '/admin/certificates') return certificatesPage(env);
   if (path === '/admin/certificates/issue' && method === 'POST') return issueCert(request, env, currentUser);
   if (path === '/admin/certificates/revoke' && method === 'POST') return revokeCert(request, env, currentUser);
@@ -239,6 +245,11 @@ export async function adminRouter(request, env, path) {
   if (path === '/admin/sellers') return sellerApplicationsPage(env);
   if (path === '/admin/sellers/decide' && method === 'POST') return decideApplication(request, env, currentUser);
   if (path === '/admin/audit') return auditLogPage(env, new URL(request.url).searchParams.get('entity'));
+  if (path === '/admin/product-audit') return productAuditPage(env, new URL(request.url).searchParams.get('saved'));
+  {
+    const m = path.match(/^\/admin\/product-audit\/(\d+)$/);
+    if (m && method === 'POST') return updateProductAudit(request, env, Number(m[1]), currentUser);
+  }
 
   return adminHtml('<div class="notice">Unknown admin page.</div>', 404);
 }
@@ -266,7 +277,8 @@ function adminHtml(body, status = 200, extraHeaders = {}) {
     <a href="/admin/sellers">Seller applications</a>
     <a href="/admin/sourcing">Sourcing requests</a>
     <a href="/admin/users">Employees</a>
-    <a href="/admin/audit">Audit log</a>
+    <a href="/admin/audit">Activity log</a>
+    <a href="/admin/product-audit">Audit</a>
   </nav>
   <div class="nav-right">
     <a href="/" target="_blank">View site</a>
@@ -323,11 +335,16 @@ async function dashboard(env, currentUser) {
   // Revenue is a financial figure, not an operational one -- shown to the owner only. Everyone
   // else who can reach the dashboard (authenticator, warehouse, support) sees the operational
   // tiles that matter for their own job.
+  const flaggedCount = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM orders WHERE risk_flags IS NOT NULL AND risk_cleared_at IS NULL"
+  ).first();
+
   const tiles = [
     ['Live listings', stats.listings],
     ['Orders', orders.length],
     ['Awaiting certificate', pendingCerts?.n || 0],
   ];
+  if (flaggedCount?.n) tiles.push(['Awaiting fraud review', flaggedCount.n]);
   if (currentUser?.role === 'owner') {
     const revenue = await env.DB.prepare(
       `SELECT COALESCE(SUM(amount),0) AS total FROM orders WHERE payment_status = 'paid'`
@@ -347,7 +364,7 @@ async function dashboard(env, currentUser) {
 </div>
 
 <h3 class="serif" style="font-size:24px; margin:0 0 14px;">Recent orders</h3>
-${ordersTable(orders)}
+${ordersTable(orders, currentUser)}
 
 <h3 class="serif" style="font-size:24px; margin:32px 0 14px;">Latest sourcing requests</h3>
 ${
@@ -369,7 +386,7 @@ ${
 }`);
 }
 
-function ordersTable(orders) {
+function ordersTable(orders, currentUser) {
   if (!orders.length) return '<div class="notice">No orders yet.</div>';
   return `
 <table class="table">
@@ -379,10 +396,28 @@ function ordersTable(orders) {
       .map((o) => {
         const idx = ORDER_STAGES.indexOf(o.status);
         const next = idx >= 0 && idx < ORDER_STAGES.length - 1 ? ORDER_STAGES[idx + 1] : null;
-        return `<tr>
+        const flagged = o.risk_flags && !o.risk_cleared_at;
+        return `<tr${flagged ? ' style="background:#fbf1ee;"' : ''}>
         <td data-label="Ref"><a href="/order/${encodeURIComponent(o.public_ref)}" target="_blank">${escapeHtml(
           o.public_ref
-        )}</a></td>
+        )}</a>
+          ${
+            flagged
+              ? `<div style="margin-top:4px;">
+                   <div style="font-size:10.5px; color:var(--oxblood); font-weight:700; line-height:1.5;">
+                     ⚠ ${o.risk_flags.split(',').map((f) => escapeHtml(riskLabel(f))).join(', ')}
+                   </div>
+                   ${
+                     currentUser?.role === 'owner'
+                       ? `<form method="post" action="/admin/orders/${o.id}/clear-risk" style="display:inline;">
+                            <button class="chip" type="submit" style="cursor:pointer; font-size:10px; padding:2px 7px;">Clear</button>
+                          </form>`
+                       : ''
+                   }
+                 </div>`
+              : ''
+          }
+        </td>
         <td data-label="Item">${escapeHtml(o.product_title)}${
           o.size_label !== 'One size' ? ` · ${escapeHtml(o.size_label)}` : ''
         }</td>
@@ -424,7 +459,7 @@ function ordersTable(orders) {
 </table>`;
 }
 
-async function ordersPage(env, issuedNo, errorMessage) {
+async function ordersPage(env, issuedNo, errorMessage, currentUser) {
   const orders = await db.listOrders(env.DB, 100);
 
   let banner = '';
@@ -462,7 +497,7 @@ async function ordersPage(env, issuedNo, errorMessage) {
 </p>
 ${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${escapeHtml(errorMessage)}</div>` : ''}
 ${banner}
-${ordersTable(orders)}`);
+${ordersTable(orders, currentUser)}`);
 }
 
 async function advanceOrder(request, env, currentUser) {
@@ -507,6 +542,18 @@ async function advanceOrder(request, env, currentUser) {
       .bind(orderId)
       .run();
   }
+  return redirect('/admin/orders');
+}
+
+// Acknowledges a fraud-review flag without touching the order's real status -- the flag was
+// never a block, just something for a human to have actually looked at before this order
+// keeps moving. Owner only (see ROUTE_RULES's default), and it's on the audit log like
+// everything else here.
+async function clearOrderRisk(request, env, orderId, currentUser) {
+  await env.DB.prepare("UPDATE orders SET risk_cleared_by = ?, risk_cleared_at = datetime('now') WHERE id = ?")
+    .bind(currentUser.id, orderId)
+    .run();
+  await logAudit(env, currentUser, 'order.risk_cleared', { entityType: 'order', entityId: orderId, request });
   return redirect('/admin/orders');
 }
 
@@ -1048,20 +1095,26 @@ function stockLabelField(id, name, selected = '') {
 // product isn't sized in UK (apparel, "one size", etc). `sizeType` decides which renders; when
 // it isn't known server-side (the product is picked from a dropdown on the same form), both
 // render and a small script swaps between them as the selection changes.
-function shoeSizeChips(idPrefix, name, selected = '') {
+function shoeSizeChips(idPrefix, name, selected = '', multiple = false) {
+  const selectedList = Array.isArray(selected) ? selected : [selected];
+  const type = multiple ? 'checkbox' : 'radio';
   return `<div class="sizes" style="grid-template-columns:repeat(4,minmax(0,1fr));">
     ${SHOE_SIZE_LABELS.map(
-      (label, i) => `<input type="radio" class="visually-hidden size-radio" id="${idPrefix}_${i}" name="${name}" value="${escapeHtml(label)}"${label === selected ? ' checked' : ''}>
+      (label, i) => `<input type="${type}" class="visually-hidden size-radio" id="${idPrefix}_${i}" name="${name}" value="${escapeHtml(label)}"${selectedList.includes(label) ? ' checked' : ''}>
         <label for="${idPrefix}_${i}" class="size"><span class="n">${escapeHtml(label)}</span></label>`
     ).join('')}
   </div>`;
 }
 
-function sizeField({ idPrefix, name, sizeType, selected = '', label = 'Size' }) {
+// `multiple: true` turns the box grid into checkboxes instead of radios, so one form
+// submission can create several offers at once -- the same seller, price and terms, several
+// sizes of the same piece, without repeating the whole form per size. Both share the same
+// .size-radio CSS (:checked works identically on a checkbox and a radio input).
+function sizeField({ idPrefix, name, sizeType, selected = '', label = 'Size', multiple = false }) {
   if (sizeType === 'uk') {
-    return `<div class="field"><label>${label}</label>${shoeSizeChips(`${idPrefix}_uk`, name, selected)}</div>`;
+    return `<div class="field"><label>${label}${multiple ? ' <span class="hint" style="font-weight:400;">(pick as many as you have)</span>' : ''}</label>${shoeSizeChips(`${idPrefix}_uk`, name, selected, multiple)}</div>`;
   }
-  return `<div class="field"><label for="${idPrefix}_text">${label}</label><input id="${idPrefix}_text" name="${name}" value="${escapeHtml(selected || 'One size')}" maxlength="40"></div>`;
+  return `<div class="field"><label for="${idPrefix}_text">${label}</label><input id="${idPrefix}_text" name="${name}" value="${escapeHtml(Array.isArray(selected) ? selected[0] || '' : selected || 'One size')}" maxlength="40"></div>`;
 }
 
 async function productsPage(env, errorMessage, preselectProductId = null) {
@@ -1144,8 +1197,8 @@ ${
           </select>
         </div>
         <div class="field"><label for="sku">Style / SKU</label><input id="sku" name="sku" maxlength="60"></div>
-        <div class="field"><label for="retail">Retail price (₹)</label><input id="retail" name="retail" inputmode="numeric" maxlength="12">
-          <span class="hint">Set this to unlock the "under retail" badge.</span>
+        <div class="field"><label for="retail">MRP (₹)</label><input id="retail" name="retail" inputmode="numeric" maxlength="12">
+          <span class="hint">The original price. Set this and price the piece below it to show a discount.</span>
         </div>
       </div>
       <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="3" maxlength="1200"></textarea></div>
@@ -1190,7 +1243,7 @@ ${
           ${shipsFromField(cities, { id: 'p_ships_from', name: 'ships_from' })}
         </div>
         <div class="form-row">
-          <div id="offer_size_wrap">${sizeField({ idPrefix: 'offer_size', name: 'offer_size', sizeType: 'none' })}</div>
+          <div id="offer_size_wrap">${sizeField({ idPrefix: 'offer_size', name: 'offer_size', sizeType: 'none', multiple: true })}</div>
           <div class="field"><label for="offer_condition">Condition</label><input id="offer_condition" name="offer_condition" value="Deadstock" maxlength="60"></div>
         </div>
         <div class="form-row">
@@ -1207,21 +1260,11 @@ ${
           <span class="hint">Ignored while "Inhaus" is ticked.</span>
         </div>
 
-        <details style="margin-top:10px;">
-          <summary style="cursor:pointer; font-size:12.5px; color:var(--muted); padding:6px 0;">Set duty, authentication or shipping myself</summary>
-          <div style="padding-top:12px;">
-            <div class="form-row">
-              <div class="field"><label for="p_duty">Duty (₹)</label><input id="p_duty" name="duty" inputmode="numeric" maxlength="12" placeholder="auto"></div>
-              <div class="field"><label for="p_auth_fee">Authentication (₹)</label><input id="p_auth_fee" name="auth_fee" inputmode="numeric" maxlength="12" placeholder="auto"></div>
-            </div>
-            <div class="form-row">
-              <div class="field"><label for="p_shipping">Shipping (₹)</label><input id="p_shipping" name="shipping" inputmode="numeric" maxlength="12" placeholder="auto"></div>
-              <div class="field"><label for="p_lead_min">Lead days min</label><input id="p_lead_min" name="lead_min" inputmode="numeric" maxlength="3" placeholder="auto"></div>
-            </div>
-            <div class="field" style="max-width:180px;"><label for="p_lead_max">Lead days max</label><input id="p_lead_max" name="lead_max" inputmode="numeric" maxlength="3" placeholder="auto"></div>
-            <span class="hint">Leave these blank to use the city and category rates. Fill one in and it wins over the automatic number.</span>
-          </div>
-        </details>
+        <p class="hint" style="margin:2px 0 0;">
+          Need to fine-tune duty, authentication fee or shipping for this exact piece? Save it
+          here first, then adjust those on the <a href="/admin/listings">Listings</a> page --
+          keeps this form to just what you need for a normal listing.
+        </p>
       </div>
 
       <button class="btn btn-block" type="submit">Add product</button>
@@ -1234,7 +1277,7 @@ ${
       function chipsHtml(idPrefix, name) {
         return '<div class="sizes" style="grid-template-columns:repeat(4,minmax(0,1fr));">' +
           SHOE_SIZES.map(function (l, i) {
-            return '<input type="radio" class="visually-hidden size-radio" id="' + idPrefix + '_' + i + '" name="' + name + '" value="' + l + '">' +
+            return '<input type="checkbox" class="visually-hidden size-radio" id="' + idPrefix + '_' + i + '" name="' + name + '" value="' + l + '">' +
               '<label for="' + idPrefix + '_' + i + '" class="size"><span class="n">' + l + '</span></label>';
           }).join('') + '</div>';
       }
@@ -1279,7 +1322,7 @@ ${
           </select>
           <span class="hint">Ignored if "Inhaus" above is checked.</span>
         </div>
-        <div id="size_label_wrap">${sizeField({ idPrefix: 'size_label_o', name: 'size_label', sizeType: (products || []).find((p) => p.id === preselectProductId)?.size_type })}</div>
+        <div id="size_label_wrap">${sizeField({ idPrefix: 'size_label_o', name: 'size_label', sizeType: (products || []).find((p) => p.id === preselectProductId)?.size_type, multiple: true })}</div>
       </div>
       <div class="form-row">
         ${shipsFromField(cities, { required: true })}
@@ -1291,20 +1334,10 @@ ${
       </div>
       ${stockLabelField('stock_label_o', 'stock_label')}
 
-      <details style="margin-bottom:14px;">
-        <summary style="cursor:pointer; font-size:12.5px; color:var(--muted); padding:6px 0;">Override the calculated values</summary>
-        <div style="padding-top:12px;">
-          <div class="form-row">
-            <div class="field"><label for="duty">Duty (₹)</label><input id="duty" name="duty" inputmode="numeric" maxlength="12" placeholder="auto"></div>
-            <div class="field"><label for="auth_fee">Authentication (₹)</label><input id="auth_fee" name="auth_fee" inputmode="numeric" maxlength="12" placeholder="auto"></div>
-          </div>
-          <div class="form-row">
-            <div class="field"><label for="shipping">Shipping (₹)</label><input id="shipping" name="shipping" inputmode="numeric" maxlength="12" placeholder="auto"></div>
-            <div class="field"><label for="lead_min">Lead days min</label><input id="lead_min" name="lead_min" inputmode="numeric" maxlength="3" placeholder="auto"></div>
-          </div>
-          <div class="field" style="max-width:180px;"><label for="lead_max">Lead days max</label><input id="lead_max" name="lead_max" inputmode="numeric" maxlength="3" placeholder="auto"></div>
-        </div>
-      </details>
+      <p class="hint" style="margin:-8px 0 14px;">
+        Need to fine-tune duty, authentication fee or shipping for this exact offer? Save it
+        here first, then adjust those from the <a href="/admin/listings">Listings</a> page.
+      </p>
 
       <button class="btn btn-block" type="submit">Add offer</button>
     </form>
@@ -1316,7 +1349,7 @@ ${
       function render(sizeType, keepValue) {
         if (sizeType === 'uk') {
           var chips = SHOE_SIZES.map(function (l, i) {
-            return '<input type="radio" class="visually-hidden size-radio" id="size_label_o_' + i + '" name="size_label" value="' + l + '"' +
+            return '<input type="checkbox" class="visually-hidden size-radio" id="size_label_o_' + i + '" name="size_label" value="' + l + '"' +
               (l === keepValue ? ' checked' : '') + '><label for="size_label_o_' + i + '" class="size"><span class="n">' + l + '</span></label>';
           }).join('');
           wrap.innerHTML = '<div class="field"><label>Size</label><div class="sizes" style="grid-template-columns:repeat(4,minmax(0,1fr));">' + chips + '</div></div>';
@@ -1547,26 +1580,40 @@ async function createProduct(request, env, currentUser) {
     if (Number.isInteger(sellerId)) {
       const city = String(form.get('ships_from') || '').trim();
       const rawNum = (k) => String(form.get(k) || '').split('.')[0].replace(/[^\d]/g, '');
-      const priced = await insertOffer(env, {
-        productId,
-        inhouse,
-        sellerId,
-        sizeLabel: String(form.get('offer_size') || 'One size').trim(),
-        condition: String(form.get('offer_condition') || 'Deadstock').trim(),
-        city,
-        sellerPrice,
-        stockLabel: form.get('stock_label'),
-        overrides: {
-          duty: rawNum('duty'),
-          auth_fee: rawNum('auth_fee'),
-          shipping: rawNum('shipping'),
-          lead_days_min: rawNum('lead_min'),
-          lead_days_max: rawNum('lead_max'),
-        },
-        currentUser,
-        request,
-      });
-      const warn = pricingWarning(priced, city);
+      // A shoe size picker allows checking several boxes -- one offer per size checked, all
+      // the same seller/price/terms, so restocking a piece in multiple sizes doesn't mean
+      // repeating this whole form once per size.
+      const sizes = form.getAll('offer_size').map((v) => String(v).trim()).filter(Boolean);
+      let priced = null;
+      let city_found_all = true;
+      let rate_found_all = true;
+      for (const sizeLabel of sizes.length ? sizes : ['One size']) {
+        const result = await insertOffer(env, {
+          productId,
+          inhouse,
+          sellerId,
+          sizeLabel,
+          condition: String(form.get('offer_condition') || 'Deadstock').trim(),
+          city,
+          sellerPrice,
+          stockLabel: form.get('stock_label'),
+          overrides: {
+            duty: rawNum('duty'),
+            auth_fee: rawNum('auth_fee'),
+            shipping: rawNum('shipping'),
+            lead_days_min: rawNum('lead_min'),
+            lead_days_max: rawNum('lead_max'),
+          },
+          currentUser,
+          request,
+        });
+        if (result) {
+          priced = result;
+          if (!result.city_found) city_found_all = false;
+          if (!result.rate_found) rate_found_all = false;
+        }
+      }
+      const warn = priced ? pricingWarning({ ...priced, city_found: city_found_all, rate_found: rate_found_all }, city) : '';
       if (uploadError) {
         return redirect('/admin/listings?error=' + encodeURIComponent(uploadError.trim()));
       }
@@ -1690,32 +1737,37 @@ async function createOffer(request, env, currentUser) {
   }
 
   const city = String(form.get('ships_from') || '').trim();
+  const sizes = form.getAll('size_label').map((v) => String(v).trim()).filter(Boolean);
 
-  const priced = await insertOffer(env, {
-    productId,
-    inhouse,
-    sellerId,
-    sizeLabel: String(form.get('size_label') || 'One size').trim(),
-    condition: String(form.get('condition') || 'Deadstock').trim(),
-    city,
-    sellerPrice,
-    stockLabel: form.get('stock_label'),
-    overrides: {
-      duty: raw('duty'),
-      auth_fee: raw('auth_fee'),
-      shipping: raw('shipping'),
-      lead_days_min: raw('lead_min'),
-      lead_days_max: raw('lead_max'),
-    },
-    currentUser,
-    request,
-  });
+  let priced = null;
+  for (const sizeLabel of sizes.length ? sizes : ['One size']) {
+    const result = await insertOffer(env, {
+      productId,
+      inhouse,
+      sellerId,
+      sizeLabel,
+      condition: String(form.get('condition') || 'Deadstock').trim(),
+      city,
+      sellerPrice,
+      stockLabel: form.get('stock_label'),
+      overrides: {
+        duty: raw('duty'),
+        auth_fee: raw('auth_fee'),
+        shipping: raw('shipping'),
+        lead_days_min: raw('lead_min'),
+        lead_days_max: raw('lead_max'),
+      },
+      currentUser,
+      request,
+    });
+    if (result) priced = result;
+  }
   if (!priced) return redirect('/admin/products');
 
   const warn = !priced.rate_found
-    ? '?error=' + encodeURIComponent('Offer added, but no duty rate is set for that category — duty was charged at 0. Set it under Rates.')
+    ? '?error=' + encodeURIComponent('Offer(s) added, but no duty rate is set for that category — duty was charged at 0. Set it under Rates.')
     : !priced.city_found
-    ? '?error=' + encodeURIComponent(`Offer added, but "${city}" is not in your source cities — shipping was charged at 0. Add it under Rates.`)
+    ? '?error=' + encodeURIComponent(`Offer(s) added, but "${city}" is not in your source cities — shipping was charged at 0. Add it under Rates.`)
     : '';
 
   return redirect('/admin/products' + warn);
@@ -1799,7 +1851,7 @@ async function editProductPage(env, productId) {
       </div>
       <div class="field"><label for="sku">Style / SKU</label><input id="sku" name="sku" maxlength="60" value="${escapeHtml(product.sku || '')}"></div>
     </div>
-    <div class="field"><label for="retail">Retail price (₹)</label><input id="retail" name="retail" inputmode="numeric" maxlength="12" value="${product.retail_price || ''}"></div>
+    <div class="field"><label for="retail">MRP (₹)</label><input id="retail" name="retail" inputmode="numeric" maxlength="12" value="${product.retail_price || ''}"></div>
     <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="3" maxlength="1200">${escapeHtml(product.description || '')}</textarea></div>
     <div class="field"><label for="details">Details</label><textarea id="details" name="details" rows="3" maxlength="2000" placeholder="Material, dimensions, what's in the box...">${escapeHtml(product.details || '')}</textarea>
       <span class="hint">Shown in its own "Details" section on the product page, separate from the description above.</span>
@@ -2664,4 +2716,88 @@ ${
     </table>`
     : '<div class="notice">Nothing logged yet.</div>'
 }`);
+}
+
+// Product audit -------------------------------------------------------------------------
+// Real procurement numbers, entered by hand once you actually know them -- where a piece was
+// bought from, what it actually cost, and what shipping and customs actually came to. This is
+// deliberately separate from the automatic category/city rates used when a listing first goes
+// up: those are a fast estimate to get something live, this is the true-up once the real
+// invoice numbers exist. Saving here overwrites seller_price/duty/shipping/landed_price
+// directly -- no rate lookup happens on this page at all. Owner only: sourcing links and real
+// cost are the most competitively sensitive numbers in the business.
+
+async function productAuditPage(env, savedId) {
+  const { results: rows } = await env.DB.prepare(
+    `SELECT o.id, o.stock_code, o.size_label, o.seller_price, o.duty, o.shipping, o.landed_price,
+            o.sourcing_url, o.sourcing_country, o.status, p.title AS product_title
+       FROM offers o JOIN products p ON p.id = o.product_id
+      ORDER BY p.created_at DESC, o.id`
+  ).all();
+
+  return adminHtml(`
+<h2 class="serif" style="font-size:32px; margin:0 0 8px;">Audit</h2>
+<p class="muted" style="margin:0 0 22px; font-size:13.5px; max-width:680px;">
+  Every listed piece, automatically. Paste the link you actually bought it from, and the real
+  amount paid, shipping and customs once you know them -- this overwrites whatever the listing
+  started with. Nothing here is guessed or auto-calculated.
+</p>
+
+${(rows || []).length ? '' : '<div class="notice">No listed pieces yet.</div>'}
+
+${(rows || [])
+  .map(
+    (o) => `<div class="panel" style="padding:20px; margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px;">
+        <strong style="font-size:15px;">${escapeHtml(o.product_title)}${o.size_label && o.size_label !== 'One size' ? ` · ${escapeHtml(o.size_label)}` : ''}</strong>
+        <span class="tag muted">${escapeHtml(o.stock_code || '')} &middot; ${escapeHtml(o.status)}</span>
+      </div>
+      ${savedId === String(o.id) ? '<div class="notice notice-good" style="margin-bottom:14px;">Saved.</div>' : ''}
+      <form method="post" action="/admin/product-audit/${o.id}">
+        <div class="field"><label for="url_${o.id}">Bought from (link)</label><input id="url_${o.id}" name="sourcing_url" maxlength="500" placeholder="https://..." value="${escapeHtml(o.sourcing_url || '')}"></div>
+        <div class="form-row">
+          <div class="field"><label for="country_${o.id}">Imported from (country)</label><input id="country_${o.id}" name="sourcing_country" maxlength="60" value="${escapeHtml(o.sourcing_country || '')}"></div>
+          <div class="field"><label for="cost_${o.id}">Amount paid for the piece (₹)</label><input id="cost_${o.id}" name="seller_price" inputmode="numeric" maxlength="12" value="${o.seller_price}"></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label for="ship_${o.id}">Shipping paid (₹)</label><input id="ship_${o.id}" name="shipping" inputmode="numeric" maxlength="12" value="${o.shipping}"></div>
+          <div class="field"><label for="customs_${o.id}">Customs / duty paid (₹)</label><input id="customs_${o.id}" name="duty" inputmode="numeric" maxlength="12" value="${o.duty}"></div>
+        </div>
+        <p class="hint" style="margin:-4px 0 12px;">Landed price (what the buyer pays) recalculates from these three plus the authentication fee, and updates immediately.</p>
+        <button class="btn" type="submit">Save</button>
+      </form>
+    </div>`
+  )
+  .join('')}`);
+}
+
+async function updateProductAudit(request, env, offerId, currentUser) {
+  const form = await request.formData();
+  const num = (k) => Number(String(form.get(k) || '').split('.')[0].replace(/[^\d]/g, '')) || 0;
+  const sourcingUrl = String(form.get('sourcing_url') || '').trim().slice(0, 500) || null;
+  const sourcingCountry = String(form.get('sourcing_country') || '').trim().slice(0, 60) || null;
+  const sellerPrice = num('seller_price');
+  const shipping = num('shipping');
+  const duty = num('duty');
+
+  const existing = await env.DB.prepare('SELECT auth_fee FROM offers WHERE id = ?').bind(offerId).first();
+  if (!existing) return redirect('/admin/product-audit');
+
+  const landedPrice = sellerPrice + duty + existing.auth_fee + shipping;
+
+  await env.DB.prepare(
+    `UPDATE offers SET sourcing_url = ?, sourcing_country = ?, seller_price = ?, shipping = ?, duty = ?, landed_price = ?
+     WHERE id = ?`
+  )
+    .bind(sourcingUrl, sourcingCountry, sellerPrice, shipping, duty, landedPrice, offerId)
+    .run();
+
+  await logAudit(env, currentUser, 'offer.audit_updated', {
+    entityType: 'offer',
+    entityId: offerId,
+    detail: `cost ${sellerPrice}, shipping ${shipping}, customs ${duty} -> landed ${landedPrice}${sourcingCountry ? `, from ${sourcingCountry}` : ''}`,
+    request,
+  });
+
+  return redirect(`/admin/product-audit?saved=${offerId}`);
 }

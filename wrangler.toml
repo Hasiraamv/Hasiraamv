@@ -47,6 +47,13 @@ SITE_NAME = "Rarehaus"
 SITE_URL = "https://rarehaus.in"
 CURRENCY = "INR"
 
+# Orders at or above this land on the Orders page with a review flag instead of shipping
+# silently -- see src/risk.js for the other signals (first-time buyer, several orders in an
+# hour, checkout from outside India). Not an automatic decline; there is no payment gateway
+# wired yet to decline anything, and refusing a legitimate buyer over a heuristic is its own
+# kind of damage. Tune this to the business -- there is no universal number.
+FRAUD_REVIEW_THRESHOLD = "200000"
+
 # DEMO_MODE shows a banner saying the catalogue is sample data and no orders are fulfilled.
 # Turned off at the owner's explicit request. NOTE: the catalogue in db/seed.sql is still
 # placeholder stock and checkout still has no payment gateway wired (see README "Before
