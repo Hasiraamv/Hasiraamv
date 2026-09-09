@@ -76,6 +76,15 @@ GRIEVANCE_EMAIL = "customer@rarehaus.in"
 GRIEVANCE_PHONE = "+91 93959 62006"
 JURISDICTION_CITY = "Guwahati"
 
+# Policy windows shown on the returns and privacy pages. Reasonable, defensible defaults are
+# set below -- change them if you want a different policy, but don't leave them blank, since
+# an unset window is a compliance gap (Consumer Protection E-Commerce Rules expect a clear
+# stated policy), not just a missing detail.
+DAMAGE_REPORT_WINDOW = "48 hours"
+REFUND_TIMEFRAME = "7 working days"
+DATA_RETENTION_PERIOD = "8 years"
+PRIVACY_REQUEST_TIMEFRAME = "30 days"
+
 # Buyer sign-in (Clerk) and welcome email (Resend). The publishable key is not secret --
 # it is sent to the browser so clerk-js can load -- so it lives here; the secret key,
 # webhook signing secret and Resend API key below do not and must be set with
