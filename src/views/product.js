@@ -54,7 +54,7 @@ export function productPage({ product, offers, images, related, selectedSize, en
 
 <section class="wrap pdp" style="display:grid; grid-template-columns:1.05fr .95fr; gap:52px; padding-top:40px;">
 
-  <div>
+  <div class="pdp-media">
     <div class="pdp-gallery" data-gallery>
       <div class="pdp-gallery-main" style="aspect-ratio:1/1; background:var(--tile); position:relative; overflow:hidden;">
         ${
@@ -121,12 +121,12 @@ export function productPage({ product, offers, images, related, selectedSize, en
 
     <div class="panel" style="margin-top:22px; padding:22px 24px;">
       <h3 class="serif" style="font-size:20px; margin:0 0 10px;">About this piece</h3>
-      <p style="margin:0 0 14px; font-size:14px; line-height:1.7; color:#4a463c;">${escapeHtml(product.description || '')}</p>
+      <p class="pdp-copy" style="margin:0 0 14px; font-size:14px; line-height:1.7; color:var(--text);">${escapeHtml(product.description || '')}</p>
       ${
         product.details
           ? `<div style="margin:0 0 14px; padding-top:14px; border-top:1px solid var(--line);">
                <h4 style="font-size:12.5px; font-weight:600; margin:0 0 8px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);">Details</h4>
-               <p style="margin:0; font-size:13.5px; line-height:1.75; color:#4a463c; white-space:pre-line;">${escapeHtml(product.details)}</p>
+               <p class="pdp-copy" style="margin:0; font-size:13.5px; line-height:1.75; color:var(--text); white-space:pre-line;">${escapeHtml(product.details)}</p>
              </div>`
           : ''
       }
@@ -183,7 +183,7 @@ export function productPage({ product, offers, images, related, selectedSize, en
       : ''
   }
 
-  <div>
+  <div class="pdp-info">
     <span class="tag gold">Imported &amp; authenticated</span>
     ${
       product.gender && product.gender !== 'unisex'

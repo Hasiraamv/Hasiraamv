@@ -418,6 +418,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .form-row { grid-template-columns: 1fr; }
   .hero-split, .pdp, .split { grid-template-columns: 1fr !important; }
   .hero-h1 { font-size: 38px !important; }
+  /* The single-column PDP would otherwise stack in source order -- photos and specs, then
+     the title and price -- so a buyer scrolls through a details table before they even see
+     what it costs. Reordering the info block first fixes that without touching desktop,
+     where the two columns already sit side by side. */
+  .pdp-info { order: -1; }
+  /* The description/details copy was set a size and a colour lighter than the rest of the
+     page (#4a463c body text vs. near-black everywhere else) -- fine on a calibrated monitor,
+     hard to read on an average phone screen outdoors or at a glance. Bumped to match the
+     15px base body size on mobile; the darker --text colour above applies everywhere. */
+  .pdp-copy { font-size: 15px !important; }
   .sizes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .table thead { display: none; }
   .table tr { display: block; border-bottom: 1px solid var(--line); padding: 12px 0; }
