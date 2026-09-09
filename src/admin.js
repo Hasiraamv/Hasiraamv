@@ -110,7 +110,9 @@ export async function adminRouter(request, env, path) {
          Admin is disabled because its secret is not set. Run
          <code>wrangler secret put SESSION_SECRET</code>, then redeploy.
        </div>`,
-      503
+      503,
+      {},
+      false
     );
   }
 
@@ -132,10 +134,10 @@ export async function adminRouter(request, env, path) {
           'set-cookie': cookieHeader(ADMIN_COOKIE, token, { maxAge: 60 * 60 * 8 }),
         });
       }
-      return adminHtml(loginForm('That email or password is not right.'), 401);
+      return adminHtml(loginForm('That email or password is not right.'), 401, {}, false);
     }
     const anyUsers = await env.DB.prepare('SELECT id FROM admin_users LIMIT 1').first();
-    return adminHtml(loginForm(null, !anyUsers));
+    return adminHtml(loginForm(null, !anyUsers), 200, {}, false);
   }
 
   if (path === '/admin/logout') {
@@ -264,7 +266,11 @@ export async function adminRouter(request, env, path) {
 
 // Shell ----------------------------------------------------------------------
 
-function adminHtml(body, status = 200, extraHeaders = {}) {
+// The nav lists every admin section by name -- Employees, Rates, Activity log, all of it --
+// which is exactly the internal map an attacker would want before they even have a password.
+// It has no business rendering for a visitor who isn't signed in yet, so `loggedIn` gates it;
+// every call site that can be reached without a valid session cookie must pass false.
+function adminHtml(body, status = 200, extraHeaders = {}, loggedIn = true) {
   return html(
     `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -274,8 +280,10 @@ function adminHtml(body, status = 200, extraHeaders = {}) {
 </head><body>
 <div class="announce"><span class="tag">Rarehaus admin</span></div>
 <div class="nav">
-  <a class="logo" href="/admin">${sealMark('var(--gold)', 22)}RAREHAUS <span style="font-size:13px; letter-spacing:0; color:var(--faint)">admin</span></a>
-  <nav class="nav-links">
+  <a class="logo" href="${loggedIn ? '/admin' : '/'}">${sealMark('var(--gold)', 22)}RAREHAUS <span style="font-size:13px; letter-spacing:0; color:var(--faint)">admin</span></a>
+  ${
+    loggedIn
+      ? `<nav class="nav-links">
     <a href="/admin/orders">Orders</a>
     <a href="/admin/certificates">Certificates</a>
     <a href="/admin/authentication">Authentication</a>
@@ -292,7 +300,9 @@ function adminHtml(body, status = 200, extraHeaders = {}) {
     <a href="/" target="_blank">View site</a>
     <a href="/admin/account/password">My account</a>
     <a href="/admin/logout">Sign out</a>
-  </div>
+  </div>`
+      : `<div class="nav-right"><a href="/" target="_blank">View site</a></div>`
+  }
 </div>
 <main class="section" style="padding-top:32px;">${body}</main>
 </body></html>`,
