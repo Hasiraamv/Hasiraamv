@@ -10,7 +10,7 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
         <span style="width:34px; height:1px; background:var(--gold-light); display:block;"></span>
         <span class="tag" style="color:var(--gold-light)">Every seller compared. One price you can trust.</span>
       </div>
-      <h1 class="serif" style="font-size:64px; line-height:1.05; margin:0 0 22px;">
+      <h1 class="serif hero-h1" style="font-size:64px; line-height:1.05; margin:0 0 22px;">
         Sourced abroad.<br>Proven before <em style="color:var(--gold-light)">it ships.</em>
       </h1>
       <p style="max-width:470px; font-size:16.5px; line-height:1.72; color:#b3ab99; margin:0 0 26px;">
