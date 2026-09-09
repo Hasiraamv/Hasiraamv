@@ -216,7 +216,13 @@ export function orderPage({ order, events, certificate }) {
   </div>
 
   ${
-    current === 0
+    order.status === 'authentication_failed'
+      ? `<div class="notice notice-bad" style="margin-top:18px;">
+           <strong>This piece did not pass our independent authentication check.</strong> Nothing was
+           shipped to you. We are processing a full refund, including duty and shipping — see the
+           breakdown below, and <a href="/contact">contact us</a> if you have questions.
+         </div>`
+      : current === 0
       ? `<div class="notice" style="margin-top:18px;">
            Your piece is being prepared and authenticated. We do not mark an order as shipped until
            it has passed our inspection, so this step takes a little longer than you may be used to —

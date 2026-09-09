@@ -27,6 +27,57 @@ export function formatINR(amount) {
   return (n < 0 ? '-₹' : '₹') + out;
 }
 
+// Spells out a whole rupee amount using the Indian numbering system (Lakh, Crore) rather than
+// the Western Thousand/Million/Billion one -- "Sixty-Seven Lakh" reads correctly to an Indian
+// buyer where "Six Million Seven Hundred Thousand" would not, even though it is the same
+// number. Used as a small parenthetical next to the digits on admin pages, the way a cheque or
+// an invoice spells an amount out so a string of digits can't be misread.
+const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+  'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+function twoDigitsToWords(n) {
+  if (n < 20) return ONES[n];
+  const tens = Math.floor(n / 10);
+  const ones = n % 10;
+  return TENS[tens] + (ones ? ' ' + ONES[ones] : '');
+}
+
+function threeDigitsToWords(n) {
+  const hundreds = Math.floor(n / 100);
+  const rest = n % 100;
+  const parts = [];
+  if (hundreds) parts.push(ONES[hundreds] + ' Hundred');
+  if (rest) parts.push(twoDigitsToWords(rest));
+  return parts.join(' ');
+}
+
+export function numberToIndianWords(amount) {
+  const n = Math.round(Math.abs(Number(amount) || 0));
+  if (n === 0) return 'Zero';
+
+  const crore = Math.floor(n / 1e7);
+  const lakh = Math.floor((n % 1e7) / 1e5);
+  const thousand = Math.floor((n % 1e5) / 1e3);
+  const hundred = n % 1000;
+
+  const parts = [];
+  if (crore) parts.push(threeDigitsToWords(crore) + ' Crore');
+  if (lakh) parts.push(twoDigitsToWords(lakh) + ' Lakh');
+  if (thousand) parts.push(twoDigitsToWords(thousand) + ' Thousand');
+  if (hundred) parts.push(threeDigitsToWords(hundred));
+
+  return parts.join(' ');
+}
+
+// The digits, plus a small "(Sixty-Seven Lakh ...)" spelled-out form in brackets -- the pairing
+// an invoice or a cheque uses so a long string of digits can't be misread or silently mistyped.
+export function formatINRWords(amount, { tag = 'span' } = {}) {
+  if (amount === null || amount === undefined) return formatINR(amount);
+  const words = numberToIndianWords(amount);
+  return `${formatINR(amount)} <${tag} class="faint" style="font-size:11px; font-weight:400;">(${words} Rupees)</${tag}>`;
+}
+
 // True until the catalogue is real stock. Controlled by the DEMO_MODE var in wrangler.toml.
 export function isDemo(env) {
   return String(env?.DEMO_MODE ?? 'true').toLowerCase() !== 'false';
@@ -310,6 +361,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .size.out { background: #f1ede2; color: #b0a893; cursor: default; }
 .size .n { font-size: 13.5px; font-weight: 600; }
 .size .p { font-size: 10.5px; margin-top: 3px; opacity: 0.85; }
+.size-radio:checked + .size { background: var(--ink-soft); color: var(--paper); border-color: var(--ink-soft); }
+.size-radio:focus-visible + .size { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* Timeline ---------------------------------------------------------- */
 .timeline { display: flex; gap: 8px; }

@@ -18,7 +18,7 @@ server-rendered HTML directly.
 | Order tracking | `/track`, `/order/:ref` | Seven-stage import timeline |
 | Certificate verification | `/verify` | Public lookup, plus full detail with the sealed code |
 | Printable certificate | `/certificate/:no` | Prints cleanly |
-| Admin | `/admin` | Orders, certificates, products, offers, sourcing requests |
+| Admin | `/admin` | Orders, certificates, products, offers, sourcing requests, employee accounts |
 
 ## Certification
 
@@ -58,11 +58,12 @@ npx wrangler d1 create mintmark  # infra name kept as-is deliberately -- see wra
 npm run db:schema
 npm run db:seed
 
-# 3. Set secrets (never commit these)
-npx wrangler secret put ADMIN_PASSWORD
+# 3. Set the session secret (never commit it)
 npx wrangler secret put SESSION_SECRET   # any long random string
 
-# 4. Deploy
+# 4. Create the first admin account (an Owner) -- see "Admin accounts" below
+
+# 5. Deploy
 npm run deploy
 ```
 
@@ -71,11 +72,35 @@ Local development:
 ```bash
 npm run db:schema:local
 npm run db:seed:local
-printf 'ADMIN_PASSWORD=localpassword\nSESSION_SECRET=localsecret\n' > .dev.vars
+printf 'SESSION_SECRET=localsecret\n' > .dev.vars
 npm run dev
 ```
 
 `.dev.vars` is gitignored. Restart `wrangler dev` after creating it, or admin returns 503.
+
+## Admin accounts
+
+Everyone with `/admin` access signs in with their own email and password -- there is no shared
+password. Roles limit what each person can reach: **Owner** (everything, including managing
+other employees, pricing and the catalogue), **Authenticator** (orders and certificates),
+**Warehouse** (orders and listings, for packing/dispatch) and **Support** (orders read-only,
+seller applications, sourcing requests). See `ROUTE_RULES` in `src/admin.js` for the exact
+mapping.
+
+Owners create every other account from the "Employees" page inside `/admin` once they can sign
+in themselves -- but the very first account has no one to create it, so it has to be inserted
+directly into the database once. Generate a password hash and insert it:
+
+```bash
+node -e "import('./src/session.js').then(m => m.hashPassword('a-strong-password')).then(console.log)"
+```
+
+```bash
+npx wrangler d1 execute mintmark --remote --command \
+  "INSERT INTO admin_users (name, email, password_hash, role) VALUES ('Your Name', 'you@example.com', '<paste the hash>', 'owner')"
+```
+
+Then sign in at `/admin/login` with that email and password.
 
 ## What is automatic
 

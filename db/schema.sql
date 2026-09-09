@@ -29,6 +29,58 @@ CREATE TABLE users (
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Employee accounts for /admin, replacing the single shared ADMIN_PASSWORD. Each person gets
+-- their own login and a role that limits what they can reach -- see ROUTE_RULES in admin.js
+-- for exactly what each role can do. status = 'disabled' revokes access immediately, without
+-- deleting the account or its history (last_login_at, created_at) -- the same soft-deletion
+-- principle as everywhere else business records live.
+CREATE TABLE admin_users (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  name           TEXT NOT NULL,
+  email          TEXT NOT NULL UNIQUE,
+  password_hash  TEXT NOT NULL,          -- see hashPassword() in session.js -- PBKDF2, never plaintext
+  role           TEXT NOT NULL DEFAULT 'owner', -- owner | authenticator | warehouse | support
+  status         TEXT NOT NULL DEFAULT 'active', -- active | disabled
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  last_login_at  TEXT
+);
+
+-- Every sensitive admin action, immutable once written (the app never issues an UPDATE or
+-- DELETE against this table). admin_user_id is nullable and name/email are copied in at write
+-- time rather than only joined live, so a row still reads sensibly if that employee's account
+-- is later disabled -- their history shouldn't vanish along with their access.
+CREATE TABLE audit_log (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  admin_user_id  INTEGER REFERENCES admin_users(id),
+  admin_name     TEXT NOT NULL,
+  admin_email    TEXT NOT NULL,
+  action         TEXT NOT NULL,          -- short verb.noun code, e.g. "offer.price_changed"
+  entity_type    TEXT,                   -- 'product' | 'offer' | 'order' | 'certificate' | 'admin_user' | 'rate' | ...
+  entity_id      TEXT,
+  detail         TEXT,                   -- short human-readable summary, e.g. "seller_price 8000 -> 9500"
+  ip             TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_audit_created ON audit_log(created_at DESC);
+CREATE INDEX idx_audit_entity ON audit_log(entity_type, entity_id);
+
+-- A dedicated case per order, rather than authentication being a checkbox on the way to
+-- issuing a certificate. Created automatically when an order reaches "authenticating" (see
+-- advanceOrder in admin.js); its decision is what is allowed to move the order on to
+-- "authenticated" (and therefore issue the certificate) or send it to "authentication_failed"
+-- -- there is deliberately no direct route from one to the other any more.
+CREATE TABLE authentication_cases (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id      INTEGER NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
+  status        TEXT NOT NULL DEFAULT 'not_started', -- not_started | assigned | passed | failed
+  assigned_to   INTEGER REFERENCES admin_users(id),
+  notes         TEXT,
+  decided_by    INTEGER REFERENCES admin_users(id),
+  decided_at    TEXT,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_authcases_status ON authentication_cases(status);
+
 CREATE TABLE categories (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   slug       TEXT NOT NULL UNIQUE,

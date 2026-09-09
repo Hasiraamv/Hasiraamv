@@ -85,8 +85,11 @@ RESEND_FROM = "Rarehaus <welcome@rarehaus.in>"
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
 # Secrets (set with `wrangler secret put <NAME>`, never commit them):
-#   ADMIN_PASSWORD        password for /admin
-#   SESSION_SECRET        random string used to sign admin and cart cookies
+#   SESSION_SECRET        random string used to sign admin and cart cookies. Admin login is
+#                         now per-employee (the admin_users table, see db/schema.sql and
+#                         "Employees" in /admin) rather than a single shared password, so
+#                         ADMIN_PASSWORD is no longer read by the app -- safe to leave set or
+#                         to remove with `wrangler secret delete ADMIN_PASSWORD`.
 #   CLERK_SECRET_KEY      from the Clerk dashboard, pairs with CLERK_PUBLISHABLE_KEY above
 #   CLERK_WEBHOOK_SECRET  from the Clerk dashboard's Webhooks page, for the endpoint at
 #                         /webhooks/clerk (subscribe it to the user.created event)
