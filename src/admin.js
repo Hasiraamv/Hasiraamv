@@ -2,6 +2,7 @@ import { escapeHtml, formatINR, html, redirect, sealMark } from './render.js';
 import * as db from './db.js';
 import { issueCertificate } from './certificates.js';
 import { storeImage, deleteImage, storeVideo, normalizeImageUrl, imageStore } from './images.js';
+import { SHOE_SIZE_LABELS } from './sizing.js';
 import {
   computeOfferPricing,
   listCategoryRates,
@@ -691,6 +692,26 @@ function stockLabelField(id, name, selected = '') {
   </div>`;
 }
 
+// A UK/US shoe size dropdown, or a free-text size field when the product isn't sized in UK
+// (apparel, "one size", etc). `productSizeType` decides which renders; when it's not known
+// server-side (the product is picked from a dropdown on the same form), both render and a
+// small script toggles between them as the product selection changes.
+function shoeSizeSelect(id, name, selected = '') {
+  return `<select id="${id}" name="${name}">
+    ${!selected ? '<option value="" disabled selected>Choose a size&hellip;</option>' : ''}
+    ${SHOE_SIZE_LABELS.map(
+      (label) => `<option value="${escapeHtml(label)}"${label === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`
+    ).join('')}
+  </select>`;
+}
+
+function sizeField({ idPrefix, name, sizeType, selected = '', label = 'Size' }) {
+  if (sizeType === 'uk') {
+    return `<div class="field"><label for="${idPrefix}_uk">${label}</label>${shoeSizeSelect(`${idPrefix}_uk`, name, selected)}</div>`;
+  }
+  return `<div class="field"><label for="${idPrefix}_text">${label}</label><input id="${idPrefix}_text" name="${name}" value="${escapeHtml(selected || 'One size')}" maxlength="40"></div>`;
+}
+
 async function productsPage(env, errorMessage, preselectProductId = null) {
   const [categories, sellers, offersResult, cities] = await Promise.all([
     db.getCategories(env.DB),
@@ -817,7 +838,7 @@ ${
           ${shipsFromField(cities, { id: 'p_ships_from', name: 'ships_from' })}
         </div>
         <div class="form-row">
-          <div class="field"><label for="offer_size">Size</label><input id="offer_size" name="offer_size" value="One size" maxlength="40"></div>
+          <div id="offer_size_wrap">${sizeField({ idPrefix: 'offer_size', name: 'offer_size', sizeType: 'none' })}</div>
           <div class="field"><label for="offer_condition">Condition</label><input id="offer_condition" name="offer_condition" value="Deadstock" maxlength="60"></div>
         </div>
         <div class="form-row">
@@ -853,6 +874,26 @@ ${
 
       <button class="btn btn-block" type="submit">Add product</button>
     </form>
+    <script>
+    (function () {
+      var SHOE_SIZES = ${JSON.stringify(SHOE_SIZE_LABELS)};
+      var sizingSelect = document.getElementById('size_type');
+      var wrap = document.getElementById('offer_size_wrap');
+      function render(sizeType) {
+        if (sizeType === 'uk') {
+          wrap.innerHTML = '<div class="field"><label for="offer_size_uk">Size</label><select id="offer_size_uk" name="offer_size">' +
+            '<option value="" disabled selected>Choose a size&hellip;</option>' +
+            SHOE_SIZES.map(function (l) { return '<option value="' + l + '">' + l + '</option>'; }).join('') +
+            '</select></div>';
+        } else {
+          wrap.innerHTML = '<div class="field"><label for="offer_size_text">Size</label><input id="offer_size_text" name="offer_size" value="One size" maxlength="40"></div>';
+        }
+      }
+      if (sizingSelect) {
+        sizingSelect.addEventListener('change', function () { render(sizingSelect.value); });
+      }
+    })();
+    </script>
   </div>
 
   <div class="panel" style="padding:22px;" id="offer-form">
@@ -860,11 +901,13 @@ ${
     <p class="muted" style="font-size:12.5px; margin:0 0 14px;">The landed price is the sum of the four parts — that is what the buyer pays and what the breakdown shows.</p>
     <form method="post" action="/admin/offers/create">
       <div class="field"><label for="product_id">Product</label>
-        <select id="product_id" name="product_id" required>
+        <select id="product_id" name="product_id" required data-size-types='${JSON.stringify(
+          Object.fromEntries((products || []).map((p) => [p.id, p.size_type]))
+        )}'>
           ${(products || [])
             .map(
               (p) =>
-                `<option value="${p.id}"${p.id === preselectProductId ? ' selected' : ''}>${escapeHtml(p.title)}</option>`
+                `<option value="${p.id}" data-size-type="${p.size_type}"${p.id === preselectProductId ? ' selected' : ''}>${escapeHtml(p.title)}</option>`
             )
             .join('')}
         </select>
@@ -880,7 +923,7 @@ ${
           </select>
           <span class="hint">Ignored if "Inhaus" above is checked.</span>
         </div>
-        <div class="field"><label for="size_label">Size</label><input id="size_label" name="size_label" value="One size" maxlength="40"></div>
+        <div id="size_label_wrap">${sizeField({ idPrefix: 'size_label_o', name: 'size_label', sizeType: (products || []).find((p) => p.id === preselectProductId)?.size_type })}</div>
       </div>
       <div class="form-row">
         ${shipsFromField(cities, { required: true })}
@@ -909,6 +952,32 @@ ${
 
       <button class="btn btn-block" type="submit">Add offer</button>
     </form>
+    <script>
+    (function () {
+      var SHOE_SIZES = ${JSON.stringify(SHOE_SIZE_LABELS)};
+      var select = document.getElementById('product_id');
+      var wrap = document.getElementById('size_label_wrap');
+      function render(sizeType, keepValue) {
+        if (sizeType === 'uk') {
+          var opts = SHOE_SIZES.map(function (l) {
+            return '<option value="' + l + '"' + (l === keepValue ? ' selected' : '') + '>' + l + '</option>';
+          }).join('');
+          wrap.innerHTML = '<div class="field"><label for="size_label_o">Size</label><select id="size_label_o" name="size_label">' +
+            (keepValue && SHOE_SIZES.indexOf(keepValue) === -1 ? '<option value="" disabled selected>Choose a size&hellip;</option>' : '') +
+            opts + '</select></div>';
+        } else {
+          wrap.innerHTML = '<div class="field"><label for="size_label_o">Size</label><input id="size_label_o" name="size_label" value="' +
+            (keepValue && SHOE_SIZES.indexOf(keepValue) === -1 ? keepValue : 'One size') + '" maxlength="40"></div>';
+        }
+      }
+      if (select) {
+        select.addEventListener('change', function () {
+          var opt = select.options[select.selectedIndex];
+          render(opt ? opt.dataset.sizeType : '', '');
+        });
+      }
+    })();
+    </script>
   </div>
 </div>
 
@@ -1458,7 +1527,8 @@ async function deleteProduct(request, env, productId) {
 
 async function editOfferPage(env, offerId) {
   const offer = await env.DB.prepare(
-    `SELECT o.*, p.title AS product_title FROM offers o JOIN products p ON p.id = o.product_id WHERE o.id = ?`
+    `SELECT o.*, p.title AS product_title, p.size_type AS product_size_type
+       FROM offers o JOIN products p ON p.id = o.product_id WHERE o.id = ?`
   )
     .bind(offerId)
     .first();
@@ -1487,7 +1557,7 @@ async function editOfferPage(env, offerId) {
             .join('')}
         </select>
       </div>
-      <div class="field"><label for="size_label">Size</label><input id="size_label" name="size_label" value="${escapeHtml(offer.size_label)}" maxlength="40"></div>
+      ${sizeField({ idPrefix: 'size_label', name: 'size_label', sizeType: offer.product_size_type, selected: offer.size_label })}
     </div>
     <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
       <input type="checkbox" id="inhouse" name="inhouse" value="1" style="width:auto;" ${offer.sourced_by === 'inhouse' ? 'checked' : ''}>
