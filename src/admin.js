@@ -210,11 +210,15 @@ export async function adminRouter(request, env, path) {
 
   {
     const m = path.match(/^\/admin\/products\/(\d+)\/edit$/);
-    if (m) return editProductPage(env, Number(m[1]));
+    if (m) return editProductPage(env, Number(m[1]), new URL(request.url).searchParams.get('error'));
   }
   {
     const m = path.match(/^\/admin\/products\/(\d+)\/update$/);
     if (m && method === 'POST') return updateProduct(request, env, Number(m[1]), currentUser);
+  }
+  {
+    const m = path.match(/^\/admin\/products\/(\d+)\/image-url$/);
+    if (m && method === 'POST') return addImageUrl(request, env, Number(m[1]));
   }
   {
     const m = path.match(/^\/admin\/products\/(\d+)\/delete$/);
@@ -1794,7 +1798,7 @@ async function setOfferStatus(request, env, currentUser) {
 // offer that already has an order against it can be withdrawn but never deleted, so order
 // history and certificates never end up pointing at something that no longer exists.
 
-async function editProductPage(env, productId) {
+async function editProductPage(env, productId, errorMessage) {
   const [product, categories, images] = await Promise.all([
     env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first(),
     db.getCategories(env.DB),
@@ -1811,9 +1815,12 @@ async function editProductPage(env, productId) {
     .bind(productId)
     .first();
   const canDelete = (orderCount?.n || 0) === 0;
+  const back = `/admin/products/${productId}/edit`;
 
   return adminHtml(`
-<h2 class="serif" style="font-size:32px; margin:0 0 22px;">Edit product</h2>
+<h2 class="serif" style="font-size:32px; margin:0 0 8px;">Edit product</h2>
+<p class="muted" style="margin:0 0 20px; font-size:13px;">Everything here matches the "Add a product" form -- nothing about a listing is fixed once it's saved.</p>
+${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${escapeHtml(errorMessage)}</div>` : ''}
 <div class="panel" style="padding:22px; max-width:640px;">
   <form method="post" action="/admin/products/${product.id}/update">
     <div class="field"><label for="title">Title</label><input id="title" name="title" required maxlength="160" value="${escapeHtml(product.title)}"></div>
@@ -1851,12 +1858,17 @@ async function editProductPage(env, productId) {
       </div>
       <div class="field"><label for="sku">Style / SKU</label><input id="sku" name="sku" maxlength="60" value="${escapeHtml(product.sku || '')}"></div>
     </div>
-    <div class="field"><label for="retail">MRP (₹)</label><input id="retail" name="retail" inputmode="numeric" maxlength="12" value="${product.retail_price || ''}"></div>
+    <div class="field"><label for="retail">MRP (₹)</label><input id="retail" name="retail" inputmode="numeric" maxlength="12" value="${product.retail_price || ''}">
+      <span class="hint">The original price. Set this and price the piece below it to show a discount.</span>
+    </div>
     <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="3" maxlength="1200">${escapeHtml(product.description || '')}</textarea></div>
     <div class="field"><label for="details">Details</label><textarea id="details" name="details" rows="3" maxlength="2000" placeholder="Material, dimensions, what's in the box...">${escapeHtml(product.details || '')}</textarea>
       <span class="hint">Shown in its own "Details" section on the product page, separate from the description above.</span>
     </div>
     <div class="field"><label for="condition">Condition notes</label><input id="condition" name="condition" maxlength="200" value="${escapeHtml(product.condition_notes || '')}"></div>
+    <div class="field"><label for="video">Video URL</label><input id="video" name="video" maxlength="400" placeholder="YouTube, Vimeo, or a direct .mp4 link" value="${/^https?:\/\//i.test(product.video_url || '') ? escapeHtml(product.video_url) : ''}">
+      <span class="hint">Leave blank to make no change. To remove an uploaded video file, use the Remove button below instead.</span>
+    </div>
     <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
       <input type="checkbox" id="is_published" name="is_published" value="1" style="width:auto;" ${product.is_published ? 'checked' : ''}>
       <label for="is_published" style="margin:0;">Published (visible on the site)</label>
@@ -1866,13 +1878,72 @@ async function editProductPage(env, productId) {
 </div>
 
 <h3 class="serif" style="font-size:20px; margin:28px 0 12px;">Photos</h3>
-<div style="display:flex; gap:10px; flex-wrap:wrap;">
+<div class="panel" style="padding:20px; max-width:640px;">
+  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+    ${images
+      .map(
+        (im, i) => `<span style="position:relative; display:inline-block;">
+          <img src="${escapeHtml(im.url)}" alt="" style="width:70px; height:70px; object-fit:cover; border:1px solid var(--line);">
+          ${i === 0 ? `<span style="position:absolute; bottom:-2px; left:-2px; background:var(--ink-soft); color:var(--paper); font-size:9px; padding:1px 4px;">1st</span>` : ''}
+          <form method="post" action="/admin/images/delete" style="display:inline;">
+            <input type="hidden" name="image_id" value="${im.id}">
+            <input type="hidden" name="redirect_to" value="${back}">
+            <button type="submit" title="Delete photo" aria-label="Delete this photo" style="position:absolute; top:-6px; right:-6px; width:18px; height:18px; line-height:1; border:1px solid var(--line); background:var(--card); cursor:pointer; font-size:11px; padding:0;">×</button>
+          </form>
+          <span style="position:absolute; top:-6px; left:-6px; display:flex; flex-direction:column;">
+            <form method="post" action="/admin/images/reorder" style="display:inline;">
+              <input type="hidden" name="image_id" value="${im.id}">
+              <input type="hidden" name="direction" value="up">
+              <input type="hidden" name="redirect_to" value="${back}">
+              <button type="submit" title="Move earlier" aria-label="Move this photo earlier" ${i === 0 ? 'disabled' : ''} style="width:16px; height:14px; line-height:1; border:1px solid var(--line); background:var(--card); cursor:pointer; font-size:9px; padding:0;">&uarr;</button>
+            </form>
+            <form method="post" action="/admin/images/reorder" style="display:inline;">
+              <input type="hidden" name="image_id" value="${im.id}">
+              <input type="hidden" name="direction" value="down">
+              <input type="hidden" name="redirect_to" value="${back}">
+              <button type="submit" title="Move later" aria-label="Move this photo later" ${i === images.length - 1 ? 'disabled' : ''} style="width:16px; height:14px; line-height:1; border:1px solid var(--line); background:var(--card); cursor:pointer; font-size:9px; padding:0;">&darr;</button>
+            </form>
+          </span>
+        </span>`
+      )
+      .join('') || '<span class="faint" style="font-size:12.5px;">No photos yet.</span>'}
+  </div>
   ${
-    images.length
-      ? images
-          .map((im) => `<img src="${escapeHtml(im.url)}" alt="" style="width:70px; height:70px; object-fit:cover; border:1px solid var(--line);">`)
-          .join('')
-      : '<span class="faint">None yet — manage photos from the catalogue table.</span>'
+    imageStore(env)
+      ? `<form method="post" action="/admin/images/upload" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+           <input type="hidden" name="product_id" value="${product.id}">
+           <input type="hidden" name="redirect_to" value="${back}">
+           <input type="file" name="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple required>
+           <button class="chip" type="submit" style="cursor:pointer;">Upload</button>
+         </form>`
+      : ''
+  }
+  <form method="post" action="/admin/products/${product.id}/image-url" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+    <input type="text" name="image_url" placeholder="Or paste an image URL" maxlength="400" style="flex:1; min-width:200px; padding:10px 12px; border:1px solid var(--line);">
+    <button class="chip" type="submit" style="cursor:pointer;">Add</button>
+  </form>
+</div>
+
+<h3 class="serif" style="font-size:20px; margin:28px 0 12px;">Video</h3>
+<div class="panel" style="padding:20px; max-width:640px;">
+  ${
+    product.video_url
+      ? `<div style="display:flex; align-items:center; gap:10px;">
+           <span class="faint" style="font-size:12.5px;">A video is set.</span>
+           <form method="post" action="/admin/products/video-remove">
+             <input type="hidden" name="product_id" value="${product.id}">
+             <input type="hidden" name="redirect_to" value="${back}">
+             <button type="submit" class="chip" style="cursor:pointer;">Remove</button>
+           </form>
+         </div>`
+      : env.IMAGES
+      ? `<form method="post" action="/admin/products/video-upload" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center;">
+           <input type="hidden" name="product_id" value="${product.id}">
+           <input type="hidden" name="redirect_to" value="${back}">
+           <input type="file" name="file" accept="video/mp4,video/webm" required>
+           <button class="chip" type="submit" style="cursor:pointer;">Upload a video file</button>
+         </form>`
+      : `<span class="faint" style="font-size:12.5px;">No video set. Use the Video URL field above, or enable R2 to upload a file directly.</span>`
   }
 </div>
 
@@ -1886,7 +1957,7 @@ async function editProductPage(env, productId) {
   }
 </div>
 
-<p style="margin-top:20px;"><a href="/admin/products">&larr; Back to products</a></p>`);
+<p style="margin-top:20px;"><a href="/admin/listings">&larr; Back to listings</a></p>`);
 }
 
 async function updateProduct(request, env, productId, currentUser) {
@@ -1902,9 +1973,16 @@ async function updateProduct(request, env, productId, currentUser) {
 
   const gender = ['men', 'women', 'unisex'].includes(form.get('gender')) ? form.get('gender') : 'unisex';
 
+  // The video URL field only ever *sets* a link -- an uploaded file's own /img/ path is left
+  // alone unless the dedicated Remove-video button is used, so retyping this box blank can
+  // never silently delete an uploaded video.
+  const video = String(form.get('video') || '').trim();
+  const videoClause = video ? ', video_url = ?' : '';
+  const videoBind = video && /^https:\/\//i.test(video) ? [video] : [];
+
   await env.DB.prepare(
     `UPDATE products SET title = ?, category_id = ?, sku = ?, description = ?, details = ?, condition_notes = ?,
-       retail_price = ?, size_type = ?, gender = ?, is_published = ? WHERE id = ?`
+       retail_price = ?, size_type = ?, gender = ?, is_published = ?${videoClause} WHERE id = ?`
   )
     .bind(
       title,
@@ -1917,6 +1995,7 @@ async function updateProduct(request, env, productId, currentUser) {
       String(form.get('size_type') || 'none'),
       gender,
       form.get('is_published') === '1' ? 1 : 0,
+      ...videoBind,
       productId
     )
     .run();
@@ -2252,12 +2331,13 @@ async function saveCity(request, env, currentUser) {
 async function uploadImage(request, env) {
   const form = await request.formData();
   const productId = Number(form.get('product_id'));
+  const back = String(form.get('redirect_to') || '/admin/products');
   if (!Number.isInteger(productId)) return redirect('/admin/products');
 
   // The file input allows selecting several photos at once (multiple attribute), so every
   // one under the "file" field name is stored and added in the order the browser sent them.
   const files = form.getAll('file').filter((f) => f && typeof f.arrayBuffer === 'function' && f.size > 0);
-  if (!files.length) return redirect('/admin/products?error=' + encodeURIComponent('No file was uploaded.'));
+  if (!files.length) return redirect(back + '?error=' + encodeURIComponent('No file was uploaded.'));
 
   const product = await env.DB.prepare('SELECT title FROM products WHERE id = ?')
     .bind(productId)
@@ -2285,14 +2365,35 @@ async function uploadImage(request, env) {
   }
 
   if (errors.length) {
-    return redirect('/admin/products?error=' + encodeURIComponent(errors.join(' ')));
+    return redirect(back + '?error=' + encodeURIComponent(errors.join(' ')));
   }
-  return redirect('/admin/products');
+  return redirect(back);
+}
+
+// Adds one photo from a pasted URL rather than an upload -- the same fallback the "Add a
+// product" form offers at creation time, now available when editing too.
+async function addImageUrl(request, env, productId) {
+  const back = `/admin/products/${productId}/edit`;
+  const image = normalizeImageUrl((await request.formData()).get('image_url'));
+  if (!image) return redirect(back + '?error=' + encodeURIComponent('That does not look like a valid image URL.'));
+
+  const product = await env.DB.prepare('SELECT title FROM products WHERE id = ?').bind(productId).first();
+  const next = await env.DB.prepare(
+    'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM product_images WHERE product_id = ?'
+  )
+    .bind(productId)
+    .first();
+  await env.DB.prepare('INSERT INTO product_images (product_id, url, alt, sort_order) VALUES (?, ?, ?, ?)')
+    .bind(productId, image, product?.title || null, next?.n || 0)
+    .run();
+
+  return redirect(back);
 }
 
 async function removeImage(request, env) {
   const form = await request.formData();
   const imageId = Number(form.get('image_id'));
+  const back = String(form.get('redirect_to') || '/admin/products');
   if (!Number.isInteger(imageId)) return redirect('/admin/products');
 
   const row = await env.DB.prepare('SELECT url FROM product_images WHERE id = ?').bind(imageId).first();
@@ -2300,7 +2401,7 @@ async function removeImage(request, env) {
     await env.DB.prepare('DELETE FROM product_images WHERE id = ?').bind(imageId).run();
     await deleteImage(env, row.url);
   }
-  return redirect('/admin/products');
+  return redirect(back);
 }
 
 // Swaps this image's sort_order with its neighbour in the same direction -- the whole
@@ -2309,6 +2410,7 @@ async function reorderImage(request, env) {
   const form = await request.formData();
   const imageId = Number(form.get('image_id'));
   const direction = form.get('direction') === 'up' ? 'up' : 'down';
+  const back = String(form.get('redirect_to') || '/admin/products');
   if (!Number.isInteger(imageId)) return redirect('/admin/products');
 
   const current = await env.DB.prepare('SELECT id, product_id, sort_order FROM product_images WHERE id = ?')
@@ -2329,29 +2431,31 @@ async function reorderImage(request, env) {
       env.DB.prepare('UPDATE product_images SET sort_order = ? WHERE id = ?').bind(current.sort_order, neighbor.id),
     ]);
   }
-  return redirect('/admin/products');
+  return redirect(back);
 }
 
 async function uploadVideo(request, env) {
   const form = await request.formData();
   const productId = Number(form.get('product_id'));
+  const back = String(form.get('redirect_to') || '/admin/products');
   if (!Number.isInteger(productId)) return redirect('/admin/products');
 
   const result = await storeVideo(env, form.get('file'));
   if (!result.ok) {
-    return redirect(`/admin/products?error=${encodeURIComponent(result.error)}`);
+    return redirect(`${back}?error=${encodeURIComponent(result.error)}`);
   }
 
   await env.DB.prepare('UPDATE products SET video_url = ? WHERE id = ?')
     .bind(`/img/${result.key}`, productId)
     .run();
 
-  return redirect('/admin/products');
+  return redirect(back);
 }
 
 async function removeVideo(request, env) {
   const form = await request.formData();
   const productId = Number(form.get('product_id'));
+  const back = String(form.get('redirect_to') || '/admin/products');
   if (!Number.isInteger(productId)) return redirect('/admin/products');
 
   const product = await env.DB.prepare('SELECT video_url FROM products WHERE id = ?').bind(productId).first();
@@ -2361,7 +2465,7 @@ async function removeVideo(request, env) {
     // never stored in R2, so deleteImage's key pattern check already no-ops on those safely).
     await deleteImage(env, product.video_url);
   }
-  return redirect('/admin/products');
+  return redirect(back);
 }
 
 async function sellerApplicationsPage(env) {
