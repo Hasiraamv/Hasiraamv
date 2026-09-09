@@ -244,6 +244,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .nav-right > a { color: var(--muted); }
 .nav-right > a:hover { color: var(--text); }
 
+/* The category strip used to live inside .nav itself, squeezed against the logo and the
+   search/sign-in/bag icons -- competing for the same row left it wrapping unpredictably and
+   looking cramped even with room to spare below. Its own full-width row means it never has
+   to share space with anything, so six category links comfortably sit on one clean line. */
+.nav-categories {
+  max-width: 1440px; margin: 0 auto; padding: 0 72px 20px;
+  border-top: 1px solid var(--line);
+}
+.nav-categories .nav-links { padding-top: 16px; gap: 32px; }
+
 /* Search and More both use <details> so they work with zero client JS; a small script in
    the footer closes them on an outside click for polish. */
 .nav-pop { position: relative; }
@@ -405,9 +415,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* Mobile ------------------------------------------------------------ */
 @media (max-width: 900px) {
-  .wrap, .nav, .section, .footer { padding-left: 20px; padding-right: 20px; }
+  .wrap, .nav, .nav-categories, .section, .footer { padding-left: 20px; padding-right: 20px; }
   .nav { flex-wrap: wrap; gap: 12px; }
-  .nav-links { order: 3; width: 100%; gap: 10px 20px; }
+  .nav-categories .nav-links { gap: 10px 20px; }
   .section { padding-top: 44px; }
   .section-head h2 { font-size: 27px; }
   .grid-2 { grid-template-columns: 1fr; }
@@ -672,18 +682,7 @@ ${
 
 <header class="no-print">
   <div class="nav">
-    <a class="logo" href="/" aria-label="${escapeHtml(site)} home">${sealMark(
-    'var(--gold)',
-    26
-  )}${escapeHtml(site.toUpperCase())}</a>
-    <nav class="nav-links" aria-label="Categories">
-      <a href="/c/sneakers">Sneakers</a>
-      <a href="/c/streetwear">Streetwear</a>
-      <a href="/c/watches">Watches</a>
-      <a href="/c/bags">Bags &amp; Leather</a>
-      <a href="/c/jewelry">Jewelry</a>
-      <a href="/c/collectibles">Collectibles</a>
-    </nav>
+    <a class="logo" href="/" aria-label="${escapeHtml(site)} home">${escapeHtml(site.toUpperCase())}</a>
     <div class="nav-right">
       <details class="nav-pop">
         <summary aria-label="Search listings">${icon('search', 'currentColor', 15)}</summary>
@@ -714,6 +713,16 @@ ${
   )} Bag (${cartCount})</a>
     </div>
   </div>
+  <div class="nav-categories">
+    <nav class="nav-links" aria-label="Categories">
+      <a href="/c/sneakers">Sneakers</a>
+      <a href="/c/streetwear">Streetwear</a>
+      <a href="/c/watches">Watches</a>
+      <a href="/c/bags">Bags &amp; Leather</a>
+      <a href="/c/jewelry">Jewelry</a>
+      <a href="/c/collectibles">Collectibles</a>
+    </nav>
+  </div>
 </header>
 
 <main id="main">
@@ -724,10 +733,7 @@ ${body}
   <div class="footer-inner">
     <div class="cols">
       <div style="max-width:280px">
-        <div class="logo" style="color:#f2ede2; font-size:20px; margin-bottom:14px;">${sealMark(
-          'var(--gold-light)',
-          24
-        )}${escapeHtml(site.toUpperCase())}</div>
+        <div class="logo" style="color:#f2ede2; font-size:20px; margin-bottom:14px;">${escapeHtml(site.toUpperCase())}</div>
         <div style="font-size:12.5px; line-height:1.7;">
           An authenticated marketplace for imported rare goods.<br>
           ${detail(env, 'LEGAL_NAME')}<br>${detail(env, 'REGISTERED_ADDRESS')}
