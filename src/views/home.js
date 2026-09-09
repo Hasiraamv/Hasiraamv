@@ -72,25 +72,32 @@ export function homePage({ categories, newArrivals, regions, stats, env }) {
   </div>
   <div class="grid grid-3">
     ${categories
-      .map(
-        (c, i) => `
-      <a href="/c/${escapeHtml(c.slug)}" style="aspect-ratio:4/3; background:${
-          i === 2
-            ? 'linear-gradient(160deg,#1c1c1a,#3b352b)'
-            : 'linear-gradient(160deg,#e7e0cf,#d5cdb8)'
-        }; display:flex; flex-direction:column; justify-content:flex-end; padding:22px; color:${
-          i === 2 ? '#f2ede2' : 'var(--text)'
-        };">
-        <span class="serif" style="font-size:25px;">${escapeHtml(c.name)}</span>
+      .map((c, i) => {
+        const dark = c.tile_image ? true : i === 2;
+        const bg = c.tile_image
+          ? `url('${escapeHtml(c.tile_image)}') center/cover no-repeat, linear-gradient(160deg,#1c1c1a,#3b352b)`
+          : i === 2
+          ? 'linear-gradient(160deg,#1c1c1a,#3b352b)'
+          : 'linear-gradient(160deg,#e7e0cf,#d5cdb8)';
+        return `
+      <a href="/c/${escapeHtml(c.slug)}" style="aspect-ratio:4/3; background:${bg}; display:flex; flex-direction:column; justify-content:flex-end; padding:22px; color:${
+          dark ? '#f2ede2' : 'var(--text)'
+        };${c.tile_image ? ' position:relative;' : ''}">
+        ${
+          c.tile_image
+            ? `<span style="position:absolute; inset:0; background:linear-gradient(0deg, rgba(10,9,7,.72), rgba(10,9,7,0) 60%);"></span>`
+            : ''
+        }
+        <span class="serif" style="font-size:25px; position:relative;">${escapeHtml(c.name)}</span>
         <span style="font-size:12px; color:${
-          i === 2 ? '#a49b88' : 'var(--muted)'
-        }; margin-top:3px;">${
+          dark ? '#a49b88' : 'var(--muted)'
+        }; margin-top:3px; position:relative;">${
           c.listing_count
             ? `${c.listing_count} listing${c.listing_count === 1 ? '' : 's'}${c.from_price ? ` · from ${formatINR(c.from_price)}` : ''}`
             : 'Opening soon'
         }</span>
-      </a>`
-      )
+      </a>`;
+      })
       .join('')}
   </div>
 </section>

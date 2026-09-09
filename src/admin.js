@@ -2,7 +2,7 @@ import { escapeHtml, formatINR, formatINRWords, html, redirect, sealMark } from 
 import * as db from './db.js';
 import { issueCertificate } from './certificates.js';
 import { storeImage, deleteImage, storeVideo, normalizeImageUrl, imageStore } from './images.js';
-import { SHOE_SIZE_LABELS } from './sizing.js';
+import { SHOE_SIZE_LABELS, EU_SHOE_SIZE_LABELS, APPAREL_SIZE_LABELS } from './sizing.js';
 import { riskLabel } from './risk.js';
 import { normalizeCode } from './coupons.js';
 import {
@@ -1135,24 +1135,30 @@ function stockLabelField(id, name, selected = '') {
 // product isn't sized in UK (apparel, "one size", etc). `sizeType` decides which renders; when
 // it isn't known server-side (the product is picked from a dropdown on the same form), both
 // render and a small script swaps between them as the selection changes.
-function shoeSizeChips(idPrefix, name, selected = '', multiple = false) {
+// Shared by UK and EU shoe sizing and apparel sizing -- just a different label list each time.
+function sizeChips(labels, idPrefix, name, selected = '', multiple = false) {
   const selectedList = Array.isArray(selected) ? selected : [selected];
   const type = multiple ? 'checkbox' : 'radio';
   return `<div class="sizes" style="grid-template-columns:repeat(4,minmax(0,1fr));">
-    ${SHOE_SIZE_LABELS.map(
+    ${labels.map(
       (label, i) => `<input type="${type}" class="visually-hidden size-radio" id="${idPrefix}_${i}" name="${name}" value="${escapeHtml(label)}"${selectedList.includes(label) ? ' checked' : ''}>
         <label for="${idPrefix}_${i}" class="size"><span class="n">${escapeHtml(label)}</span></label>`
     ).join('')}
   </div>`;
 }
 
+const SIZE_LABELS_BY_TYPE = { uk: SHOE_SIZE_LABELS, eu: EU_SHOE_SIZE_LABELS, apparel: APPAREL_SIZE_LABELS };
+
 // `multiple: true` turns the box grid into checkboxes instead of radios, so one form
 // submission can create several offers at once -- the same seller, price and terms, several
 // sizes of the same piece, without repeating the whole form per size. Both share the same
-// .size-radio CSS (:checked works identically on a checkbox and a radio input).
+// .size-radio CSS (:checked works identically on a checkbox and a radio input). Every sizing
+// system (UK/EU shoes, apparel) gets the same picker; only "none" falls back to free text,
+// since there is no fixed list to pick from.
 function sizeField({ idPrefix, name, sizeType, selected = '', label = 'Size', multiple = false }) {
-  if (sizeType === 'uk') {
-    return `<div class="field"><label>${label}${multiple ? ' <span class="hint" style="font-weight:400;">(pick as many as you have)</span>' : ''}</label>${shoeSizeChips(`${idPrefix}_uk`, name, selected, multiple)}</div>`;
+  const labels = SIZE_LABELS_BY_TYPE[sizeType];
+  if (labels) {
+    return `<div class="field"><label>${label}${multiple ? ' <span class="hint" style="font-weight:400;">(pick as many as you have)</span>' : ''}</label>${sizeChips(labels, `${idPrefix}_${sizeType}`, name, selected, multiple)}</div>`;
   }
   return `<div class="field"><label for="${idPrefix}_text">${label}</label><input id="${idPrefix}_text" name="${name}" value="${escapeHtml(Array.isArray(selected) ? selected[0] || '' : selected || 'One size')}" maxlength="40"></div>`;
 }
@@ -1321,19 +1327,24 @@ ${
     </form>
     <script>
     (function () {
-      var SHOE_SIZES = ${JSON.stringify(SHOE_SIZE_LABELS)};
+      var SIZE_LABELS_BY_TYPE = {
+        uk: ${JSON.stringify(SHOE_SIZE_LABELS)},
+        eu: ${JSON.stringify(EU_SHOE_SIZE_LABELS)},
+        apparel: ${JSON.stringify(APPAREL_SIZE_LABELS)}
+      };
       var sizingSelect = document.getElementById('size_type');
       var wrap = document.getElementById('offer_size_wrap');
-      function chipsHtml(idPrefix, name) {
+      function chipsHtml(idPrefix, name, labels) {
         return '<div class="sizes" style="grid-template-columns:repeat(4,minmax(0,1fr));">' +
-          SHOE_SIZES.map(function (l, i) {
+          labels.map(function (l, i) {
             return '<input type="checkbox" class="visually-hidden size-radio" id="' + idPrefix + '_' + i + '" name="' + name + '" value="' + l + '">' +
               '<label for="' + idPrefix + '_' + i + '" class="size"><span class="n">' + l + '</span></label>';
           }).join('') + '</div>';
       }
       function render(sizeType) {
-        if (sizeType === 'uk') {
-          wrap.innerHTML = '<div class="field"><label>Size</label>' + chipsHtml('offer_size_uk', 'offer_size') + '</div>';
+        var labels = SIZE_LABELS_BY_TYPE[sizeType];
+        if (labels) {
+          wrap.innerHTML = '<div class="field"><label>Size <span class="hint" style="font-weight:400;">(pick as many as you have)</span></label>' + chipsHtml('offer_size_' + sizeType, 'offer_size', labels) + '</div>';
         } else {
           wrap.innerHTML = '<div class="field"><label for="offer_size_text">Size</label><input id="offer_size_text" name="offer_size" value="One size" maxlength="40"></div>';
         }
@@ -1545,19 +1556,24 @@ ${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${e
     </form>
     <script>
     (function () {
-      var SHOE_SIZES = ${JSON.stringify(SHOE_SIZE_LABELS)};
+      var SIZE_LABELS_BY_TYPE = {
+        uk: ${JSON.stringify(SHOE_SIZE_LABELS)},
+        eu: ${JSON.stringify(EU_SHOE_SIZE_LABELS)},
+        apparel: ${JSON.stringify(APPAREL_SIZE_LABELS)}
+      };
       var select = document.getElementById('product_id');
       var wrap = document.getElementById('size_label_wrap');
       function render(sizeType, keepValue) {
-        if (sizeType === 'uk') {
-          var chips = SHOE_SIZES.map(function (l, i) {
+        var labels = SIZE_LABELS_BY_TYPE[sizeType];
+        if (labels) {
+          var chips = labels.map(function (l, i) {
             return '<input type="checkbox" class="visually-hidden size-radio" id="size_label_o_' + i + '" name="size_label" value="' + l + '"' +
               (l === keepValue ? ' checked' : '') + '><label for="size_label_o_' + i + '" class="size"><span class="n">' + l + '</span></label>';
           }).join('');
-          wrap.innerHTML = '<div class="field"><label>Size</label><div class="sizes" style="grid-template-columns:repeat(4,minmax(0,1fr));">' + chips + '</div></div>';
+          wrap.innerHTML = '<div class="field"><label>Size <span class="hint" style="font-weight:400;">(pick as many as you have)</span></label><div class="sizes" style="grid-template-columns:repeat(4,minmax(0,1fr));">' + chips + '</div></div>';
         } else {
           wrap.innerHTML = '<div class="field"><label for="size_label_o">Size</label><input id="size_label_o" name="size_label" value="' +
-            (keepValue && SHOE_SIZES.indexOf(keepValue) === -1 ? keepValue : 'One size') + '" maxlength="40"></div>';
+            (keepValue || 'One size') + '" maxlength="40"></div>';
         }
       }
       if (select) {
