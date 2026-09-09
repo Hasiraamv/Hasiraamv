@@ -310,6 +310,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .size.out { background: #f1ede2; color: #b0a893; cursor: default; }
 .size .n { font-size: 13.5px; font-weight: 600; }
 .size .p { font-size: 10.5px; margin-top: 3px; opacity: 0.85; }
+.size-radio:checked + .size { background: var(--ink-soft); color: var(--paper); border-color: var(--ink-soft); }
+.size-radio:focus-visible + .size { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* Timeline ---------------------------------------------------------- */
 .timeline { display: flex; gap: 8px; }
