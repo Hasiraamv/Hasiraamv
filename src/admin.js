@@ -66,6 +66,7 @@ const ROUTE_RULES = [
   { test: (p) => p.startsWith('/admin/sellers') || p === '/admin/sourcing', roles: ['owner', 'support'] },
   { test: (p) => p.startsWith('/admin/users'), roles: ['owner'] },
   { test: (p) => p === '/admin/audit', roles: ['owner'] },
+  { test: (p) => p.startsWith('/admin/product-audit'), roles: ['owner'] },
 ];
 
 // Writes one audit_log row. Never throws into the caller -- a logging failure must not be
@@ -244,6 +245,11 @@ export async function adminRouter(request, env, path) {
   if (path === '/admin/sellers') return sellerApplicationsPage(env);
   if (path === '/admin/sellers/decide' && method === 'POST') return decideApplication(request, env, currentUser);
   if (path === '/admin/audit') return auditLogPage(env, new URL(request.url).searchParams.get('entity'));
+  if (path === '/admin/product-audit') return productAuditPage(env, new URL(request.url).searchParams.get('saved'));
+  {
+    const m = path.match(/^\/admin\/product-audit\/(\d+)$/);
+    if (m && method === 'POST') return updateProductAudit(request, env, Number(m[1]), currentUser);
+  }
 
   return adminHtml('<div class="notice">Unknown admin page.</div>', 404);
 }
@@ -271,7 +277,8 @@ function adminHtml(body, status = 200, extraHeaders = {}) {
     <a href="/admin/sellers">Seller applications</a>
     <a href="/admin/sourcing">Sourcing requests</a>
     <a href="/admin/users">Employees</a>
-    <a href="/admin/audit">Audit log</a>
+    <a href="/admin/audit">Activity log</a>
+    <a href="/admin/product-audit">Audit</a>
   </nav>
   <div class="nav-right">
     <a href="/" target="_blank">View site</a>
@@ -1190,8 +1197,8 @@ ${
           </select>
         </div>
         <div class="field"><label for="sku">Style / SKU</label><input id="sku" name="sku" maxlength="60"></div>
-        <div class="field"><label for="retail">Retail price (₹)</label><input id="retail" name="retail" inputmode="numeric" maxlength="12">
-          <span class="hint">Set this to unlock the "under retail" badge.</span>
+        <div class="field"><label for="retail">MRP (₹)</label><input id="retail" name="retail" inputmode="numeric" maxlength="12">
+          <span class="hint">The original price. Set this and price the piece below it to show a discount.</span>
         </div>
       </div>
       <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="3" maxlength="1200"></textarea></div>
@@ -1253,21 +1260,11 @@ ${
           <span class="hint">Ignored while "Inhaus" is ticked.</span>
         </div>
 
-        <details style="margin-top:10px;">
-          <summary style="cursor:pointer; font-size:12.5px; color:var(--muted); padding:6px 0;">Set duty, authentication or shipping myself</summary>
-          <div style="padding-top:12px;">
-            <div class="form-row">
-              <div class="field"><label for="p_duty">Duty (₹)</label><input id="p_duty" name="duty" inputmode="numeric" maxlength="12" placeholder="auto"></div>
-              <div class="field"><label for="p_auth_fee">Authentication (₹)</label><input id="p_auth_fee" name="auth_fee" inputmode="numeric" maxlength="12" placeholder="auto"></div>
-            </div>
-            <div class="form-row">
-              <div class="field"><label for="p_shipping">Shipping (₹)</label><input id="p_shipping" name="shipping" inputmode="numeric" maxlength="12" placeholder="auto"></div>
-              <div class="field"><label for="p_lead_min">Lead days min</label><input id="p_lead_min" name="lead_min" inputmode="numeric" maxlength="3" placeholder="auto"></div>
-            </div>
-            <div class="field" style="max-width:180px;"><label for="p_lead_max">Lead days max</label><input id="p_lead_max" name="lead_max" inputmode="numeric" maxlength="3" placeholder="auto"></div>
-            <span class="hint">Leave these blank to use the city and category rates. Fill one in and it wins over the automatic number.</span>
-          </div>
-        </details>
+        <p class="hint" style="margin:2px 0 0;">
+          Need to fine-tune duty, authentication fee or shipping for this exact piece? Save it
+          here first, then adjust those on the <a href="/admin/listings">Listings</a> page --
+          keeps this form to just what you need for a normal listing.
+        </p>
       </div>
 
       <button class="btn btn-block" type="submit">Add product</button>
@@ -1337,20 +1334,10 @@ ${
       </div>
       ${stockLabelField('stock_label_o', 'stock_label')}
 
-      <details style="margin-bottom:14px;">
-        <summary style="cursor:pointer; font-size:12.5px; color:var(--muted); padding:6px 0;">Override the calculated values</summary>
-        <div style="padding-top:12px;">
-          <div class="form-row">
-            <div class="field"><label for="duty">Duty (₹)</label><input id="duty" name="duty" inputmode="numeric" maxlength="12" placeholder="auto"></div>
-            <div class="field"><label for="auth_fee">Authentication (₹)</label><input id="auth_fee" name="auth_fee" inputmode="numeric" maxlength="12" placeholder="auto"></div>
-          </div>
-          <div class="form-row">
-            <div class="field"><label for="shipping">Shipping (₹)</label><input id="shipping" name="shipping" inputmode="numeric" maxlength="12" placeholder="auto"></div>
-            <div class="field"><label for="lead_min">Lead days min</label><input id="lead_min" name="lead_min" inputmode="numeric" maxlength="3" placeholder="auto"></div>
-          </div>
-          <div class="field" style="max-width:180px;"><label for="lead_max">Lead days max</label><input id="lead_max" name="lead_max" inputmode="numeric" maxlength="3" placeholder="auto"></div>
-        </div>
-      </details>
+      <p class="hint" style="margin:-8px 0 14px;">
+        Need to fine-tune duty, authentication fee or shipping for this exact offer? Save it
+        here first, then adjust those from the <a href="/admin/listings">Listings</a> page.
+      </p>
 
       <button class="btn btn-block" type="submit">Add offer</button>
     </form>
@@ -1864,7 +1851,7 @@ async function editProductPage(env, productId) {
       </div>
       <div class="field"><label for="sku">Style / SKU</label><input id="sku" name="sku" maxlength="60" value="${escapeHtml(product.sku || '')}"></div>
     </div>
-    <div class="field"><label for="retail">Retail price (₹)</label><input id="retail" name="retail" inputmode="numeric" maxlength="12" value="${product.retail_price || ''}"></div>
+    <div class="field"><label for="retail">MRP (₹)</label><input id="retail" name="retail" inputmode="numeric" maxlength="12" value="${product.retail_price || ''}"></div>
     <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="3" maxlength="1200">${escapeHtml(product.description || '')}</textarea></div>
     <div class="field"><label for="details">Details</label><textarea id="details" name="details" rows="3" maxlength="2000" placeholder="Material, dimensions, what's in the box...">${escapeHtml(product.details || '')}</textarea>
       <span class="hint">Shown in its own "Details" section on the product page, separate from the description above.</span>
@@ -2729,4 +2716,88 @@ ${
     </table>`
     : '<div class="notice">Nothing logged yet.</div>'
 }`);
+}
+
+// Product audit -------------------------------------------------------------------------
+// Real procurement numbers, entered by hand once you actually know them -- where a piece was
+// bought from, what it actually cost, and what shipping and customs actually came to. This is
+// deliberately separate from the automatic category/city rates used when a listing first goes
+// up: those are a fast estimate to get something live, this is the true-up once the real
+// invoice numbers exist. Saving here overwrites seller_price/duty/shipping/landed_price
+// directly -- no rate lookup happens on this page at all. Owner only: sourcing links and real
+// cost are the most competitively sensitive numbers in the business.
+
+async function productAuditPage(env, savedId) {
+  const { results: rows } = await env.DB.prepare(
+    `SELECT o.id, o.stock_code, o.size_label, o.seller_price, o.duty, o.shipping, o.landed_price,
+            o.sourcing_url, o.sourcing_country, o.status, p.title AS product_title
+       FROM offers o JOIN products p ON p.id = o.product_id
+      ORDER BY p.created_at DESC, o.id`
+  ).all();
+
+  return adminHtml(`
+<h2 class="serif" style="font-size:32px; margin:0 0 8px;">Audit</h2>
+<p class="muted" style="margin:0 0 22px; font-size:13.5px; max-width:680px;">
+  Every listed piece, automatically. Paste the link you actually bought it from, and the real
+  amount paid, shipping and customs once you know them -- this overwrites whatever the listing
+  started with. Nothing here is guessed or auto-calculated.
+</p>
+
+${(rows || []).length ? '' : '<div class="notice">No listed pieces yet.</div>'}
+
+${(rows || [])
+  .map(
+    (o) => `<div class="panel" style="padding:20px; margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px;">
+        <strong style="font-size:15px;">${escapeHtml(o.product_title)}${o.size_label && o.size_label !== 'One size' ? ` · ${escapeHtml(o.size_label)}` : ''}</strong>
+        <span class="tag muted">${escapeHtml(o.stock_code || '')} &middot; ${escapeHtml(o.status)}</span>
+      </div>
+      ${savedId === String(o.id) ? '<div class="notice notice-good" style="margin-bottom:14px;">Saved.</div>' : ''}
+      <form method="post" action="/admin/product-audit/${o.id}">
+        <div class="field"><label for="url_${o.id}">Bought from (link)</label><input id="url_${o.id}" name="sourcing_url" maxlength="500" placeholder="https://..." value="${escapeHtml(o.sourcing_url || '')}"></div>
+        <div class="form-row">
+          <div class="field"><label for="country_${o.id}">Imported from (country)</label><input id="country_${o.id}" name="sourcing_country" maxlength="60" value="${escapeHtml(o.sourcing_country || '')}"></div>
+          <div class="field"><label for="cost_${o.id}">Amount paid for the piece (₹)</label><input id="cost_${o.id}" name="seller_price" inputmode="numeric" maxlength="12" value="${o.seller_price}"></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label for="ship_${o.id}">Shipping paid (₹)</label><input id="ship_${o.id}" name="shipping" inputmode="numeric" maxlength="12" value="${o.shipping}"></div>
+          <div class="field"><label for="customs_${o.id}">Customs / duty paid (₹)</label><input id="customs_${o.id}" name="duty" inputmode="numeric" maxlength="12" value="${o.duty}"></div>
+        </div>
+        <p class="hint" style="margin:-4px 0 12px;">Landed price (what the buyer pays) recalculates from these three plus the authentication fee, and updates immediately.</p>
+        <button class="btn" type="submit">Save</button>
+      </form>
+    </div>`
+  )
+  .join('')}`);
+}
+
+async function updateProductAudit(request, env, offerId, currentUser) {
+  const form = await request.formData();
+  const num = (k) => Number(String(form.get(k) || '').split('.')[0].replace(/[^\d]/g, '')) || 0;
+  const sourcingUrl = String(form.get('sourcing_url') || '').trim().slice(0, 500) || null;
+  const sourcingCountry = String(form.get('sourcing_country') || '').trim().slice(0, 60) || null;
+  const sellerPrice = num('seller_price');
+  const shipping = num('shipping');
+  const duty = num('duty');
+
+  const existing = await env.DB.prepare('SELECT auth_fee FROM offers WHERE id = ?').bind(offerId).first();
+  if (!existing) return redirect('/admin/product-audit');
+
+  const landedPrice = sellerPrice + duty + existing.auth_fee + shipping;
+
+  await env.DB.prepare(
+    `UPDATE offers SET sourcing_url = ?, sourcing_country = ?, seller_price = ?, shipping = ?, duty = ?, landed_price = ?
+     WHERE id = ?`
+  )
+    .bind(sourcingUrl, sourcingCountry, sellerPrice, shipping, duty, landedPrice, offerId)
+    .run();
+
+  await logAudit(env, currentUser, 'offer.audit_updated', {
+    entityType: 'offer',
+    entityId: offerId,
+    detail: `cost ${sellerPrice}, shipping ${shipping}, customs ${duty} -> landed ${landedPrice}${sourcingCountry ? `, from ${sourcingCountry}` : ''}`,
+    request,
+  });
+
+  return redirect(`/admin/product-audit?saved=${offerId}`);
 }

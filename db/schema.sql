@@ -151,6 +151,8 @@ CREATE TABLE offers (
   lead_days_max  INTEGER NOT NULL DEFAULT 28,
   status         TEXT NOT NULL DEFAULT 'active', -- active | reserved | sold | withdrawn
   stock_label    TEXT,                   -- optional merchandising tag: limited | last_one | made_to_order
+  sourcing_url     TEXT,                 -- the actual listing/supplier link this piece was bought from
+  sourcing_country TEXT,                 -- where it was actually imported from -- internal only, never shown to buyers
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_offers_product ON offers(product_id, status);
