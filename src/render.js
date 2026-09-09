@@ -768,18 +768,35 @@ ${env?.GROQ_API_KEY ? chatWidget(site) : ''}
 </html>`;
 }
 
+// A plain headers object can only carry one value per key, but clearing the cart and the
+// coupon cookie in the same response needs two separate Set-Cookie headers -- passing
+// 'set-cookie' as an array here appends each one instead of the last silently winning.
+function buildHeaders(base, extraHeaders) {
+  const headers = new Headers(base);
+  for (const [key, value] of Object.entries(extraHeaders)) {
+    if (Array.isArray(value)) {
+      for (const v of value) headers.append(key, v);
+    } else {
+      headers.set(key, value);
+    }
+  }
+  return headers;
+}
+
 export function html(body, status = 200, extraHeaders = {}) {
   return new Response(body, {
     status,
-    headers: {
-      'content-type': 'text/html; charset=utf-8',
-      'x-content-type-options': 'nosniff',
-      'referrer-policy': 'strict-origin-when-cross-origin',
-      ...extraHeaders,
-    },
+    headers: buildHeaders(
+      {
+        'content-type': 'text/html; charset=utf-8',
+        'x-content-type-options': 'nosniff',
+        'referrer-policy': 'strict-origin-when-cross-origin',
+      },
+      extraHeaders
+    ),
   });
 }
 
 export function redirect(location, extraHeaders = {}) {
-  return new Response(null, { status: 302, headers: { location, ...extraHeaders } });
+  return new Response(null, { status: 302, headers: buildHeaders({ location }, extraHeaders) });
 }

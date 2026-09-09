@@ -131,7 +131,7 @@ export async function getOfferById(db, id) {
     .prepare(
       `SELECT o.*, s.name AS seller_name, s.city AS seller_city,
               p.title AS product_title, p.slug AS product_slug, p.id AS product_id,
-              c.slug AS category_slug
+              c.id AS category_id, c.slug AS category_slug
          FROM offers o
          JOIN sellers s ON s.id = o.seller_id
          JOIN products p ON p.id = o.product_id
@@ -212,9 +212,10 @@ export async function createOrder(db, data) {
     .prepare(
       `INSERT INTO orders
         (public_ref, user_id, offer_id, product_id, size_label, amount, seller_price, duty, auth_fee, shipping,
+         discount_amount, coupon_code,
          buyer_name, buyer_email, buyer_phone, address_line1, address_line2, city, state, pincode,
          status, payment_status, eta_min, eta_max)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'placed', 'pending', ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'placed', 'pending', ?, ?)`
     )
     .bind(
       data.publicRef,
@@ -227,6 +228,8 @@ export async function createOrder(db, data) {
       data.duty,
       data.authFee,
       data.shipping,
+      data.discountAmount || 0,
+      data.couponCode || null,
       data.buyerName,
       data.buyerEmail,
       data.buyerPhone,

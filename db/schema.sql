@@ -166,11 +166,13 @@ CREATE TABLE orders (
   offer_id        INTEGER NOT NULL REFERENCES offers(id),
   product_id      INTEGER NOT NULL REFERENCES products(id),
   size_label      TEXT NOT NULL,
-  amount          INTEGER NOT NULL,       -- landed price captured at purchase time
+  amount          INTEGER NOT NULL,       -- what the buyer actually paid (landed price minus any coupon discount)
   seller_price    INTEGER NOT NULL,
   duty            INTEGER NOT NULL,
   auth_fee        INTEGER NOT NULL,
   shipping        INTEGER NOT NULL,
+  discount_amount INTEGER NOT NULL DEFAULT 0,   -- how much a coupon knocked off; amount + discount_amount = landed price
+  coupon_code     TEXT,                          -- the code applied, if any (kept even if the coupon is later deleted)
   buyer_name      TEXT NOT NULL,
   buyer_email     TEXT NOT NULL,
   buyer_phone     TEXT NOT NULL,
@@ -322,3 +324,26 @@ CREATE TABLE sourcing_requests (
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_sourcing_created ON sourcing_requests(created_at DESC);
+
+-- Coupon codes. scope decides what a code discounts: 'all' (whole order), 'category'
+-- (only items in category_id), or 'product' (only that one product). discount_value is a
+-- whole-number percentage (1-100) when discount_type = 'percent', or a rupee amount when
+-- discount_type = 'fixed'. used_count only increments once a real order is placed with it,
+-- never just from applying it in the cart.
+CREATE TABLE coupons (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  code            TEXT NOT NULL UNIQUE,
+  description     TEXT,
+  discount_type   TEXT NOT NULL DEFAULT 'percent', -- percent | fixed
+  discount_value  INTEGER NOT NULL,
+  scope           TEXT NOT NULL DEFAULT 'all',      -- all | category | product
+  category_id     INTEGER REFERENCES categories(id),
+  product_id      INTEGER REFERENCES products(id),
+  min_order_value INTEGER,
+  max_uses        INTEGER,
+  used_count      INTEGER NOT NULL DEFAULT 0,
+  expires_at      TEXT,
+  active          INTEGER NOT NULL DEFAULT 1,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_coupons_code ON coupons(code);

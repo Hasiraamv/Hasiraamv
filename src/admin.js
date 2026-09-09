@@ -4,6 +4,7 @@ import { issueCertificate } from './certificates.js';
 import { storeImage, deleteImage, storeVideo, normalizeImageUrl, imageStore } from './images.js';
 import { SHOE_SIZE_LABELS } from './sizing.js';
 import { riskLabel } from './risk.js';
+import { normalizeCode } from './coupons.js';
 import {
   computeOfferPricing,
   listCategoryRates,
@@ -65,6 +66,7 @@ const ROUTE_RULES = [
   },
   { test: (p) => p.startsWith('/admin/sellers') || p === '/admin/sourcing', roles: ['owner', 'support'] },
   { test: (p) => p.startsWith('/admin/discounts'), roles: ['owner'] },
+  { test: (p) => p.startsWith('/admin/coupons'), roles: ['owner'] },
   { test: (p) => p.startsWith('/admin/users'), roles: ['owner'] },
   { test: (p) => p === '/admin/audit', roles: ['owner'] },
   { test: (p) => p.startsWith('/admin/product-audit'), roles: ['owner'] },
@@ -217,6 +219,17 @@ export async function adminRouter(request, env, path) {
     const m = path.match(/^\/admin\/discounts\/(\d+)\/update$/);
     if (m && method === 'POST') return updateDiscount(request, env, Number(m[1]), currentUser);
   }
+  if (path === '/admin/coupons')
+    return couponsPage(env, new URL(request.url).searchParams.get('error'));
+  if (path === '/admin/coupons/create' && method === 'POST') return createCoupon(request, env, currentUser);
+  {
+    const m = path.match(/^\/admin\/coupons\/(\d+)\/toggle$/);
+    if (m && method === 'POST') return toggleCoupon(request, env, Number(m[1]), currentUser);
+  }
+  {
+    const m = path.match(/^\/admin\/coupons\/(\d+)\/delete$/);
+    if (m && method === 'POST') return deleteCoupon(request, env, Number(m[1]), currentUser);
+  }
   if (path === '/admin/products/create' && method === 'POST') return createProduct(request, env, currentUser);
   if (path === '/admin/offers/create' && method === 'POST') return createOffer(request, env, currentUser);
   if (path === '/admin/offers/status' && method === 'POST') return setOfferStatus(request, env, currentUser);
@@ -297,6 +310,7 @@ function adminHtml(body, status = 200, extraHeaders = {}, loggedIn = true) {
     <a href="/admin/listings">Listings</a>
     <a href="/admin/products">Add &amp; edit</a>
     <a href="/admin/discounts">Discounts</a>
+    <a href="/admin/coupons">Coupons</a>
     <a href="/admin/rates">Rates</a>
     <a href="/admin/sellers">Seller applications</a>
     <a href="/admin/sourcing">Sourcing requests</a>
@@ -1628,6 +1642,191 @@ async function updateDiscount(request, env, productId, currentUser) {
   });
 
   return redirect('/admin/discounts');
+}
+
+// Coupons ---------------------------------------------------------------------------------
+
+async function couponsPage(env, errorMessage) {
+  const [categories, { results: products }, { results: coupons }] = await Promise.all([
+    db.getCategories(env.DB),
+    env.DB.prepare('SELECT id, title FROM products ORDER BY title').all(),
+    env.DB.prepare(
+      `SELECT co.*, cat.name AS category_name, p.title AS product_title
+         FROM coupons co
+         LEFT JOIN categories cat ON cat.id = co.category_id
+         LEFT JOIN products p ON p.id = co.product_id
+        ORDER BY co.created_at DESC`
+    ).all(),
+  ]);
+
+  return adminHtml(`
+<h2 class="serif" style="font-size:32px; margin:0 0 22px;">Coupons</h2>
+${errorMessage ? `<div class="notice notice-bad" style="margin-bottom:20px;">${escapeHtml(errorMessage)}</div>` : ''}
+
+<div style="max-width:640px; margin-bottom:32px;">
+  <div class="panel" style="padding:22px;">
+    <h3 class="serif" style="font-size:20px; margin:0 0 14px;">New coupon</h3>
+    <form method="post" action="/admin/coupons/create">
+      <div class="form-row">
+        <div class="field"><label for="code">Code</label><input id="code" name="code" required maxlength="40" style="text-transform:uppercase;" placeholder="e.g. WELCOME10"></div>
+        <div class="field"><label for="description">Description (internal)</label><input id="description" name="description" maxlength="160"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label for="discount_type">Discount</label>
+          <select id="discount_type" name="discount_type">
+            <option value="percent">Percent off</option>
+            <option value="fixed">Fixed amount off (₹)</option>
+          </select>
+        </div>
+        <div class="field"><label for="discount_value">Value</label><input id="discount_value" name="discount_value" required inputmode="numeric" maxlength="12" placeholder="e.g. 10"></div>
+      </div>
+
+      <div class="field"><label for="scope">Applies to</label>
+        <select id="scope" name="scope">
+          <option value="all">Everything</option>
+          <option value="category">One category</option>
+          <option value="product">One product</option>
+        </select>
+      </div>
+      <div class="field" id="scope_category_wrap" hidden><label for="category_id">Category</label>
+        <select id="category_id" name="category_id">
+          ${categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" id="scope_product_wrap" hidden><label for="product_id">Product</label>
+        <select id="product_id" name="product_id">
+          ${(products || []).map((p) => `<option value="${p.id}">${escapeHtml(p.title)}</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="field"><label for="min_order_value">Minimum bag value (₹, optional)</label><input id="min_order_value" name="min_order_value" inputmode="numeric" maxlength="12"></div>
+        <div class="field"><label for="max_uses">Max uses (optional)</label><input id="max_uses" name="max_uses" inputmode="numeric" maxlength="8"></div>
+      </div>
+      <div class="field" style="max-width:220px;"><label for="expires_at">Expires (optional)</label><input id="expires_at" name="expires_at" type="date"></div>
+
+      <button class="btn btn-block" type="submit">Create coupon</button>
+    </form>
+    <script>
+    (function () {
+      var scope = document.getElementById('scope');
+      var catWrap = document.getElementById('scope_category_wrap');
+      var prodWrap = document.getElementById('scope_product_wrap');
+      function render() {
+        catWrap.hidden = scope.value !== 'category';
+        prodWrap.hidden = scope.value !== 'product';
+      }
+      scope.addEventListener('change', render);
+      render();
+    })();
+    </script>
+  </div>
+</div>
+
+<table class="table">
+  <thead><tr><th>Code</th><th>Discount</th><th>Applies to</th><th class="num">Used</th><th>Expires</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+    ${(coupons || [])
+      .map((c) => {
+        const scopeLabel =
+          c.scope === 'category'
+            ? escapeHtml(c.category_name || `Category #${c.category_id}`)
+            : c.scope === 'product'
+            ? escapeHtml(c.product_title || `Product #${c.product_id}`)
+            : 'Everything';
+        const discountLabel = c.discount_type === 'fixed' ? `₹${c.discount_value} off` : `${c.discount_value}% off`;
+        const expired = c.expires_at && new Date(c.expires_at) < new Date();
+        return `<tr>
+        <td data-label="Code"><strong class="mono">${escapeHtml(c.code)}</strong>
+          ${c.description ? `<div style="font-size:11.5px; color:var(--faint); margin-top:2px;">${escapeHtml(c.description)}</div>` : ''}
+        </td>
+        <td data-label="Discount">${discountLabel}</td>
+        <td data-label="Applies to">${scopeLabel}</td>
+        <td data-label="Used" class="num">${c.used_count}${c.max_uses ? ` / ${c.max_uses}` : ''}</td>
+        <td data-label="Expires">${c.expires_at ? escapeHtml(c.expires_at) : '—'}${expired ? ' <span style="color:var(--oxblood);">(expired)</span>' : ''}</td>
+        <td data-label="Status">
+          <form method="post" action="/admin/coupons/${c.id}/toggle" style="display:inline;">
+            <button type="submit" class="chip${c.active ? ' active' : ''}" style="cursor:pointer;">${c.active ? 'Active' : 'Disabled'}</button>
+          </form>
+        </td>
+        <td>
+          ${
+            c.used_count === 0
+              ? `<form method="post" action="/admin/coupons/${c.id}/delete" onsubmit="return confirm('Delete this coupon?');" style="display:inline;">
+                   <button type="submit" style="border:0; background:none; color:var(--oxblood); cursor:pointer; font-size:12.5px;">Delete</button>
+                 </form>`
+              : ''
+          }
+        </td>
+      </tr>`;
+      })
+      .join('')}
+  </tbody>
+</table>`);
+}
+
+async function createCoupon(request, env, currentUser) {
+  const form = await request.formData();
+  const code = normalizeCode(form.get('code'));
+  if (!code) return redirect('/admin/coupons?error=' + encodeURIComponent('Enter a code.'));
+
+  const num = (k) => {
+    const v = String(form.get(k) || '').split('.')[0].replace(/[^\d]/g, '');
+    return v ? Number(v) : null;
+  };
+
+  const discountType = form.get('discount_type') === 'fixed' ? 'fixed' : 'percent';
+  const discountValue = num('discount_value');
+  if (!discountValue || discountValue <= 0 || (discountType === 'percent' && discountValue > 100)) {
+    return redirect(
+      '/admin/coupons?error=' + encodeURIComponent('Enter a valid discount value (a percent must be 1-100).')
+    );
+  }
+
+  const scope = ['all', 'category', 'product'].includes(form.get('scope')) ? form.get('scope') : 'all';
+  const categoryId = scope === 'category' ? Number(form.get('category_id')) || null : null;
+  const productId = scope === 'product' ? Number(form.get('product_id')) || null : null;
+
+  const existing = await env.DB.prepare('SELECT id FROM coupons WHERE code = ?').bind(code).first();
+  if (existing) return redirect('/admin/coupons?error=' + encodeURIComponent(`Code ${code} already exists.`));
+
+  await env.DB.prepare(
+    `INSERT INTO coupons (code, description, discount_type, discount_value, scope, category_id, product_id, min_order_value, max_uses, expires_at, active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+  )
+    .bind(
+      code,
+      String(form.get('description') || '').trim() || null,
+      discountType,
+      discountValue,
+      scope,
+      categoryId,
+      productId,
+      num('min_order_value'),
+      num('max_uses'),
+      String(form.get('expires_at') || '').trim() || null
+    )
+    .run();
+
+  await logAudit(env, currentUser, 'coupon.created', { entityType: 'coupon', entityId: code, detail: `${discountType} ${discountValue}, scope ${scope}`, request });
+  return redirect('/admin/coupons');
+}
+
+async function toggleCoupon(request, env, couponId, currentUser) {
+  const coupon = await env.DB.prepare('SELECT code, active FROM coupons WHERE id = ?').bind(couponId).first();
+  if (!coupon) return redirect('/admin/coupons');
+  const next = coupon.active ? 0 : 1;
+  await env.DB.prepare('UPDATE coupons SET active = ? WHERE id = ?').bind(next, couponId).run();
+  await logAudit(env, currentUser, 'coupon.status_changed', { entityType: 'coupon', entityId: coupon.code, detail: next ? 'enabled' : 'disabled', request });
+  return redirect('/admin/coupons');
+}
+
+async function deleteCoupon(request, env, couponId, currentUser) {
+  const coupon = await env.DB.prepare('SELECT code, used_count FROM coupons WHERE id = ?').bind(couponId).first();
+  if (!coupon || coupon.used_count > 0) return redirect('/admin/coupons');
+  await env.DB.prepare('DELETE FROM coupons WHERE id = ?').bind(couponId).run();
+  await logAudit(env, currentUser, 'coupon.deleted', { entityType: 'coupon', entityId: coupon.code, request });
+  return redirect('/admin/coupons');
 }
 
 function slugify(text) {
