@@ -122,7 +122,7 @@ class PaperTradingLoop:
         )
 
         state = self._portfolio_state({symbol: bar.close})
-        check = self.risk_engine.check_order(order, state, reference_price=bar.close)
+        check = self.risk_engine.approve(order, state, reference_price=bar.close)
         if not check.approved:
             order.status = OrderStatus.REJECTED
             logger.info("order_rejected", extra={"extra_fields": {"symbol": symbol, "reasons": check.reasons}})

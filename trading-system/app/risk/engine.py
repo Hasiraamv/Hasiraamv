@@ -1,7 +1,8 @@
 """The risk engine. Every order — whether proposed by a signal, the portfolio
-optimizer, a human, or the LLM agent — MUST pass through
-`RiskEngine.check_order` before it reaches app.execution. There is no other
-path to a fill in this codebase.
+optimizer, a human, or the LLM agent — MUST call `RiskEngine.approve(order,
+state, reference_price)` before it reaches app.execution, and is rejected
+with a human-readable reason (or several) the moment it fails any limit.
+There is no other path to a fill in this codebase.
 
 The LLM must never call this module's approval path directly with an order
 that skips these checks; app.agent only ever *proposes*.
@@ -59,12 +60,16 @@ class RiskEngine:
     def __init__(self, settings: Settings | None = None):
         self.settings = settings or get_settings()
 
-    def check_order(
+    def approve(
         self,
         order: Order,
         state: PortfolioState,
         reference_price: float,
     ) -> RiskCheckResult:
+        """The single entry point every order must pass through. Evaluates
+        every limit configured via .env (see app.config.Settings) and
+        returns a RiskCheckResult with `approved=False` and one reason per
+        limit breached — never raises, never partially applies an order."""
         s = self.settings
         reasons: list[str] = []
         limits: dict[str, float] = {}
@@ -158,6 +163,10 @@ class RiskEngine:
         )
 
         return result
+
+    # Backward-compatible alias — `approve` is the name every new caller
+    # should use; kept so any external/older code calling check_order still works.
+    check_order = approve
 
     def trip_kill_switch(self, reason: str) -> None:
         """Irreversible-until-restart safety valve. Once tripped, every

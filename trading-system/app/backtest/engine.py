@@ -131,7 +131,7 @@ class BacktestEngine:
                     reason=f"signal:{signal.model_name}:{signal.direction.value}",
                 )
 
-                check = self.risk_engine.check_order(order, state, reference_price=bar.close)
+                check = self.risk_engine.approve(order, state, reference_price=bar.close)
                 if not check.approved:
                     order.status = OrderStatus.REJECTED
                     rejected += 1

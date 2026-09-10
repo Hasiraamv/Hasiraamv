@@ -3,7 +3,7 @@
 **PAPER TRADING ONLY.** This system never places a live order and never
 requests a withdrawal-capable API key. Every order — from a signal, the
 portfolio optimizer, a human, or the LLM agent — must pass through
-[`app/risk/engine.py`](app/risk/engine.py) (`RiskEngine.check_order`), the
+[`app/risk/engine.py`](app/risk/engine.py) (`RiskEngine.approve`), the
 single approval gate in the codebase. There is no other path to a fill.
 The LLM (`app/llm`, `app/agent`) is advisory only: it proposes, a human
 approves, and it is never called from the hot trading loop.
@@ -106,8 +106,10 @@ uv pip install -e ".[dev]"
 pytest
 ```
 
-Covers: risk engine rejects an oversized/over-leveraged/kill-switched
-order (`tests/test_risk.py`), backtest sanity on synthetic data including
+Covers: risk engine rejects an oversized/over-leveraged/over-drawdown/
+kill-switched order, with every limit loaded the way `.env` actually loads
+it (env vars, not code) and each one proven independently
+(`tests/test_risk.py`), backtest sanity on synthetic data including
 that funding accrues on every bar a position is held — not just bars
 with a fill — and that a tight order-notional cap actually vetoes fills
 end to end (`tests/test_backtest.py`), the LightGBM walk-forward strategy
@@ -130,6 +132,9 @@ against mocked CCXT/ccxt.pro with no network access
 | Run backtest end to end | `python -m app backtest --strategy lightgbm_walkforward --pair BTC/USDT --from <date>` (or `baseline_rsi_macd`) |
 | Start paper trading on testnet | `python -m app paper --config paper.yaml` with `EXCHANGE_TESTNET=true` and sandbox `EXCHANGE_API_KEY`/`EXCHANGE_API_SECRET` set |
 | Risk engine blocks an oversized order | `tests/test_risk.py::test_oversized_order_rejected` |
+| Risk engine blocks an over-leveraged order | `tests/test_risk.py::test_leverage_cap_rejects_order_pushing_gross_notional_over_equity` |
+| Risk engine blocks orders during a drawdown breach | `tests/test_risk.py::test_drawdown_breach_rejects_new_orders` |
+| Every risk limit in `.env` is actually enforced | `tests/test_risk.py::test_every_limit_configured_via_env_is_enforced` |
 | Agent produces a daily report using Qwen | `python -m app agent --task "daily report"` (requires `QWEN_*` env vars) |
 
 ## What is not implemented

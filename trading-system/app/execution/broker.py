@@ -8,7 +8,7 @@
   and it never calls any withdrawal/transfer endpoint.
 
 Neither class is reachable except via app.risk.engine having already
-approved the order — see RiskEngine.check_order.
+approved the order — see RiskEngine.approve.
 """
 from __future__ import annotations
 
