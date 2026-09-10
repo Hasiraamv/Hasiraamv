@@ -1,0 +1,150 @@
+"""CLI entry point.
+
+    python -m app data ingest --symbol BTC/USDT --timeframe 1h --since 2024-01-01
+    python -m app backtest --strategy baseline_rsi_macd --pair BTC/USDT --from 2024-01-01
+    python -m app paper --config paper.yaml
+    python -m app agent --task "daily report"
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from datetime import UTC, datetime
+
+from app.monitoring.logging_config import configure_logging, get_logger
+
+logger = get_logger("app.cli")
+
+
+def _date_to_ms(date_str: str) -> int:
+    dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=UTC)
+    return int(dt.timestamp() * 1000)
+
+
+def cmd_data_ingest(args: argparse.Namespace) -> None:
+    from app.data.ingest import CCXTIngestor
+
+    ingestor = CCXTIngestor()
+    since_ms = _date_to_ms(args.since)
+    written = ingestor.backfill_ohlcv(args.symbol, args.timeframe, since_ms)
+    print(json.dumps({"symbol": args.symbol, "timeframe": args.timeframe, "bars_written": written}))
+
+
+def cmd_backtest(args: argparse.Namespace) -> None:
+    from app.backtest.engine import BacktestEngine, Bar
+    from app.config import get_settings
+    from app.data.storage import ParquetStore
+    from app.signals.baseline import BaselineSignalGenerator
+
+    settings = get_settings()
+    store = ParquetStore(settings.parquet_dir)
+    df = store.read_ohlcv(settings.exchange_id, args.pair, "1h")
+    if df.is_empty() if hasattr(df, "is_empty") else len(df) == 0:
+        print(
+            f"No cached OHLCV for {args.pair}. Run `python -m app data ingest --symbol {args.pair} "
+            f"--timeframe 1h --since {args.__dict__['from']}` first.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    rows = df.to_dicts()
+    bars = [
+        Bar(symbol=args.pair, ts=r["ts"], open=r["open"], high=r["high"], low=r["low"], close=r["close"], volume=r["volume"])
+        for r in rows
+    ]
+
+    strategies = {"baseline_rsi_macd": BaselineSignalGenerator()}
+    strategy = strategies.get(args.strategy, strategies["baseline_rsi_macd"])
+
+    engine = BacktestEngine()
+    result = engine.run({args.pair: bars}, strategy)
+    print(
+        json.dumps(
+            {
+                "accepted_orders": result.accepted_orders,
+                "rejected_orders": result.rejected_orders,
+                "final_equity": result.equity_curve[-1] if result.equity_curve else None,
+                "metrics": vars(result.metrics),
+            },
+            default=str,
+            indent=2,
+        )
+    )
+
+
+def cmd_paper(args: argparse.Namespace) -> None:
+    import asyncio
+
+    import yaml
+
+    from app.config import get_settings
+    from app.paper.scheduler import PaperTradingLoop
+    from app.signals.baseline import BaselineSignalGenerator
+
+    config = {}
+    if args.config:
+        with open(args.config) as fh:
+            config = yaml.safe_load(fh) or {}
+
+    settings = get_settings()
+    symbols = config.get("symbols", settings.symbols)
+    loop = PaperTradingLoop(symbols=symbols, strategy=BaselineSignalGenerator())
+    print(f"Starting paper trading loop for {symbols}. PAPER TRADING ONLY. Ctrl-C to stop.")
+    try:
+        asyncio.run(loop.run_forever())
+    except KeyboardInterrupt:
+        loop.stop()
+
+
+def cmd_agent(args: argparse.Namespace) -> None:
+    from app.agent.graph import run_daily_report
+
+    result = run_daily_report(task=args.task)
+    print(result.get("report", ""))
+    pending = result.get("pending_approvals", [])
+    if pending:
+        print(f"\n{len(pending)} proposal(s) awaiting human approval:", file=sys.stderr)
+        print(json.dumps(pending, indent=2, default=str), file=sys.stderr)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="app", description="Crypto research/backtest/paper-trading system")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    data_parser = sub.add_parser("data", help="Data operations")
+    data_sub = data_parser.add_subparsers(dest="data_command", required=True)
+    ingest_parser = data_sub.add_parser("ingest", help="Backfill OHLCV via CCXT")
+    ingest_parser.add_argument("--symbol", required=True)
+    ingest_parser.add_argument("--timeframe", default="1h")
+    ingest_parser.add_argument("--since", required=True, help="YYYY-MM-DD")
+    ingest_parser.set_defaults(func=cmd_data_ingest)
+
+    backtest_parser = sub.add_parser("backtest", help="Run an event-driven backtest")
+    backtest_parser.add_argument("--strategy", default="baseline_rsi_macd")
+    backtest_parser.add_argument("--pair", required=True)
+    backtest_parser.add_argument("--from", dest="from", required=True, help="YYYY-MM-DD")
+    backtest_parser.set_defaults(func=cmd_backtest)
+
+    paper_parser = sub.add_parser("paper", help="Run the paper trading scheduler loop")
+    paper_parser.add_argument("--config", default=None, help="Path to paper.yaml")
+    paper_parser.set_defaults(func=cmd_paper)
+
+    agent_parser = sub.add_parser("agent", help="Run the LangGraph agent (advisory only)")
+    agent_parser.add_argument("--task", default="Produce the daily trading report.")
+    agent_parser.set_defaults(func=cmd_agent)
+
+    return parser
+
+
+def main() -> None:
+    from app.config import get_settings
+
+    configure_logging(get_settings().log_level)
+    parser = build_parser()
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
