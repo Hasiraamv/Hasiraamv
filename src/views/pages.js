@@ -326,8 +326,9 @@ export function termsPage(env) {
 
 <h3 class="serif" style="${H3}">Governing law</h3>
 <p style="${P}">
-  These terms are governed by the laws of India, with courts at
-  ${detail(env, 'JURISDICTION_CITY')} having jurisdiction.
+  These terms are governed by the laws of India. Courts at ${detail(env, 'JURISDICTION_CITY')} have
+  jurisdiction over disputes arising from them, without prejudice to your right as a consumer to
+  approach a consumer forum with jurisdiction over your own place of residence or work.
 </p>`,
   });
 }
