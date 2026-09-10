@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Presets for OpenAI-compatible LLM providers. QWEN_BASE_URL/QWEN_API_KEY always
@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     # --- environment / mode -------------------------------------------------
     env: str = Field(default="development")
+    trading_mode: str = Field(default="paper", description="Informational only — paper_trading_only is what's enforced.")
     paper_trading_only: bool = Field(default=True, description="Must always be True. Enforced in code, not just config.")
 
     # --- LLM (Qwen via OpenAI-compatible API) --------------------------------
@@ -41,7 +42,7 @@ class Settings(BaseSettings):
     mlflow_tracking_uri: str = Field(default="./mlruns")
 
     # --- exchange (testnet / sandbox only — never live withdrawal keys) -------
-    exchange_id: str = Field(default="binance")
+    exchange_id: str = Field(default="binance", validation_alias=AliasChoices("EXCHANGE_ID", "EXCHANGE"))
     exchange_testnet: bool = Field(default=True)
     exchange_api_key: str = Field(default="")
     exchange_api_secret: str = Field(default="")
@@ -54,7 +55,9 @@ class Settings(BaseSettings):
     max_leverage: float = Field(default=1.0, description="Hard cap. Spot only, no leverage above 1x")
     max_daily_loss_pct: float = Field(default=0.03)
     max_drawdown_pct: float = Field(default=0.15)
-    max_order_notional: float = Field(default=10_000.0)
+    max_order_notional: float = Field(
+        default=10_000.0, validation_alias=AliasChoices("MAX_ORDER_NOTIONAL", "MAX_ORDER_USD")
+    )
     price_sanity_band_pct: float = Field(default=0.10, description="Reject orders priced this far from last mark")
     kill_switch: bool = Field(default=False, description="When True, RiskEngine vetoes every order")
 
@@ -75,6 +78,13 @@ class Settings(BaseSettings):
     def _must_be_paper(cls, v: bool) -> bool:
         if not v:
             raise ValueError("paper_trading_only cannot be disabled")
+        return v
+
+    @field_validator("trading_mode")
+    @classmethod
+    def _trading_mode_must_be_paper(cls, v: str) -> str:
+        if v.lower() != "paper":
+            raise ValueError(f"trading_mode must be 'paper', got {v!r} — this system never places live orders")
         return v
 
     def llm_base_url(self) -> str:

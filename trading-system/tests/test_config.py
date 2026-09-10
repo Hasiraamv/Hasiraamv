@@ -28,3 +28,21 @@ def test_llm_base_url_prefers_explicit_qwen_base_url():
 def test_llm_base_url_falls_back_to_provider_preset():
     s = Settings(qwen_base_url="", llm_provider="ollama")
     assert "11434" in s.llm_base_url()
+
+
+def test_exchange_alias_env_var(monkeypatch):
+    monkeypatch.setenv("EXCHANGE", "coinbase")
+    s = Settings()
+    assert s.exchange_id == "coinbase"
+
+
+def test_max_order_usd_alias_env_var(monkeypatch):
+    monkeypatch.setenv("MAX_ORDER_USD", "500")
+    s = Settings()
+    assert s.max_order_notional == 500.0
+
+
+def test_trading_mode_must_be_paper(monkeypatch):
+    monkeypatch.setenv("TRADING_MODE", "live")
+    with pytest.raises(ValidationError):
+        Settings()
