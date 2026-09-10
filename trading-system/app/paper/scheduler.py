@@ -1,7 +1,14 @@
-"""Deterministic paper-trading loop: data -> signal -> risk check -> simulated
-fill -> log. Runs against the exchange testnet (via TestnetBroker) or, if no
-testnet credentials are configured, against SimulatedBroker fed by the most
-recent bars in Postgres/Parquet.
+"""Deterministic paper-trading loop: live data -> signal -> risk check ->
+simulated fill (fees + slippage) -> log. TESTNET ONLY: it either routes
+through TestnetBroker against the exchange's sandbox endpoint, or — with no
+exchange keys configured — through the pure in-memory SimulatedBroker. It
+refuses outright to build a broker against a live (non-sandbox) endpoint;
+see `_build_broker`.
+
+Every signal, risk decision (approved or rejected), and fill is written to
+the append-only decision log via `app.monitoring.logging_config.log_decision`
+— see app.risk.engine.RiskEngine.approve for the risk-check half of that
+trail, which fires on every single order regardless of outcome.
 
 The LLM is NEVER called from this loop — it is scheduled/on-demand only, via
 app.agent, and only ever proposes changes that a human or the risk engine
@@ -47,7 +54,16 @@ class PaperTradingLoop:
         self._running = False
 
     def _build_broker(self):
-        if self.settings.exchange_api_key and self.settings.exchange_testnet:
+        """TESTNET ONLY. Exchange credentials with EXCHANGE_TESTNET not set to
+        true are refused outright rather than silently downgraded to pure
+        simulation — a misconfigured .env should fail loudly, not quietly
+        run somewhere the operator didn't intend."""
+        if self.settings.exchange_api_key:
+            if not self.settings.exchange_testnet:
+                raise RuntimeError(
+                    "EXCHANGE_API_KEY is set but EXCHANGE_TESTNET is not true. Paper trading is "
+                    "testnet-only and refuses to build a broker against a live exchange endpoint."
+                )
             return TestnetBroker(
                 self.settings.exchange_id,
                 self.settings.exchange_api_key,
@@ -101,6 +117,18 @@ class PaperTradingLoop:
         if signal is None or signal.direction == SignalDirection.FLAT:
             return
 
+        log_decision(
+            kind="signal",
+            symbol=symbol,
+            outcome=signal.direction.value,
+            payload={
+                "model_name": signal.model_name,
+                "confidence": signal.confidence,
+                "predicted_return": signal.predicted_return,
+            },
+            log_dir=self.settings.log_dir,
+        )
+
         target_notional = self.equity * self.settings.max_position_pct * signal.confidence
         target_qty = target_notional / bar.close if bar.close else 0.0
         if signal.direction == SignalDirection.SHORT:
@@ -122,10 +150,20 @@ class PaperTradingLoop:
         )
 
         state = self._portfolio_state({symbol: bar.close})
+        # The only order-approval path in the codebase — see RiskEngine.approve,
+        # which itself logs a "risk_check" decision (approved or rejected)
+        # for every single order regardless of outcome.
         check = self.risk_engine.approve(order, state, reference_price=bar.close)
         if not check.approved:
             order.status = OrderStatus.REJECTED
             logger.info("order_rejected", extra={"extra_fields": {"symbol": symbol, "reasons": check.reasons}})
+            log_decision(
+                kind="order",
+                symbol=symbol,
+                outcome="rejected",
+                payload={"client_order_id": order.client_order_id, "reasons": check.reasons},
+                log_dir=self.settings.log_dir,
+            )
             return
 
         order.status = OrderStatus.ACCEPTED
@@ -138,20 +176,34 @@ class PaperTradingLoop:
             kind="order",
             symbol=symbol,
             outcome="filled",
-            payload={"client_order_id": order.client_order_id, "quantity": fill.quantity, "price": fill.price},
+            payload={
+                "client_order_id": order.client_order_id,
+                "side": side.value,
+                "quantity": fill.quantity,
+                "price": fill.price,
+                "fee": fill.fee,
+                "slippage_bps": fill.slippage_bps,
+            },
             log_dir=self.settings.log_dir,
         )
 
-    async def run_forever(self) -> None:
+    async def run_forever(self, max_iterations: int | None = None) -> None:
+        """Polls every symbol once per `poll_interval_seconds`, forever by
+        default. `max_iterations` (total polling rounds, all symbols) bounds
+        the loop for tests; production callers leave it as None."""
         self._running = True
-        while self._running:
+        count = 0
+        while self._running and (max_iterations is None or count < max_iterations):
             for symbol in self.symbols:
                 try:
                     bar = await self.fetch_latest_bar(symbol)
                     self.process_bar(symbol, bar)
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("paper_loop_error", extra={"extra_fields": {"symbol": symbol, "error": str(exc)}})
-            await asyncio.sleep(self.poll_interval_seconds)
+            count += 1
+            if self._running and (max_iterations is None or count < max_iterations):
+                await asyncio.sleep(self.poll_interval_seconds)
+        self._running = False
 
     def stop(self) -> None:
         self._running = False

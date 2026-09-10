@@ -101,6 +101,8 @@ class TestnetBroker:
     exposes or calls withdrawal/transfer methods.
     """
 
+    __test__ = False  # not a pytest test class despite the name
+
     _FORBIDDEN_METHODS = ("withdraw", "transfer", "fetch_deposit_address", "create_deposit_address")
 
     def __init__(self, exchange_id: str, api_key: str, api_secret: str, sandbox: bool = True):

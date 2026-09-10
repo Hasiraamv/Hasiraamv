@@ -64,7 +64,11 @@ python -m app data stream --symbols BTC/USDT ETH/USDT --timeframe 1m
 python -m app backtest --strategy baseline_rsi_macd --pair BTC/USDT --from 2024-01-01
 python -m app backtest --strategy lightgbm_walkforward --pair BTC/USDT --from 2024-01-01
 
-# 3. Paper trading — data -> signal -> risk check -> simulated fill -> log
+# 3. Paper trading — TESTNET ONLY. live data -> signal -> RiskEngine.approve
+#    -> simulated fill (fees + slippage) -> log. Uses TestnetBroker (exchange
+#    sandbox) if EXCHANGE_API_KEY + EXCHANGE_TESTNET=true are set, otherwise
+#    the pure in-memory SimulatedBroker; refuses to start if a key is set
+#    without EXCHANGE_TESTNET=true rather than silently falling back.
 python -m app paper --config paper.yaml
 
 # 4. Agent — Research -> Portfolio -> Risk-commentary -> Reporting, PROPOSE only
@@ -122,7 +126,12 @@ that leverage above 1x is rejected at the config layer
 REST fetch + normalization, paginated backfill with reconnect/backoff,
 WS streaming reconnect/backoff, and Postgres + Parquet persistence, all
 against mocked CCXT/ccxt.pro with no network access
-(`tests/test_data_ingest.py`).
+(`tests/test_data_ingest.py`), and the paper-trading loop — refuses to
+build a broker against a live endpoint, routes every order through
+RiskEngine.approve before it can reach the broker (verified a rejected
+order never calls `broker.execute`), fills go through fees + slippage,
+every signal/order decision is logged, and the polling loop keeps going
+after a fetch error (`tests/test_paper.py`).
 
 ## Acceptance criteria mapping
 
