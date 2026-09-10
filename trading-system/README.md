@@ -131,7 +131,15 @@ build a broker against a live endpoint, routes every order through
 RiskEngine.approve before it can reach the broker (verified a rejected
 order never calls `broker.execute`), fills go through fees + slippage,
 every signal/order decision is logged, and the polling loop keeps going
-after a fetch error (`tests/test_paper.py`).
+after a fetch error (`tests/test_paper.py`), and the agent layer — the
+tool registry matches the spec exactly and none of it can reach
+app.execution or app.risk.engine, propose_strategy only ever records a
+PENDING proposal that stays pending until a human explicitly calls
+approve_proposal (never the graph itself), the graph runs
+Research → Portfolio → Risk-commentary → Reporting in order with each
+node's own named role, and the compiled graph runs against the real
+LangGraph library end to end (`tests/test_agent.py`, LLM fully mocked —
+no network).
 
 ## Acceptance criteria mapping
 
