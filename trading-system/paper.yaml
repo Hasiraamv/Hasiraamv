@@ -1,0 +1,6 @@
+# Sample paper-trading config. Spot only, no leverage, testnet/simulator only.
+symbols:
+  - BTC/USDT
+  - ETH/USDT
+poll_interval_seconds: 60
+strategy: baseline_rsi_macd

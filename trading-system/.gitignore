@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+data/parquet/
+mlruns/
+logs/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
