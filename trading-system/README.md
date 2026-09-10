@@ -86,6 +86,59 @@ uvicorn app.api:app --reload --port 8000
 # http://localhost:8000/  and  http://localhost:8000/docs
 ```
 
+## Daily Qwen report (scheduled)
+
+`scripts/daily_report.sh` runs `python -m app agent --task "daily report"` and
+writes the output to `logs/reports/<YYYY-MM-DD>.md`, always printing the
+report path (even on failure, so cron/systemd logs point straight at the
+detail) and exiting non-zero if the agent call failed — same propose-only
+agent as above, nothing here places an order or changes config.
+
+```bash
+chmod +x scripts/daily_report.sh
+./scripts/daily_report.sh   # run once by hand first to confirm QWEN_* env vars are set
+```
+
+**cron** (runs at 07:00 UTC daily; add via `crontab -e`):
+```
+0 7 * * * /absolute/path/to/trading-system/scripts/daily_report.sh >> /absolute/path/to/trading-system/logs/cron.log 2>&1
+```
+
+**systemd timer** (alternative to cron — put these in `/etc/systemd/system/`):
+```ini
+# daily-qwen-report.service
+[Unit]
+Description=Qwen daily trading report
+
+[Service]
+Type=oneshot
+WorkingDirectory=/absolute/path/to/trading-system
+ExecStart=/absolute/path/to/trading-system/scripts/daily_report.sh
+```
+```ini
+# daily-qwen-report.timer
+[Unit]
+Description=Run the Qwen daily report every day at 07:00 UTC
+
+[Timer]
+OnCalendar=*-*-* 07:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+```bash
+sudo systemctl enable --now daily-qwen-report.timer
+systemctl list-timers daily-qwen-report.timer   # confirm it's scheduled
+journalctl -u daily-qwen-report.service          # check a run's output
+```
+
+Either way, make sure `QWEN_BASE_URL`/`QWEN_API_KEY`/`QWEN_MODEL` are set in
+the environment the scheduler runs under (cron and systemd don't source your
+shell's `.bashrc` — put them in `.env` in this directory, which
+`app.config.Settings` loads automatically, or in the systemd unit's
+`Environment=`/`EnvironmentFile=`).
+
 ## LLM provider (Qwen, OpenAI-compatible)
 
 Set `QWEN_BASE_URL`, `QWEN_API_KEY`, `QWEN_MODEL` directly, or set
