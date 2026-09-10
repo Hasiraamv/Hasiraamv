@@ -55,8 +55,14 @@ python -m app data ingest --symbol BTC/USDT --kind funding --since 2024-01-01
 #     independent reconnect + backoff
 python -m app data stream --symbols BTC/USDT ETH/USDT --timeframe 1m
 
-# 2. Backtest — event-driven, every simulated order passes through RiskEngine
+# 2. Backtest — event-driven (fees, slippage, funding), every simulated order
+#    passes through RiskEngine. --strategy is baseline_rsi_macd (no deps) or
+#    lightgbm_walkforward (retrains on a schedule using only past data, wired
+#    through app.signals.lgbm_strategy.LGBMWalkForwardSignalGenerator; needs
+#    the [ml] extra). Funding rates previously ingested via `data ingest
+#    --kind funding` are merged onto the bars automatically if present.
 python -m app backtest --strategy baseline_rsi_macd --pair BTC/USDT --from 2024-01-01
+python -m app backtest --strategy lightgbm_walkforward --pair BTC/USDT --from 2024-01-01
 
 # 3. Paper trading — data -> signal -> risk check -> simulated fill -> log
 python -m app paper --config paper.yaml
@@ -101,8 +107,13 @@ pytest
 ```
 
 Covers: risk engine rejects an oversized/over-leveraged/kill-switched
-order (`tests/test_risk.py`), backtest sanity on synthetic data
-(`tests/test_backtest.py`), LLM client tool-calling and strict-JSON
+order (`tests/test_risk.py`), backtest sanity on synthetic data including
+that funding accrues on every bar a position is held — not just bars
+with a fill — and that a tight order-notional cap actually vetoes fills
+end to end (`tests/test_backtest.py`), the LightGBM walk-forward strategy
+— never trains on future data, retrains on schedule, and runs end to end
+through the backtest engine (`tests/test_signals_lgbm.py`, needs the
+`[ml]` extra — skipped otherwise), LLM client tool-calling and strict-JSON
 fallback (`tests/test_llm_client.py`), settings validation, including
 that leverage above 1x is rejected at the config layer
 (`tests/test_config.py`), and the data layer — OHLCV/trades/funding
@@ -116,7 +127,7 @@ against mocked CCXT/ccxt.pro with no network access
 | Criterion | How |
 | --- | --- |
 | Ingest 1 year BTC/USDT OHLCV | `python -m app data ingest --symbol BTC/USDT --kind ohlcv --timeframe 1h --since <1y ago>` |
-| Run backtest end to end | `python -m app backtest --strategy baseline_rsi_macd --pair BTC/USDT --from <date>` |
+| Run backtest end to end | `python -m app backtest --strategy lightgbm_walkforward --pair BTC/USDT --from <date>` (or `baseline_rsi_macd`) |
 | Start paper trading on testnet | `python -m app paper --config paper.yaml` with `EXCHANGE_TESTNET=true` and sandbox `EXCHANGE_API_KEY`/`EXCHANGE_API_SECRET` set |
 | Risk engine blocks an oversized order | `tests/test_risk.py::test_oversized_order_rejected` |
 | Agent produces a daily report using Qwen | `python -m app agent --task "daily report"` (requires `QWEN_*` env vars) |

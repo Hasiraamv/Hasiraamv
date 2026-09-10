@@ -52,19 +52,36 @@ def cmd_data_stream(args: argparse.Namespace) -> None:
         pass
 
 
+def _merge_funding_into_bars(bars: list, funding_df) -> None:
+    """Best-effort as-of merge of previously-ingested funding rates onto bars,
+    forward-filling the most recent known rate at or before each bar's
+    timestamp. No-op if no funding data has been ingested for this pair."""
+    if funding_df is None or (hasattr(funding_df, "is_empty") and funding_df.is_empty()) or len(funding_df) == 0:
+        return
+
+    import polars as pl
+
+    bars_df = pl.DataFrame({"ts": [b.ts for b in bars]}).sort("ts")
+    funding_sorted = funding_df.select(["ts", "funding_rate"]).sort("ts")
+    merged = bars_df.join_asof(funding_sorted, on="ts", strategy="backward")
+    for bar, rate in zip(bars, merged["funding_rate"].fill_null(0.0).to_list()):
+        bar.funding_rate = float(rate or 0.0)
+
+
 def cmd_backtest(args: argparse.Namespace) -> None:
     from app.backtest.engine import BacktestEngine, Bar
     from app.config import get_settings
     from app.data.storage import ParquetStore
     from app.signals.baseline import BaselineSignalGenerator
+    from app.signals.lgbm_strategy import LGBMWalkForwardSignalGenerator
 
     settings = get_settings()
     store = ParquetStore(settings.parquet_dir)
-    df = store.read_ohlcv(settings.exchange_id, args.pair, "1h")
+    df = store.read_ohlcv(settings.exchange_id, args.pair, args.timeframe)
     if df.is_empty() if hasattr(df, "is_empty") else len(df) == 0:
         print(
             f"No cached OHLCV for {args.pair}. Run `python -m app data ingest --symbol {args.pair} "
-            f"--timeframe 1h --since {args.__dict__['from']}` first.",
+            f"--kind ohlcv --timeframe {args.timeframe} --since {args.__dict__['from']}` first.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -74,9 +91,16 @@ def cmd_backtest(args: argparse.Namespace) -> None:
         Bar(symbol=args.pair, ts=r["ts"], open=r["open"], high=r["high"], low=r["low"], close=r["close"], volume=r["volume"])
         for r in rows
     ]
+    _merge_funding_into_bars(bars, store.read_funding(settings.exchange_id, args.pair))
 
-    strategies = {"baseline_rsi_macd": BaselineSignalGenerator()}
-    strategy = strategies.get(args.strategy, strategies["baseline_rsi_macd"])
+    strategies = {
+        "baseline_rsi_macd": BaselineSignalGenerator(),
+        "lightgbm_walkforward": LGBMWalkForwardSignalGenerator(),
+    }
+    if args.strategy not in strategies:
+        print(f"Unknown strategy {args.strategy!r}. Choices: {list(strategies)}", file=sys.stderr)
+        sys.exit(1)
+    strategy = strategies[args.strategy]
 
     engine = BacktestEngine()
     result = engine.run({args.pair: bars}, strategy)
@@ -147,9 +171,12 @@ def build_parser() -> argparse.ArgumentParser:
     stream_parser.add_argument("--timeframe", default="1h")
     stream_parser.set_defaults(func=cmd_data_stream)
 
-    backtest_parser = sub.add_parser("backtest", help="Run an event-driven backtest")
-    backtest_parser.add_argument("--strategy", default="baseline_rsi_macd")
+    backtest_parser = sub.add_parser("backtest", help="Run an event-driven backtest (fees, slippage, funding)")
+    backtest_parser.add_argument(
+        "--strategy", choices=["baseline_rsi_macd", "lightgbm_walkforward"], default="baseline_rsi_macd"
+    )
     backtest_parser.add_argument("--pair", required=True)
+    backtest_parser.add_argument("--timeframe", default="1h")
     backtest_parser.add_argument("--from", dest="from", required=True, help="YYYY-MM-DD")
     backtest_parser.set_defaults(func=cmd_backtest)
 

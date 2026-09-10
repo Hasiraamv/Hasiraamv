@@ -1,8 +1,11 @@
 import math
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from app.backtest.engine import BacktestEngine, Bar
 from app.config import Settings
+from app.models.trading import Signal, SignalDirection
 from app.signals.baseline import BaselineSignalGenerator
 
 
@@ -69,3 +72,56 @@ def test_backtest_routes_every_order_through_risk_engine_and_can_reject():
     assert tight_result.rejected_orders > 0
     # equity is untouched when every order is vetoed (no fills, no fees)
     assert tight_result.equity_curve[-1] == tight_result.equity_curve[0] == 100_000.0
+
+
+def test_funding_accrues_every_bar_a_position_is_held_not_just_on_fill_bars():
+    """A held position accrues funding on every bar until closed, not only on
+    the bar where a fill happened — funding is charged per settlement period
+    regardless of trading activity."""
+    start = datetime(2024, 1, 1, tzinfo=UTC)
+    n_bars = 6
+    funding_rate = 0.001
+
+    def make_bars(rate: float) -> list[Bar]:
+        return [
+            Bar(
+                symbol="BTC/USDT",
+                ts=start + timedelta(hours=i),
+                open=100.0,
+                high=100.0,
+                low=100.0,
+                close=100.0,
+                volume=1_000.0,
+                funding_rate=rate,
+            )
+            for i in range(n_bars)
+        ]
+
+    calls = {"n": 0}
+
+    def enter_once_then_hold(symbol: str, window: list[Bar]):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return Signal(
+                symbol=symbol, ts=window[-1].ts, direction=SignalDirection.LONG, confidence=1.0, model_name="test"
+            )
+        return None  # hold — never trades again
+
+    settings = Settings(max_position_pct=1.0, max_leverage=1.0, max_order_notional=1_000_000.0)
+
+    no_funding = BacktestEngine(settings=settings, starting_equity=100_000.0).run(
+        {"BTC/USDT": make_bars(0.0)}, enter_once_then_hold, lookback=1
+    )
+    calls["n"] = 0
+    with_funding = BacktestEngine(settings=settings, starting_equity=100_000.0).run(
+        {"BTC/USDT": make_bars(funding_rate)}, enter_once_then_hold, lookback=1
+    )
+
+    # entry: full equity -> 1000 units @ 100.0, held unchanged for the rest of the run
+    qty = 1000.0
+    single_bar_funding = qty * 100.0 * funding_rate  # = 100.0
+
+    diff = no_funding.equity_curve[-1] - with_funding.equity_curve[-1]
+    # position is open (and thus accruing funding) for bars 1..n_bars-1 = 5 bars,
+    # not just the single entry bar
+    assert diff == pytest.approx(single_bar_funding * (n_bars - 1), rel=1e-9)

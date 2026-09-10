@@ -90,6 +90,12 @@ class BacktestEngine:
                     current_day = bar.ts.date().toordinal()
                     daily_start_equity = equity
 
+                # Funding accrues on the position held INTO this bar, every bar,
+                # independent of whether a trade happens on it — not just on
+                # bars where a fill occurs.
+                if bar.funding_rate and positions[symbol]:
+                    equity -= positions[symbol] * bar.close * bar.funding_rate
+
                 window = bars_by_symbol[symbol][max(0, i - lookback + 1) : i + 1]
                 if len(window) < min(lookback, 2):
                     continue
@@ -153,10 +159,6 @@ class BacktestEngine:
 
                 positions[symbol] = new_qty
                 equity -= fill.fee
-
-                # funding cost/credit for perpetual-style symbols, if provided
-                if bar.funding_rate:
-                    equity -= positions[symbol] * bar.close * bar.funding_rate
 
             peak_equity = max(peak_equity, equity)
             equity_curve.append(equity)
