@@ -27,8 +27,29 @@ def cmd_data_ingest(args: argparse.Namespace) -> None:
 
     ingestor = CCXTIngestor()
     since_ms = _date_to_ms(args.since)
-    written = ingestor.backfill_ohlcv(args.symbol, args.timeframe, since_ms)
-    print(json.dumps({"symbol": args.symbol, "timeframe": args.timeframe, "bars_written": written}))
+
+    if args.kind == "ohlcv":
+        written = ingestor.backfill_ohlcv(args.symbol, args.timeframe, since_ms)
+        print(json.dumps({"symbol": args.symbol, "timeframe": args.timeframe, "kind": "ohlcv", "rows_written": written}))
+    elif args.kind == "trades":
+        written = ingestor.backfill_trades(args.symbol, since_ms)
+        print(json.dumps({"symbol": args.symbol, "kind": "trades", "rows_written": written}))
+    elif args.kind == "funding":
+        written = ingestor.backfill_funding(args.symbol, since_ms)
+        print(json.dumps({"symbol": args.symbol, "kind": "funding", "rows_written": written}))
+
+
+def cmd_data_stream(args: argparse.Namespace) -> None:
+    import asyncio
+
+    from app.data.ingest import CCXTIngestor
+
+    ingestor = CCXTIngestor()
+    print(f"Streaming OHLCV+trades (WS) and funding/OI (REST poll) for {args.symbols or ingestor.settings.symbols}. Ctrl-C to stop.")
+    try:
+        asyncio.run(ingestor.run_universe(symbols=args.symbols, timeframe=args.timeframe))
+    except KeyboardInterrupt:
+        pass
 
 
 def cmd_backtest(args: argparse.Namespace) -> None:
@@ -114,11 +135,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     data_parser = sub.add_parser("data", help="Data operations")
     data_sub = data_parser.add_subparsers(dest="data_command", required=True)
-    ingest_parser = data_sub.add_parser("ingest", help="Backfill OHLCV via CCXT")
+    ingest_parser = data_sub.add_parser("ingest", help="Backfill OHLCV/trades/funding via CCXT REST")
     ingest_parser.add_argument("--symbol", required=True)
-    ingest_parser.add_argument("--timeframe", default="1h")
+    ingest_parser.add_argument("--kind", choices=["ohlcv", "trades", "funding"], default="ohlcv")
+    ingest_parser.add_argument("--timeframe", default="1h", help="Only used for --kind ohlcv")
     ingest_parser.add_argument("--since", required=True, help="YYYY-MM-DD")
     ingest_parser.set_defaults(func=cmd_data_ingest)
+
+    stream_parser = data_sub.add_parser("stream", help="Run WS streaming + funding/OI polling for the symbol universe")
+    stream_parser.add_argument("--symbols", nargs="*", default=None, help="Defaults to settings.symbols")
+    stream_parser.add_argument("--timeframe", default="1h")
+    stream_parser.set_defaults(func=cmd_data_stream)
 
     backtest_parser = sub.add_parser("backtest", help="Run an event-driven backtest")
     backtest_parser.add_argument("--strategy", default="baseline_rsi_macd")

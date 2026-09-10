@@ -45,8 +45,15 @@ docker compose up -d postgres redis
 ## Commands
 
 ```bash
-# 1. Ingest OHLCV (CCXT REST, reconnect + backoff, writes Postgres + Parquet)
-python -m app data ingest --symbol BTC/USDT --timeframe 1h --since 2024-01-01
+# 1. Ingest OHLCV/trades/funding history (CCXT REST, reconnect + backoff, writes Postgres + Parquet)
+python -m app data ingest --symbol BTC/USDT --kind ohlcv --timeframe 1h --since 2024-01-01
+python -m app data ingest --symbol BTC/USDT --kind trades --since 2024-01-01
+python -m app data ingest --symbol BTC/USDT --kind funding --since 2024-01-01
+
+# 1b. Stream OHLCV + trades over WS (ccxt.pro) and poll funding/open-interest over
+#     REST for the whole symbol universe (BTC/USDT, ETH/USDT by default), each with
+#     independent reconnect + backoff
+python -m app data stream --symbols BTC/USDT ETH/USDT --timeframe 1m
 
 # 2. Backtest — event-driven, every simulated order passes through RiskEngine
 python -m app backtest --strategy baseline_rsi_macd --pair BTC/USDT --from 2024-01-01
@@ -96,15 +103,19 @@ pytest
 Covers: risk engine rejects an oversized/over-leveraged/kill-switched
 order (`tests/test_risk.py`), backtest sanity on synthetic data
 (`tests/test_backtest.py`), LLM client tool-calling and strict-JSON
-fallback (`tests/test_llm_client.py`), and settings validation, including
+fallback (`tests/test_llm_client.py`), settings validation, including
 that leverage above 1x is rejected at the config layer
-(`tests/test_config.py`).
+(`tests/test_config.py`), and the data layer — OHLCV/trades/funding
+REST fetch + normalization, paginated backfill with reconnect/backoff,
+WS streaming reconnect/backoff, and Postgres + Parquet persistence, all
+against mocked CCXT/ccxt.pro with no network access
+(`tests/test_data_ingest.py`).
 
 ## Acceptance criteria mapping
 
 | Criterion | How |
 | --- | --- |
-| Ingest 1 year BTC/USDT OHLCV | `python -m app data ingest --symbol BTC/USDT --timeframe 1h --since <1y ago>` |
+| Ingest 1 year BTC/USDT OHLCV | `python -m app data ingest --symbol BTC/USDT --kind ohlcv --timeframe 1h --since <1y ago>` |
 | Run backtest end to end | `python -m app backtest --strategy baseline_rsi_macd --pair BTC/USDT --from <date>` |
 | Start paper trading on testnet | `python -m app paper --config paper.yaml` with `EXCHANGE_TESTNET=true` and sandbox `EXCHANGE_API_KEY`/`EXCHANGE_API_SECRET` set |
 | Risk engine blocks an oversized order | `tests/test_risk.py::test_oversized_order_rejected` |
