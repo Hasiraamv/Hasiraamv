@@ -71,6 +71,9 @@ async function route(request, env, ctx) {
     });
   }
 
+  if (path === '/robots.txt') return robotsRoute(env);
+  if (path === '/sitemap.xml') return sitemapRoute(env);
+
   if (method === 'POST' && !sameOrigin(request)) {
     return new Response('Bad origin', { status: 403 });
   }
@@ -244,6 +247,7 @@ async function homeRoute(request, env, cart, user) {
       env,
       user,
       cartCount: cart.length,
+      canonicalPath: '/',
       description:
         'Authenticated imports. Every verified seller compared, every piece checked twice, delivery windows shown upfront.',
       body: homePage({ categories, newArrivals, regions, stats, env }),
@@ -301,6 +305,7 @@ async function categoryRoute(request, env, url, slug, cart, user) {
       env,
       user,
       cartCount: cart.length,
+      canonicalPath: `/c/${slug}`,
       body: categoryPage({ category, products, filters: f, total: products.length }),
     })
   );
@@ -354,6 +359,7 @@ async function productRoute(request, env, url, slug, cart, user) {
       env,
       user,
       cartCount: cart.length,
+      canonicalPath: `/p/${product.slug}`,
       body: productPage({
         product,
         offers,
@@ -688,6 +694,56 @@ async function sourcingSubmit(request, env) {
 }
 
 // Simple content pages ------------------------------------------------------
+
+function siteOrigin(env) {
+  return (env.SITE_URL || '').replace(/\/+$/, '');
+}
+
+function robotsRoute(env) {
+  const origin = siteOrigin(env);
+  const body = [
+    'User-agent: *',
+    'Allow: /',
+    'Disallow: /admin',
+    'Disallow: /account',
+    'Disallow: /cart',
+    'Disallow: /checkout',
+    origin ? `Sitemap: ${origin}/sitemap.xml` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+  return new Response(body + '\n', {
+    headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=3600' },
+  });
+}
+
+async function sitemapRoute(env) {
+  const origin = siteOrigin(env);
+  const staticPaths = ['/', ...Object.keys(STATIC_PAGES)];
+
+  const [categories, productRows] = await Promise.all([
+    db.getCategories(env.DB),
+    env.DB.prepare('SELECT slug FROM products WHERE is_published = 1').all(),
+  ]);
+
+  const urls = [
+    ...staticPaths.map((p) => ({ loc: p, priority: p === '/' ? '1.0' : '0.5' })),
+    ...categories.map((c) => ({ loc: `/c/${c.slug}`, priority: '0.7' })),
+    ...(productRows.results || []).map((p) => ({ loc: `/p/${p.slug}`, priority: '0.8' })),
+  ];
+
+  const body = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls
+    .map((u) => `  <url><loc>${escapeHtml(origin + u.loc)}</loc><priority>${u.priority}</priority></url>`)
+    .join('\n')}
+</urlset>
+`;
+
+  return new Response(body, {
+    headers: { 'content-type': 'application/xml; charset=utf-8', 'cache-control': 'public, max-age=3600' },
+  });
+}
 
 const STATIC_PAGES = {
   '/authentication': { title: 'Authentication', body: (env) => authenticationPage(env) },

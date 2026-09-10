@@ -648,7 +648,7 @@ export function layout({ title, description, body, env, cartCount = 0, activeNav
 <meta name="description" content="${escapeHtml(
     description || 'Authenticated imports. Every seller compared, every piece checked twice.'
   )}">
-<link rel="preconnect" href="https://fonts.googleapis.com">
+${canonicalPath && env?.SITE_URL ? `<link rel="canonical" href="${escapeHtml(env.SITE_URL.replace(/\/+$/, '') + canonicalPath)}">\n` : ''}<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="${FONTS}">
 <link rel="stylesheet" href="/styles.css">
