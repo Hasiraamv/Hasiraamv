@@ -62,6 +62,17 @@ async function route(request, env, ctx) {
     });
   }
 
+  if (path === '/robots.txt') {
+    const site = env?.SITE_URL || 'https://rarehaus.in';
+    return new Response(`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /cart\nDisallow: /checkout\nDisallow: /account\n\nSitemap: ${site}/sitemap.xml\n`, {
+      headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=86400' },
+    });
+  }
+
+  if (path === '/sitemap.xml') {
+    return sitemapRoute(env);
+  }
+
   if (path === '/styles.css') {
     return new Response(STYLES, {
       headers: {
@@ -197,6 +208,36 @@ async function clerkWebhook(request, env, ctx) {
 }
 
 // Routes ---------------------------------------------------------------------
+
+// Lists every crawlable URL for search engines: the static pages, every category, and every
+// published product. Regenerated on each request rather than cached, so a newly listed piece
+// is discoverable immediately rather than waiting on a stale cache.
+async function sitemapRoute(env) {
+  const site = env?.SITE_URL || 'https://rarehaus.in';
+  const staticPaths = [
+    '/', '/c/all', '/about', '/authentication', '/shipping', '/returns',
+    '/terms', '/privacy', '/cookies', '/sell', '/contact', '/track', '/verify',
+  ];
+
+  const [categories, { results: products }] = await Promise.all([
+    db.getCategories(env.DB),
+    env.DB.prepare("SELECT slug FROM products WHERE is_published = 1").all(),
+  ]);
+
+  const urls = [
+    ...staticPaths.map((p) => `${site}${p}`),
+    ...categories.map((c) => `${site}/c/${c.slug}`),
+    ...(products || []).map((p) => `${site}/p/${p.slug}`),
+  ];
+
+  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
+    .map((u) => `  <url><loc>${escapeHtml(u)}</loc></url>`)
+    .join('\n')}\n</urlset>\n`;
+
+  return new Response(body, {
+    headers: { 'content-type': 'application/xml; charset=utf-8', 'cache-control': 'public, max-age=3600' },
+  });
+}
 
 async function homeRoute(request, env, cart, user) {
   const [categories, newArrivals, regions, stats] = await Promise.all([
