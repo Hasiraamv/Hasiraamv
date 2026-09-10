@@ -27,15 +27,16 @@ def cmd_data_ingest(args: argparse.Namespace) -> None:
 
     ingestor = CCXTIngestor()
     since_ms = _date_to_ms(args.since)
+    until_ms = _date_to_ms(args.to) if args.to else None
 
     if args.kind == "ohlcv":
-        written = ingestor.backfill_ohlcv(args.symbol, args.timeframe, since_ms)
+        written = ingestor.backfill_ohlcv(args.symbol, args.timeframe, since_ms, until_ms=until_ms)
         print(json.dumps({"symbol": args.symbol, "timeframe": args.timeframe, "kind": "ohlcv", "rows_written": written}))
     elif args.kind == "trades":
-        written = ingestor.backfill_trades(args.symbol, since_ms)
+        written = ingestor.backfill_trades(args.symbol, since_ms, until_ms=until_ms)
         print(json.dumps({"symbol": args.symbol, "kind": "trades", "rows_written": written}))
     elif args.kind == "funding":
-        written = ingestor.backfill_funding(args.symbol, since_ms)
+        written = ingestor.backfill_funding(args.symbol, since_ms, until_ms=until_ms)
         print(json.dumps({"symbol": args.symbol, "kind": "funding", "rows_written": written}))
 
 
@@ -96,6 +97,7 @@ def cmd_backtest(args: argparse.Namespace) -> None:
     strategies = {
         "baseline_rsi_macd": BaselineSignalGenerator(),
         "lightgbm_walkforward": LGBMWalkForwardSignalGenerator(),
+        "lgbm_baseline": LGBMWalkForwardSignalGenerator(),  # alias
     }
     if args.strategy not in strategies:
         print(f"Unknown strategy {args.strategy!r}. Choices: {list(strategies)}", file=sys.stderr)
@@ -126,6 +128,7 @@ def cmd_paper(args: argparse.Namespace) -> None:
     from app.config import get_settings
     from app.paper.scheduler import PaperTradingLoop
     from app.signals.baseline import BaselineSignalGenerator
+    from app.signals.lgbm_strategy import LGBMWalkForwardSignalGenerator
 
     config = {}
     if args.config:
@@ -134,8 +137,26 @@ def cmd_paper(args: argparse.Namespace) -> None:
 
     settings = get_settings()
     symbols = config.get("symbols", settings.symbols)
-    loop = PaperTradingLoop(symbols=symbols, strategy=BaselineSignalGenerator())
-    print(f"Starting paper trading loop for {symbols}. PAPER TRADING ONLY. Ctrl-C to stop.")
+    poll_interval_seconds = config.get("poll_interval_seconds", 60.0)
+
+    strategies = {
+        "baseline_rsi_macd": lambda: BaselineSignalGenerator(),
+        "lightgbm_walkforward": lambda: LGBMWalkForwardSignalGenerator(),
+        "lgbm_baseline": lambda: LGBMWalkForwardSignalGenerator(),
+    }
+    strategy_name = config.get("strategy", "baseline_rsi_macd")
+    if strategy_name not in strategies:
+        print(f"Unknown strategy {strategy_name!r} in {args.config}. Choices: {list(strategies)}", file=sys.stderr)
+        sys.exit(1)
+    strategy = strategies[strategy_name]()
+
+    loop = PaperTradingLoop(
+        symbols=symbols, strategy=strategy, settings=settings, poll_interval_seconds=poll_interval_seconds
+    )
+    print(
+        f"Starting paper trading loop for {symbols} (strategy={strategy_name}, "
+        f"poll_interval_seconds={poll_interval_seconds}). PAPER TRADING ONLY. Ctrl-C to stop."
+    )
     try:
         asyncio.run(loop.run_forever())
     except KeyboardInterrupt:
@@ -160,10 +181,11 @@ def build_parser() -> argparse.ArgumentParser:
     data_parser = sub.add_parser("data", help="Data operations")
     data_sub = data_parser.add_subparsers(dest="data_command", required=True)
     ingest_parser = data_sub.add_parser("ingest", help="Backfill OHLCV/trades/funding via CCXT REST")
-    ingest_parser.add_argument("--symbol", required=True)
+    ingest_parser.add_argument("--symbol", "--pair", dest="symbol", required=True)
     ingest_parser.add_argument("--kind", choices=["ohlcv", "trades", "funding"], default="ohlcv")
     ingest_parser.add_argument("--timeframe", default="1h", help="Only used for --kind ohlcv")
-    ingest_parser.add_argument("--since", required=True, help="YYYY-MM-DD")
+    ingest_parser.add_argument("--since", "--from", dest="since", required=True, help="YYYY-MM-DD")
+    ingest_parser.add_argument("--to", dest="to", default=None, help="YYYY-MM-DD, defaults to now")
     ingest_parser.set_defaults(func=cmd_data_ingest)
 
     stream_parser = data_sub.add_parser("stream", help="Run WS streaming + funding/OI polling for the symbol universe")
@@ -173,7 +195,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     backtest_parser = sub.add_parser("backtest", help="Run an event-driven backtest (fees, slippage, funding)")
     backtest_parser.add_argument(
-        "--strategy", choices=["baseline_rsi_macd", "lightgbm_walkforward"], default="baseline_rsi_macd"
+        "--strategy",
+        choices=["baseline_rsi_macd", "lightgbm_walkforward", "lgbm_baseline"],
+        default="baseline_rsi_macd",
     )
     backtest_parser.add_argument("--pair", required=True)
     backtest_parser.add_argument("--timeframe", default="1h")

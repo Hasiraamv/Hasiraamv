@@ -116,6 +116,34 @@ def test_backfill_ohlcv_persists_to_parquet_and_sqlite(tmp_path):
     assert bars[0].symbol == "BTC/USDT"
 
 
+def test_backfill_ohlcv_enforces_until_ms_even_when_exchange_ignores_it(tmp_path):
+    """Some exchanges (Kraken's OHLC endpoint included) ignore any upper bound
+    and just return up to `limit` bars forward from `since` — until_ms must be
+    enforced on the returned rows, not just used to decide whether to keep
+    paginating, or a bounded range silently ingests everything up to 'now'."""
+    settings = _settings(tmp_path)
+    ingestor = CCXTIngestor(settings=settings)
+    fake_exchange = MagicMock()
+    # a single page spanning far beyond the requested until_ms
+    fake_exchange.fetch_ohlcv.return_value = [
+        _ohlcv_row(1_700_000_000_000),  # in range
+        _ohlcv_row(1_700_086_400_000),  # in range (1 day later)
+        _ohlcv_row(1_700_172_800_000),  # OUT of range (2 days later)
+        _ohlcv_row(1_700_259_200_000),  # OUT of range (3 days later)
+    ]
+    ingestor._exchange = fake_exchange
+
+    until_ms = 1_700_100_000_000  # cuts off between the 2nd and 3rd row
+    written = ingestor.backfill_ohlcv("BTC/USDT", "1h", since_ms=1_700_000_000_000, until_ms=until_ms)
+
+    assert written == 2  # only the two in-range rows were persisted
+
+    store = ParquetStore(settings.parquet_dir)
+    df = store.read_ohlcv("binance", "BTC/USDT", "1h")
+    assert len(df) == 2
+    assert df["ts"].max().timestamp() * 1000 <= until_ms
+
+
 # =========================================================================
 # Trades
 # =========================================================================

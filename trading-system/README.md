@@ -45,10 +45,15 @@ docker compose up -d postgres redis
 ## Commands
 
 ```bash
-# 1. Ingest OHLCV/trades/funding history (CCXT REST, reconnect + backoff, writes Postgres + Parquet)
-python -m app data ingest --symbol BTC/USDT --kind ohlcv --timeframe 1h --since 2024-01-01
-python -m app data ingest --symbol BTC/USDT --kind trades --since 2024-01-01
-python -m app data ingest --symbol BTC/USDT --kind funding --since 2024-01-01
+# 0. Infra (Postgres/Timescale + Redis)
+docker compose up -d postgres redis
+
+# 1. Ingest OHLCV/trades/funding history (CCXT REST, reconnect + backoff, writes
+#    Postgres + Parquet). --pair/--from/--to are accepted as aliases for
+#    --symbol/--since/--to (an explicit end date, defaults to now).
+python -m app data ingest --pair BTC/USDT --kind ohlcv --timeframe 1h --from 2024-01-01 --to 2025-01-01
+python -m app data ingest --pair BTC/USDT --kind trades --from 2024-01-01
+python -m app data ingest --pair BTC/USDT --kind funding --from 2024-01-01
 
 # 1b. Stream OHLCV + trades over WS (ccxt.pro) and poll funding/open-interest over
 #     REST for the whole symbol universe (BTC/USDT, ETH/USDT by default), each with
@@ -57,25 +62,27 @@ python -m app data stream --symbols BTC/USDT ETH/USDT --timeframe 1m
 
 # 2. Backtest — event-driven (fees, slippage, funding), every simulated order
 #    passes through RiskEngine. --strategy is baseline_rsi_macd (no deps) or
-#    lightgbm_walkforward (retrains on a schedule using only past data, wired
-#    through app.signals.lgbm_strategy.LGBMWalkForwardSignalGenerator; needs
-#    the [ml] extra). Funding rates previously ingested via `data ingest
-#    --kind funding` are merged onto the bars automatically if present.
+#    lightgbm_walkforward / lgbm_baseline (same strategy, either name — retrains
+#    on a schedule using only past data, via
+#    app.signals.lgbm_strategy.LGBMWalkForwardSignalGenerator; needs the [ml]
+#    extra). Funding rates previously ingested via `data ingest --kind funding`
+#    are merged onto the bars automatically if present.
 python -m app backtest --strategy baseline_rsi_macd --pair BTC/USDT --from 2024-01-01
-python -m app backtest --strategy lightgbm_walkforward --pair BTC/USDT --from 2024-01-01
+python -m app backtest --strategy lgbm_baseline --pair BTC/USDT --from 2024-01-01
 
 # 3. Paper trading — TESTNET ONLY. live data -> signal -> RiskEngine.approve
 #    -> simulated fill (fees + slippage) -> log. Uses TestnetBroker (exchange
 #    sandbox) if EXCHANGE_API_KEY + EXCHANGE_TESTNET=true are set, otherwise
 #    the pure in-memory SimulatedBroker; refuses to start if a key is set
 #    without EXCHANGE_TESTNET=true rather than silently falling back.
+#    paper.yaml's symbols/strategy/poll_interval_seconds are all honored.
 python -m app paper --config paper.yaml
 
 # 4. Agent — Research -> Portfolio -> Risk-commentary -> Reporting, PROPOSE only
 python -m app agent --task "daily report"
 
-# API + minimal dashboard
-uvicorn app.api.main:app --reload
+# 5. API + minimal dashboard (app.api:app and app.api.main:app both resolve)
+uvicorn app.api:app --reload --port 8000
 # http://localhost:8000/  and  http://localhost:8000/docs
 ```
 

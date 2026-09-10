@@ -305,8 +305,9 @@ class CCXTIngestor:
         cursor = since_ms
         total_written = 0
         backoff = 1.0
+        reached_until = False
 
-        while cursor < until_ms:
+        while cursor < until_ms and not reached_until:
             try:
                 rows = fetch_batch(cursor)
                 backoff = 1.0
@@ -322,13 +323,22 @@ class CCXTIngestor:
             if not rows:
                 break
 
-            persist(rows)
-            total_written += len(rows)
+            # Some exchanges (e.g. Kraken's OHLC endpoint) ignore any notion of
+            # an upper bound and just return up to `limit` bars forward from
+            # `since` — so `until_ms` must be enforced here on the data itself,
+            # not just used to decide whether to keep paginating.
+            next_cursor_ts_ms = int(rows[-1]["ts"].timestamp() * 1000)
+            in_range_rows = [r for r in rows if int(r["ts"].timestamp() * 1000) <= until_ms]
+            if len(in_range_rows) < len(rows):
+                reached_until = True
 
-            last_ts_ms = int(rows[-1]["ts"].timestamp() * 1000)
-            if last_ts_ms <= cursor:
+            if in_range_rows:
+                persist(in_range_rows)
+                total_written += len(in_range_rows)
+
+            if next_cursor_ts_ms <= cursor:
                 break
-            cursor = last_ts_ms + 1
+            cursor = next_cursor_ts_ms + 1
 
         return total_written
 
