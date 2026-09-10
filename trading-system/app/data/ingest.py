@@ -42,6 +42,10 @@ class CCXTIngestor:
                     "apiKey": self.settings.exchange_api_key,
                     "secret": self.settings.exchange_api_secret,
                     "enableRateLimit": True,
+                    # Respect HTTPS_PROXY/REQUESTS_CA_BUNDLE — ccxt disables requests'
+                    # environment trust by default, which silently breaks connectivity
+                    # behind a TLS-intercepting proxy.
+                    "requests_trust_env": True,
                 }
             )
             if self.settings.exchange_testnet and hasattr(self._exchange, "set_sandbox_mode"):
@@ -337,6 +341,7 @@ class CCXTIngestor:
                 "apiKey": self.settings.exchange_api_key,
                 "secret": self.settings.exchange_api_secret,
                 "enableRateLimit": True,
+                "aiohttp_trust_env": True,  # respect HTTPS_PROXY behind a TLS-intercepting proxy
             }
         )
         if self.settings.exchange_testnet and hasattr(exchange, "set_sandbox_mode"):

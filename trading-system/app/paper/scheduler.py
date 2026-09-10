@@ -78,7 +78,7 @@ class PaperTradingLoop:
         import ccxt
 
         exchange_class = getattr(ccxt, self.settings.exchange_id)
-        exchange = exchange_class({"enableRateLimit": True})
+        exchange = exchange_class({"enableRateLimit": True, "requests_trust_env": True})
         if self.settings.exchange_testnet and hasattr(exchange, "set_sandbox_mode"):
             exchange.set_sandbox_mode(True)
         ohlcv = exchange.fetch_ohlcv(symbol, timeframe="1m", limit=1)

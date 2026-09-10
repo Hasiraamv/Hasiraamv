@@ -114,7 +114,9 @@ class TestnetBroker:
         import ccxt  # lazy import
 
         exchange_class = getattr(ccxt, exchange_id)
-        self.exchange = exchange_class({"apiKey": api_key, "secret": api_secret, "enableRateLimit": True})
+        self.exchange = exchange_class(
+            {"apiKey": api_key, "secret": api_secret, "enableRateLimit": True, "requests_trust_env": True}
+        )
         if hasattr(self.exchange, "set_sandbox_mode"):
             self.exchange.set_sandbox_mode(True)
         for forbidden in self._FORBIDDEN_METHODS:
