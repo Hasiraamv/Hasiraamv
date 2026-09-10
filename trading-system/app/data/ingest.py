@@ -332,6 +332,31 @@ class CCXTIngestor:
             if len(in_range_rows) < len(rows):
                 reached_until = True
 
+            if not in_range_rows and total_written == 0:
+                # The requested window may simply be older than this exchange's
+                # REST OHLC history depth (some exchanges, e.g. Kraken, ignore
+                # `since` entirely once it's older than their fixed lookback
+                # window and just return their most recent bars instead) —
+                # surface that clearly rather than silently reporting 0 rows.
+                earliest_available = rows[0]["ts"]
+                logger.warning(
+                    "requested_range_unreachable",
+                    extra={
+                        "extra_fields": {
+                            **log_context,
+                            "requested_since": datetime.fromtimestamp(since_ms / 1000, tz=UTC).isoformat(),
+                            "requested_until": datetime.fromtimestamp(until_ms / 1000, tz=UTC).isoformat(),
+                            "earliest_bar_returned": earliest_available.isoformat(),
+                            "hint": (
+                                "The exchange returned data starting after the requested --to date — "
+                                "likely a REST history-depth limit on this endpoint/timeframe. Try a "
+                                "coarser --timeframe (e.g. 1d instead of 1h) or a --from/--to range "
+                                "closer to now."
+                            ),
+                        }
+                    },
+                )
+
             if in_range_rows:
                 persist(in_range_rows)
                 total_written += len(in_range_rows)
