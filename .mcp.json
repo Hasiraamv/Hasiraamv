@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "bybit": {
+      "command": "npx",
+      "args": ["-y", "bybit-official-trading-server@latest"],
+      "env": {
+        "BYBIT_API_KEY": "${BYBIT_API_KEY}",
+        "BYBIT_API_SECRET": "${BYBIT_API_SECRET}",
+        "BYBIT_ENVIRONMENT": "${BYBIT_ENVIRONMENT:-mainnet}"
+      }
+    }
+  }
+}
