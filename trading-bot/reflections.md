@@ -3,13 +3,13 @@
 ### Trade manual-btc-buy-3, before entry
 
 Why am I entering this trade?
-[fill in — this was actually a mechanics test requested in chat, not a planned trade; fill in your real reasoning for future trades]
+Testing that a chat-requested order actually flows through risk approval and produces a fill — not a market view. (Future entries should replace this with a real thesis.)
 
 What evidence supports it?
-[fill in]
+None — no market data was used (price was an assumed placeholder, not live), so there's no real evidence behind this specific fill.
 
 What would prove the idea wrong?
-[fill in]
+Not applicable to a mechanics test; for a real trade, this should be the specific condition that would make you exit.
 
 Am I following the documented strategy or acting on impulse?
 No documented strategy exists yet (see `strategy.md`, status: Draft) — this and the two rejected orders were ad hoc sizing tests, not strategy-driven trades.
