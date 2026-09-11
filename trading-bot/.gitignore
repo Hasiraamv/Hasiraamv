@@ -1,6 +1,7 @@
-# Never commit credentials or local MCP config that may embed them
+# Never commit credentials or local secrets from this trading bot.
 .env
 .env.*
+secrets/
 *.key
-*.secret
-mcp-local.json
+*.pem
+mcp-credentials*
