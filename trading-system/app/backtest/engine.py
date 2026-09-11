@@ -145,7 +145,18 @@ class BacktestEngine:
                 prev_qty = positions[symbol]
                 new_qty = prev_qty + (fill.quantity if side == OrderSide.BUY else -fill.quantity)
 
-                if prev_qty != 0 and (prev_qty > 0) != (new_qty >= 0) and new_qty != prev_qty:
+                # A fill is "closing" when it moves the position toward zero
+                # (SELL against a long, or BUY against a short) — this must
+                # catch a full close to exactly flat and a partial reduction,
+                # not just a flip through zero to the opposite side. The
+                # previous check `(prev_qty > 0) != (new_qty >= 0)` treated
+                # new_qty == 0 as "same sign as prev_qty > 0" (0 >= 0 is
+                # True), so it silently skipped realizing P&L on the single
+                # most common case: closing a position exactly to flat.
+                is_closing_fill = (prev_qty > 0 and side == OrderSide.SELL) or (
+                    prev_qty < 0 and side == OrderSide.BUY
+                )
+                if is_closing_fill:
                     closed_qty = min(abs(prev_qty), abs(fill.quantity))
                     pnl = closed_qty * (fill.price - avg_entry[symbol]) * (1 if prev_qty > 0 else -1)
                     trade_pnls.append(pnl)

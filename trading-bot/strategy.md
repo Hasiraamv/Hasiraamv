@@ -39,16 +39,38 @@ invalidation state.)
 
 ## Exit and profit management
 
-Stop condition: none coded — the strategy has no explicit stop-loss; the only backstop
-is `RiskEngine`'s account-level `max_daily_loss_pct` (3%) and `max_drawdown_pct` (15%)
-circuit breakers, which halt *all* new orders, not this specific position.
-Profit condition: position is closed/reduced only when a new SHORT signal fires
-(RSI > 70, MACD hist < 0) — there's no fixed take-profit level.
-Time based exit, if any: none.
+**Updated 2026-09-11 — stop-loss/take-profit now implemented.** Added
+`app/signals/risk_managed.py`: `StopLossTakeProfitWrapper`, which wraps
+`BaselineSignalGenerator` (or any strategy) and forces an exit the moment price
+moves against the entry by `stop_loss_pct`, or in favor by `take_profit_pct`,
+independent of what the RSI/MACD signal would otherwise say that bar. 4 unit tests
+in `tests/test_risk_managed.py`, all passing.
 
-**Caveat — this strategy has no per-trade risk management.** If you want stop-loss/
-take-profit behavior, that needs to be added to `app/paper/scheduler.py` or a new
-signal generator; right now it's pure signal-flip exit.
+Stop condition: -5% from entry (`stop_loss_pct=0.05`, configurable)
+Profit condition: +10% from entry (`take_profit_pct=0.10`, configurable), otherwise
+still closes on the original signal-flip (RSI > 70, MACD hist < 0)
+Time based exit, if any: none
+
+Account-level backstops still apply on top of this: `RiskEngine`'s
+`max_daily_loss_pct` (3%) and `max_drawdown_pct` (15%) halt *all* new orders when
+breached — those are portfolio-level circuit breakers, not a substitute for this
+per-trade stop.
+
+**Known limitation:** the wrapper only checks at bar close, not intrabar — a price
+that gaps straight past the stop within one bar (e.g. a news-driven crash) will
+realize a larger loss than 5%, not get capped exactly there. This is real slippage
+risk, not a wrapper bug; confirmed in `tests/test_risk_managed.py`'s own test
+comments.
+
+**Also found and fixed a real bug while building this:** `BacktestEngine.run` in
+`app/backtest/engine.py` was silently failing to realize P&L when a position closed
+to exactly flat (only a full flip through zero to the opposite side was recognized
+as "closing"). This meant a backtested strategy that goes long and fully exits would
+show ~$0 impact on equity for that trade — invisible in the metrics — even though
+the trade actually lost or gained money. Fixed and covered by
+`test_full_backtest_integration_caps_a_losing_trade`; all 25 existing repo tests
+still pass. This was silently wrong before today, in code that predates this
+session.
 
 ## Position constraints
 
@@ -101,6 +123,12 @@ engine outputs, not evidence the strategy works or doesn't.
 **What this run actually proved:** the pipeline itself works end to end against real
 market data (fetch → signal → risk check → simulated fill → metrics), which is real
 progress. It did not validate the strategy — that needs materially more history.
+
+**Re-run with the stop-loss wrapper (same 50-day data, same day):** 2 orders
+accepted, 1 trade actually closed this time (the stop-loss forced the exit instead
+of holding forever) — pnl -$0.59, total return -0.41% over 50 days. Still a
+1-trade sample, so treat this as "the mechanism works," not "the strategy loses
+money" or "the strategy makes money." Neither claim is supportable from n=1.
 
 Forward test period: none yet — would be `python -m app paper --config paper.yaml`
 once a real backtest looks reasonable.
